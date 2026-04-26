@@ -1,0 +1,636 @@
+from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks, Request
+from sqlalchemy.orm import Session, joinedload
+from typing import List
+from datetime import datetime, timedelta
+from app import models, schemas, database
+from app.auth import get_current_user
+from app.email_service import send_booking_confirmation_email
+from app.audit_logger import log_action, get_client_ip
+from app.database import SessionLocal
+
+
+router = APIRouter(
+    prefix="/admin/reservations",
+    tags=["reservations"]
+)
+
+
+def check_overlap(db: Session, bath_id: int, start: datetime, end: datetime, exclude_id: int = None):
+    """
+    Проверяет пересечение с существующими бронями, включая время на уборку после каждой.
+    Время уборки берется из настроек (по умолчанию 30 минут).
+    Использует FOR UPDATE для предотвращения race condition.
+    """
+    # Получаем время уборки из настроек
+    cleaning_setting = db.query(models.Settings).filter(models.Settings.key == "cleaning_time_minutes").first()
+    cleaning_minutes = cleaning_setting.value if cleaning_setting else 30
+    
+    query = db.query(models.Reservation).filter(
+        models.Reservation.bath_id == bath_id,
+        models.Reservation.start_datetime < end,
+        (models.Reservation.end_datetime + timedelta(minutes=cleaning_minutes)) > start
+    ).with_for_update(skip_locked=True)  # Блокировка для предотвращения race condition
+    
+    if exclude_id:
+        query = query.filter(models.Reservation.reservation_id != exclude_id)
+    return query.first()
+
+
+@router.get("/", response_model=List[schemas.ReservationResponse])
+def get_reservations(
+    date: str = None, 
+    bath_id: int = None,
+    status: str = None,
+    db: Session = Depends(database.get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    query = db.query(models.Reservation).options(
+        joinedload(models.Reservation.status_rel),
+        joinedload(models.Reservation.reservation_products).joinedload(models.ReservationProduct.product)
+    )
+
+    if date is not None:
+        try:
+            if "T" in date:
+                target_date = datetime.fromisoformat(date.split('T')[0]).date()
+            else:
+                target_date = datetime.strptime(date, "%Y-%m-%d").date()
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD")
+
+        start_of_day = datetime.combine(target_date, datetime.min.time())
+        end_of_day = datetime.combine(target_date, datetime.max.time())
+
+        query = query.filter(
+            models.Reservation.start_datetime >= start_of_day,
+            models.Reservation.end_datetime <= end_of_day
+        )
+
+    if bath_id is not None:
+        query = query.filter(models.Reservation.bath_id == bath_id)
+    
+    if status is not None:
+        query = query.join(models.ReservationStatus).filter(models.ReservationStatus.status_name == status)
+
+    reservations = query.all()
+
+    for res in reservations:
+        # Товары — только если объект существует
+        res.products = [
+            schemas.ReservationProductResponse(
+                product_id=rp.product.id,
+                name=rp.product.name,
+                quantity=rp.quantity,
+                purchase_price=rp.product.last_purchase_price,
+                unit_id=rp.product.unit_id
+            )
+            for rp in res.reservation_products
+            if rp.product is not None
+        ]
+        
+        # Статус
+        res.status = res.status_rel.status_name if res.status_rel else "Неизвестный"
+
+    return reservations
+
+
+@router.post("/", response_model=schemas.ReservationResponse, status_code=status.HTTP_201_CREATED)
+def create_reservation(
+    reservation: schemas.ReservationCreate,
+    background_tasks: BackgroundTasks,
+    request: Request,
+    db: Session = Depends(database.get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    # 1. Проверяем, существует ли баня
+    bath = db.query(models.Bath).filter(models.Bath.bath_id == reservation.bath_id).first()
+    if not bath:
+        raise HTTPException(status_code=404, detail="Баня не найдена")
+
+    # 2. Проверяем, существует ли статус
+    status_obj = db.query(models.ReservationStatus).filter(models.ReservationStatus.id == reservation.status_id).first()
+    if not status_obj:
+        raise HTTPException(status_code=400, detail=f"Статус с ID {reservation.status_id} не найден")
+
+    # 3. Парсим даты
+    try:
+        start_dt = datetime.fromisoformat(reservation.start_datetime)
+        end_dt = datetime.fromisoformat(reservation.end_datetime)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Неверный формат даты. Используйте ISO: YYYY-MM-DDTHH:MM:SS")
+
+    if start_dt >= end_dt:
+        raise HTTPException(status_code=400, detail="Время окончания должно быть позже начала")
+
+    # 4. Проверяем пересечения
+    overlap = check_overlap(db, reservation.bath_id, start_dt, end_dt)
+    if overlap:
+        raise HTTPException(status_code=400, detail="Бронь пересекается с существующей")
+
+    # 5. Рассчитываем общую стоимость
+    total_cost = 0
+
+    # 5.1 Стоимость бани + гости
+    duration_hours = (end_dt - start_dt).total_seconds() / 3600
+    # Определяем день недели для начала бронирования (0=понедельник, 6=воскресенье)
+    weekday = start_dt.weekday()
+    # пн=0, вт=1, ср=2, чт=3 → будни; пт=4, сб=5, вс=6 → выходные
+    hourly_rate = bath.cost_weekend if weekday >= 4 else bath.cost_weekday
+    bath_base_cost = int(hourly_rate * duration_hours)
+    extra_guests = max(0, reservation.guests - bath.base_guests)
+    extra_guest_cost = extra_guests * bath.extra_guest_price
+    total_cost += bath_base_cost + extra_guest_cost
+
+    # 5.2 Стоимость товаров
+    if reservation.products:
+        product_ids = [p.product_id for p in reservation.products]
+        products = db.query(models.Product).filter(models.Product.id.in_(product_ids)).all()
+        product_map = {p.id: p for p in products}
+        for item in reservation.products:
+            product = product_map.get(item.product_id)
+            if not product:
+                raise HTTPException(status_code=400, detail=f"Товар с ID {item.product_id} не найден")
+            # Проверяем наличие, но НЕ списываем здесь!
+            if product.total_quantity < item.quantity:
+                raise HTTPException(status_code=400, detail=f"Недостаточно товара {product.name} на складе")
+            total_cost += product.last_purchase_price * item.quantity
+
+    # 6. Создаём бронь
+    db_reservation = models.Reservation(
+        bath_id=reservation.bath_id,
+        start_datetime=start_dt,
+        end_datetime=end_dt,
+        client_name=reservation.client_name,
+        client_phone=reservation.client_phone,
+        client_email=reservation.client_email,
+        notes=reservation.notes,
+        guests=reservation.guests,
+        total_cost=total_cost,
+        status_id=reservation.status_id,
+    )
+    db.add(db_reservation)
+    db.flush()
+
+    # 7. Сохраняем товары и списываем со склада (резервирование)
+    if reservation.products:
+        for item in reservation.products:
+            product = db.query(models.Product).filter(models.Product.id == item.product_id).first()
+            if not product:
+                raise HTTPException(status_code=400, detail=f"Товар с ID {item.product_id} не найден")
+            if product.total_quantity < item.quantity:
+                raise HTTPException(status_code=400, detail=f"Недостаточно товара {product.name} на складе")
+            # Списываем товар при создании брони (резервирование)
+            product.total_quantity -= item.quantity
+            db.add(models.ReservationProduct(
+                reservation_id=db_reservation.reservation_id,
+                product_id=item.product_id,
+                quantity=item.quantity
+            ))
+
+    db.commit()
+    db.refresh(db_reservation)
+
+    # === ФОРМИРУЕМ ОТВЕТ ВРУЧНУЮ ===
+    response_products = []
+    if reservation.products:
+        for item in reservation.products:
+            product = db.query(models.Product).filter(models.Product.id == item.product_id).first()
+            if product:
+                response_products.append(
+                    schemas.ReservationProductResponse(
+                        product_id=product.id,
+                        name=product.name,
+                        quantity=item.quantity,
+                        purchase_price=product.last_purchase_price,
+                        unit_id=product.unit_id
+                    )
+                )
+
+    # === ОТПРАВЛЯЕМ EMAIL ПОДТВЕРЖДЕНИЯ ===
+    if reservation.client_email:
+        try:
+            # Подготавливаем данные о товарах для email
+            products_for_email = []
+            if reservation.products:
+                for item in reservation.products:
+                    product = db.query(models.Product).filter(models.Product.id == item.product_id).first()
+                    if product:
+                        products_for_email.append({
+                            'name': product.name,
+                            'quantity': item.quantity,
+                            'purchase_price': product.last_purchase_price
+                        })
+            
+            # Отправляем email
+            send_booking_confirmation_email(
+                email=reservation.client_email,
+                client_name=reservation.client_name,
+                bath_name=bath.name,
+                start_datetime=start_dt,
+                end_datetime=end_dt,
+                guests=reservation.guests,
+                total_cost=total_cost,
+                products=products_for_email,
+                notes=reservation.notes
+            )
+        except Exception as e:
+            print(f"Ошибка при отправке email: {e}")
+            # Не прерываем создание брони, если email не отправился
+
+    # Асинхронное логирование создания бронирования
+    background_tasks.add_task(
+        log_action,
+        db=SessionLocal(),
+        user_id=current_user.user_id,
+        action="CREATE",
+        entity_type="reservation",
+        entity_id=db_reservation.reservation_id,
+        details={"client_name": reservation.client_name, "bath_id": reservation.bath_id},
+        ip_address=get_client_ip(request),
+        user_agent=request.headers.get("user-agent")
+    )
+
+    return schemas.ReservationResponse(
+        reservation_id=db_reservation.reservation_id,
+        bath_id=db_reservation.bath_id,
+        start_datetime=db_reservation.start_datetime,
+        end_datetime=db_reservation.end_datetime,
+        client_name=db_reservation.client_name,
+        client_phone=db_reservation.client_phone,
+        client_email=db_reservation.client_email,
+        notes=db_reservation.notes,
+        guests=db_reservation.guests,
+        total_cost=db_reservation.total_cost,
+        status=status_obj.status_name,
+        products=response_products,
+        # Поле `massages` отсутствует в схеме ReservationResponse (см. schemas.py)
+    )
+
+
+@router.get("/{id}", response_model=schemas.ReservationResponse)
+def get_reservation(
+    id: int,
+    db: Session = Depends(database.get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    reservation = db.query(models.Reservation)\
+        .options(
+            joinedload(models.Reservation.status_rel),
+            joinedload(models.Reservation.reservation_products).joinedload(models.ReservationProduct.product)
+        )\
+        .filter(models.Reservation.reservation_id == id)\
+        .first()
+    
+    if not reservation:
+        raise HTTPException(status_code=404, detail="Бронь не найдена")
+
+    reservation.products = [
+        schemas.ReservationProductResponse(
+            product_id=rp.product.id,
+            name=rp.product.name,
+            quantity=rp.quantity,
+            purchase_price=rp.product.last_purchase_price
+        )
+        for rp in reservation.reservation_products
+    ]
+    reservation.status = reservation.status_rel.status_name
+
+    return reservation
+
+
+@router.put("/{id}", response_model=schemas.ReservationResponse)
+def update_reservation(
+    id: int,
+    reservation: schemas.ReservationUpdate,
+    background_tasks: BackgroundTasks,
+    request: Request,
+    db: Session = Depends(database.get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    # Debug logging
+    print(f"\n=== UPDATE RESERVATION REQUEST ===")
+    print(f"Reservation ID: {id}")
+    print(f"Update data: {reservation.model_dump(exclude_unset=True)}")
+    print(f"==================================\n")
+    
+    try:
+        db_reservation = db.query(models.Reservation).filter(models.Reservation.reservation_id == id).first()
+        if not db_reservation:
+            print(f"❌ Reservation {id} not found")
+            raise HTTPException(status_code=404, detail="Бронь не найдена")
+        
+        print(f"✅ Found reservation: {db_reservation.client_name}")
+
+        # Сохраняем старые значения для сравнения
+        old_status_id = db_reservation.status_id
+        old_bath_id = db_reservation.bath_id
+        old_start_datetime = db_reservation.start_datetime
+        old_end_datetime = db_reservation.end_datetime
+        print(f"Old values: status={old_status_id}, bath={old_bath_id}")
+
+        # Обновляем основные поля (только те, что переданы)
+        update_data = reservation.model_dump(exclude_unset=True)
+        
+        # Обновляем простые поля
+        for key, value in update_data.items():
+            if key not in ['guests', 'status_id', 'products', 'start_datetime', 'end_datetime']:
+                if value is not None:
+                    setattr(db_reservation, key, value)
+                    print(f"Updated {key} = {value}")
+
+        # Обработка guests - используем переданное или оставляем текущее
+        if reservation.guests is not None:
+            db_reservation.guests = reservation.guests
+            print(f"Updated guests = {reservation.guests}")
+        current_guests = db_reservation.guests
+
+        # Обработка status_id
+        status_obj = None
+        if reservation.status_id is not None:
+            status_obj = db.query(models.ReservationStatus).filter(models.ReservationStatus.id == reservation.status_id).first()
+            if not status_obj:
+                print(f"❌ Status {reservation.status_id} not found")
+                raise HTTPException(status_code=400, detail=f"Статус с ID {reservation.status_id} не найден")
+            db_reservation.status_id = reservation.status_id
+            print(f"Updated status_id = {reservation.status_id}")
+
+        # Проверяем, изменился ли статус на "закрыт"
+        new_status_id = reservation.status_id if reservation.status_id is not None else old_status_id
+        
+        # Если статус изменен на "закрыт" (проверяем по названию)
+        if status_obj and status_obj.status_name == "закрыт" and old_status_id != new_status_id:
+            # Получаем товары из брони
+            reservation_products = db.query(models.ReservationProduct).filter(
+                models.ReservationProduct.reservation_id == id
+            ).all()
+            
+            # Создаем документ реализации (без повторного списания!)
+            # Товары уже были списаны при создании/редактировании брони
+            realization_doc = models.RealizationDocument(
+                date=date.today(),
+                reservation_id=id,
+                client_name=db_reservation.client_name,
+                client_phone=db_reservation.client_phone,
+                total_amount=db_reservation.total_cost
+            )
+            db.add(realization_doc)
+            db.flush()  # Получаем ID документа
+            
+            # Добавляем строки документа
+            for rp in reservation_products:
+                product = db.query(models.Product).filter(
+                    models.Product.id == rp.product_id
+                ).first()
+                if product:
+                    doc_item = models.RealizationDocumentItem(
+                        document_id=realization_doc.id,
+                        product_id=rp.product_id,
+                        quantity=rp.quantity,
+                        price=product.last_purchase_price
+                    )
+                    db.add(doc_item)
+
+        # Обработка дат - используем текущие значения если не переданы новые
+        start_dt = db_reservation.start_datetime
+        end_dt = db_reservation.end_datetime
+        print(f"\nProcessing dates...")
+        print(f"Current start_dt: {start_dt}, end_dt: {end_dt}")
+
+        if reservation.start_datetime:
+            try:
+                start_dt = datetime.fromisoformat(reservation.start_datetime)
+                print(f"New start_dt: {start_dt}")
+            except ValueError:
+                print(f"❌ Invalid start_datetime format: {reservation.start_datetime}")
+                raise HTTPException(status_code=400, detail="Неверный формат даты начала")
+        if reservation.end_datetime:
+            try:
+                end_dt = datetime.fromisoformat(reservation.end_datetime)
+                print(f"New end_dt: {end_dt}")
+            except ValueError:
+                print(f"❌ Invalid end_datetime format: {reservation.end_datetime}")
+                raise HTTPException(status_code=400, detail="Неверный формат даты окончания")
+
+        # Проверяем даты только если они были изменены или это не обновление статуса
+        if reservation.start_datetime or reservation.end_datetime or not reservation.status_id:
+            print(f"Validating dates: {start_dt} < {end_dt}")
+            if start_dt >= end_dt:
+                print(f"❌ End time must be after start time")
+                raise HTTPException(status_code=400, detail="Время окончания должно быть позже начала")
+
+            # Проверка пересечений только если изменились даты или баня
+            if (reservation.start_datetime or reservation.end_datetime or reservation.bath_id):
+                print(f"Checking for overlaps...")
+                overlap = check_overlap(db, db_reservation.bath_id, start_dt, end_dt, exclude_id=id)
+                if overlap:
+                    print(f"❌ Overlap detected with reservation {overlap.reservation_id}")
+                    raise HTTPException(status_code=400, detail="Бронь пересекается с существующей")
+                print(f"✅ No overlaps found")
+
+            db_reservation.start_datetime = start_dt
+            db_reservation.end_datetime = end_dt
+            print(f"Updated dates successfully")
+
+            # Пересчёт стоимости только если изменились даты, гости или товары
+            if reservation.start_datetime or reservation.end_datetime or reservation.guests or reservation.products:
+                print(f"\nRecalculating cost...")
+                bath = db.query(models.Bath).filter(models.Bath.bath_id == db_reservation.bath_id).first()
+                if not bath:
+                    print(f"❌ Bath {db_reservation.bath_id} not found")
+                    raise HTTPException(status_code=500, detail="Баня, связанная с бронью, не найдена")
+
+                duration_hours = (end_dt - start_dt).total_seconds() / 3600
+                print(f"Duration: {duration_hours} hours")
+                # Определяем день недели для начала бронирования (0=понедельник, 6=воскресенье)
+                weekday = start_dt.weekday()
+                print(f"Weekday: {weekday} (0=Mon, 6=Sun)")
+                # пн=0, вт=1, ср=2, чт=3 → будни; пт=4, сб=5, вс=6 → выходные
+                hourly_rate = bath.cost_weekend if weekday >= 4 else bath.cost_weekday
+                bath_base_cost = int(hourly_rate * duration_hours)
+                extra_guests = max(0, current_guests - bath.base_guests)
+                extra_guest_cost = extra_guests * bath.extra_guest_price
+                total_cost = bath_base_cost + extra_guest_cost
+                print(f"Bath cost: {bath_base_cost}, Extra guests: {extra_guests} x {bath.extra_guest_price} = {extra_guest_cost}")
+                print(f"Total before products: {total_cost}")
+
+                # Стоимость товаров
+                if reservation.products:
+                    print(f"\nProcessing {len(reservation.products)} products...")
+                    product_ids = [p.product_id for p in reservation.products]
+                    products = db.query(models.Product).filter(models.Product.id.in_(product_ids)).all()
+                    product_map = {p.id: p for p in products}
+                    for item in reservation.products:
+                        product = product_map.get(item.product_id)
+                        if not product:
+                            print(f"❌ Product {item.product_id} not found")
+                            raise HTTPException(status_code=400, detail=f"Товар с ID {item.product_id} не найден")
+                        print(f"Product: {product.name}, Qty: {item.quantity}, Stock: {product.total_quantity}, Price: {product.last_purchase_price}")
+                        if product.total_quantity < item.quantity:
+                            print(f"❌ Insufficient stock for {product.name}")
+                            raise HTTPException(status_code=400, detail=f"Недостаточно товара {product.name} на складе")
+                        product_cost = product.last_purchase_price * item.quantity
+                        total_cost += product_cost
+                        print(f"Added product cost: {product_cost}")
+
+                db_reservation.total_cost = total_cost
+                print(f"✅ Total cost: {total_cost}")
+
+        # Обновляем товары только если они были переданы в запросе
+        if reservation.products is not None:
+            print(f"\nUpdating products...")
+            # Удаляем старые связи (только товары)
+            db.query(models.ReservationProduct).filter(models.ReservationProduct.reservation_id == id).delete()
+            print(f"Deleted old products")
+
+            # Добавляем новые связи (без списания!)
+            for item in reservation.products:
+                product = db.query(models.Product).filter(models.Product.id == item.product_id).first()
+                if not product:
+                    print(f"❌ Product {item.product_id} not found")
+                    raise HTTPException(status_code=400, detail=f"Товар с ID {item.product_id} не найден")
+                # Только проверка наличия, без списания!
+                if product.total_quantity < item.quantity:
+                    print(f"❌ Insufficient stock for {product.name}: {product.total_quantity} < {item.quantity}")
+                    raise HTTPException(status_code=400, detail=f"Недостаточно товара {product.name} на складе")
+                db.add(models.ReservationProduct(
+                    reservation_id=id,
+                    product_id=item.product_id,
+                    quantity=item.quantity
+                ))
+                print(f"Added product: {product.name} x {item.quantity}")
+            print(f"✅ Products updated successfully")
+
+        print(f"\nCommitting to database...")
+        db.commit()
+        db.refresh(db_reservation)
+        print(f"✅ Reservation {id} updated successfully\n")
+
+        # === ФОРМИРУЕМ ОТВЕТ ВРУЧНУЮ ===
+        # Всегда получаем актуальные товары из базы
+        response_products = []
+        for rp in db_reservation.reservation_products:
+            if rp.product:
+                response_products.append(
+                    schemas.ReservationProductResponse(
+                        product_id=rp.product.id,
+                        name=rp.product.name,
+                        quantity=rp.quantity,
+                        purchase_price=rp.product.last_purchase_price,
+                        unit_id=rp.product.unit_id
+                    )
+                )
+
+        # === ОТПРАВЛЯЕМ EMAIL ОБ ИЗМЕНЕНИИ БРОНИ ===
+        # Отправляем только если изменились важные поля и есть email
+        if db_reservation.client_email and (reservation.start_datetime or reservation.end_datetime or 
+                                             reservation.guests or reservation.products or reservation.bath_id):
+            try:
+                # Получаем название бани
+                bath = db.query(models.Bath).filter(models.Bath.bath_id == db_reservation.bath_id).first()
+                
+                # Подготавливаем данные о товарах для email из базы
+                products_for_email = []
+                for rp in db_reservation.reservation_products:
+                    if rp.product:
+                        products_for_email.append({
+                            'name': rp.product.name,
+                            'quantity': rp.quantity,
+                            'purchase_price': rp.product.last_purchase_price
+                        })
+                
+                # Отправляем email об изменении
+                send_booking_confirmation_email(
+                    email=db_reservation.client_email,
+                    client_name=db_reservation.client_name,
+                    bath_name=bath.name if bath else "Не указано",
+                    start_datetime=db_reservation.start_datetime,
+                    end_datetime=db_reservation.end_datetime,
+                    guests=db_reservation.guests,
+                    total_cost=db_reservation.total_cost,
+                    products=products_for_email,
+                    notes=db_reservation.notes
+                )
+            except Exception as e:
+                print(f"Ошибка при отправке email об изменении: {e}")
+
+        status_name = (status_obj or db.query(models.ReservationStatus)
+                       .filter(models.ReservationStatus.id == db_reservation.status_id)
+                       .first()).status_name
+
+        # Асинхронное логирование обновления бронирования
+        background_tasks.add_task(
+            log_action,
+            db=SessionLocal(),
+            user_id=current_user.user_id,
+            action="UPDATE",
+            entity_type="reservation",
+            entity_id=id,
+            details={"client_name": db_reservation.client_name},
+            ip_address=get_client_ip(request),
+            user_agent=request.headers.get("user-agent")
+        )
+
+        return schemas.ReservationResponse(
+            reservation_id=db_reservation.reservation_id,
+            bath_id=db_reservation.bath_id,
+            start_datetime=db_reservation.start_datetime,
+            end_datetime=db_reservation.end_datetime,
+            client_name=db_reservation.client_name,
+            client_phone=db_reservation.client_phone,
+            client_email=db_reservation.client_email,
+            notes=db_reservation.notes,
+            guests=db_reservation.guests,
+            total_cost=db_reservation.total_cost,
+            status=status_name,
+            products=response_products,
+            # Поле `massages` отсутствует
+        )
+    
+    except HTTPException:
+        # Re-raise HTTP exceptions as-is
+        raise
+    except Exception as e:
+        # Catch any other unexpected errors
+        print(f"\n❌ Unexpected error updating reservation {id}:")
+        print(f"Error: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Внутренняя ошибка сервера: {str(e)}")
+
+
+@router.delete("/{id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_reservation(
+    id: int,
+    background_tasks: BackgroundTasks,
+    request: Request,
+    db: Session = Depends(database.get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    reservation = db.query(models.Reservation).filter(models.Reservation.reservation_id == id).first()
+    if not reservation:
+        raise HTTPException(status_code=404, detail="Бронь не найдена")
+
+    # === ВОЗВРАТ ТОВАРОВ НА СКЛАД ДО УДАЛЕНИЯ ===
+    for rp in reservation.reservation_products:
+        product = db.query(models.Product).filter(models.Product.id == rp.product_id).first()
+        if product:
+            product.total_quantity += rp.quantity
+
+    # Теперь можно безопасно удалить
+    db.delete(reservation)
+    db.commit()
+
+    # Асинхронное логирование удаления бронирования
+    background_tasks.add_task(
+        log_action,
+        db=SessionLocal(),
+        user_id=current_user.user_id,
+        action="DELETE",
+        entity_type="reservation",
+        entity_id=id,
+        details={"client_name": reservation.client_name},
+        ip_address=get_client_ip(request),
+        user_agent=request.headers.get("user-agent")
+    )
+
+    return None
