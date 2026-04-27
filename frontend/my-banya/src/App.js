@@ -11,7 +11,7 @@ import BathsCard from './pages/Baths/BathsCard/BathsCard';
 import AdminLogin from './pages/Admin/AdminLogin/AdminLogin';
 import PrivateRoute from './components/PrivateRoute';
 import Admin from './pages/Admin/Admin';
-import AdminReservations from './pages/Admin/Reservations/AdminReservations';
+import AdminReservations from './pages/Admin/Reservations/AdminReservationsNew';
 import AdminBookings from './pages/Admin/AdminBookings/AdminBookings';
 import AdminBathsList from './pages/Admin/AdminBaths/AdminBathsList';
 import BathForm from './pages/Admin/AdminBaths/BathForm';
@@ -34,7 +34,7 @@ import AdminDashboard from './pages/Admin/AdminDashboard';
 import PasswordResetRequest from './pages/Admin/AdminLogin/PasswordResetRequest';
 import PasswordResetVerify from './pages/Admin/AdminLogin/PasswordResetVerify';
 import PasswordResetComplete from './pages/Admin/AdminLogin/PasswordResetComplete';
-import AdministratorPage from './pages/Admin/Administrator/AdministratorPage';
+import AdministratorPage from './pages/Admin/Administrator/AdministratorPageNew';
 import Promotions from './pages/Admin/Promotions/Promotions';
 import SettingsPage from './pages/Admin/Settings/SettingsPage';
 

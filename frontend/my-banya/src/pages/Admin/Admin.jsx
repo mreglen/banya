@@ -15,12 +15,6 @@ function Admin() {
   const [isCompanyOpen, setIsCompanyOpen] = useState(false);
   const [isDocumentsOpen, setIsDocumentsOpen] = useState(false);
   const [isStorageOpen, setIsStorageOpen] = useState(false);
-  const [renderKey, setRenderKey] = useState(0);
-
-  // Принудительно обновляем Outlet при смене маршрута
-  useEffect(() => {
-    setRenderKey(prev => prev + 1);
-  }, [location.pathname]);
 
   // Map of routes to page titles
   const getPageTitle = () => {
@@ -450,7 +444,7 @@ function Admin() {
 
       {/* Main Content */}
       <main className="flex-1 md:ml-0 ml-0 pt-16 md:pt-0 p-4 md:p-8 pb-20 md:pb-8">
-        <Outlet key={renderKey} />
+        <Outlet />
       </main>
 
       {/* Mobile Sidebar */}
