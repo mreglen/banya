@@ -81,7 +81,7 @@ function PasswordResetVerify() {
     setLoading(true);
 
     try {
-      await apiClient.post('/api/admin/password-reset/verify', {
+      await apiClient.post('/admin/password-reset/verify', {
         email,
         code: fullCode
       });
@@ -104,7 +104,7 @@ function PasswordResetVerify() {
     setLoading(true);
 
     try {
-      await apiClient.post('/api/admin/password-reset/request', { email });
+      await apiClient.post('/admin/password-reset/request', { email });
       setResendTimer(30);
       setCanResend(false);
       setCode(['', '', '', '', '', '']);

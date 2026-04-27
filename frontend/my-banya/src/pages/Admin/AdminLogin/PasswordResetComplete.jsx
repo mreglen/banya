@@ -41,7 +41,7 @@ function PasswordResetComplete() {
     setLoading(true);
 
     try {
-      await apiClient.post('/api/admin/password-reset/complete', {
+      await apiClient.post('/admin/password-reset/complete', {
         email,
         code,
         new_password: password

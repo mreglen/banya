@@ -8,7 +8,7 @@ from app.schemas import PasswordResetRequest, PasswordResetVerify, PasswordReset
 from app.security import hash_password
 from app.email_service import send_password_reset_email
 
-router = APIRouter(prefix="/api/admin/password-reset", tags=["Password Reset"])
+router = APIRouter(prefix="/admin/password-reset", tags=["Password Reset"])
 
 
 def generate_code() -> str:

@@ -5,7 +5,7 @@ export const createBooking = createAsyncThunk(
   'booking/createBooking',
   async (bookingData, { rejectWithValue }) => {
     try {
-      const response = await apiClient.post('/api/bookings/', bookingData);
+      const response = await apiClient.post('/bookings/', bookingData);
       return response.data;
     } catch (error) {
       // Логируем ошибку для отладки

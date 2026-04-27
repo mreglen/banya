@@ -16,7 +16,7 @@ function PasswordResetRequest() {
     setLoading(true);
 
     try {
-      const response = await apiClient.post('/api/admin/password-reset/request', {
+      const response = await apiClient.post('/admin/password-reset/request', {
         email
       });
 
