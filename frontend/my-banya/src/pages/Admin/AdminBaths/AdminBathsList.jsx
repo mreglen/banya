@@ -1,11 +1,14 @@
 // src/pages/Admin/AdminBaths/AdminBathsList.jsx
 import { useNavigate } from 'react-router-dom';
-import { useGetBathsQuery } from '../../../redux/slices/apiSlice';
+import { useState } from 'react';
+import { useGetBathsQuery, useUploadBathPhotosMutation } from '../../../redux/slices/apiSlice';
 import AdminBathsSkeleton from './AdminBathsSkeleton';
 
 function AdminBathsList() {
   const navigate = useNavigate();
-  const { data: baths, isLoading, error } = useGetBathsQuery();
+  const { data: baths, isLoading, error, refetch } = useGetBathsQuery();
+  const [uploadBathPhotos] = useUploadBathPhotosMutation();
+  const [uploadingBathId, setUploadingBathId] = useState(null);
   
   // Для фото используем базовый URL сервера (без /api)
   const SERVER_BASE_URL = process.env.REACT_APP_API_URL ? process.env.REACT_APP_API_URL.replace('/api', '') : (window.location.origin || 'http://127.0.0.1:8000');
@@ -19,6 +22,20 @@ function AdminBathsList() {
 
   const handleEditClick = (bathId) => {
     navigate(`/admin/baths/edit/${bathId}`);
+  };
+
+  const handleUploadPhotos = async (bathId, files) => {
+    if (!files || files.length === 0) return;
+    setUploadingBathId(bathId);
+    try {
+      await uploadBathPhotos({ bath_id: bathId, files: Array.from(files) }).unwrap();
+      refetch();
+    } catch (err) {
+      console.error('Ошибка загрузки фото:', err);
+      alert('Не удалось загрузить фото');
+    } finally {
+      setUploadingBathId(null);
+    }
   };
 
   return (
@@ -50,6 +67,30 @@ function AdminBathsList() {
               <h3 className="font-bold text-gray-800 text-lg">{bath.name}</h3>
               <p className="text-gray-600 text-sm mt-1">{bath.title}</p>
               <p className="font-semibold text-green-600 mt-2">от {bath.cost_weekday} ₽/час</p>
+              <div className="mt-3">
+                <label
+                  className={`inline-flex items-center justify-center px-3 py-2 rounded-lg text-sm font-medium transition cursor-pointer ${
+                    uploadingBathId === bath.bath_id
+                      ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                      : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+                  }`}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {uploadingBathId === bath.bath_id ? 'Загрузка...' : 'Загрузить фото'}
+                  <input
+                    type="file"
+                    multiple
+                    accept="image/*"
+                    className="hidden"
+                    disabled={uploadingBathId === bath.bath_id}
+                    onChange={(e) => {
+                      e.stopPropagation();
+                      handleUploadPhotos(bath.bath_id, e.target.files);
+                      e.target.value = '';
+                    }}
+                  />
+                </label>
+              </div>
             </div>
           </div>
         ))}

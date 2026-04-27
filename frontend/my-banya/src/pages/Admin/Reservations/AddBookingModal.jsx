@@ -24,14 +24,15 @@ const generateTimeOptions = () => {
   return options;
 };
 
-function AddBookingModal({ isOpen, onClose, booking, selectedDate }) {
+function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess }) {
   const isEditing = !!booking;
+  const today = new Date().toISOString().split('T')[0];
   const [updateReservation] = useUpdateReservationMutation();
   const [createReservation, { isLoading: isCreating }] = useCreateReservationMutation();
 
   const [formData, setFormData] = useState({
     bath_id: '',
-    date: selectedDate || '',
+    date: today,
     start_time: '09:00',
     end_time: '10:00',
     client_name: '',
@@ -62,15 +63,15 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate }) {
   };
 
   useEffect(() => {
-    if (!isEditing && selectedDate) {
+    if (!isEditing) {
       setFormData((prev) => ({
         ...prev,
-        date: selectedDate,
+        date: today,
         start_time: '09:00',
         end_time: '10:00',
       }));
     }
-  }, [selectedDate, isEditing]);
+  }, [isEditing, today]);
 
   useEffect(() => {
     if (booking && statusOptions.length > 0) {
@@ -325,7 +326,11 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate }) {
           status_id: formData.status_id
         };
 
-        onClose(updatedBooking);
+        if (onEditSuccess) {
+          onEditSuccess(updatedBooking);
+        } else {
+          onClose(updatedBooking);
+        }
       } else {
         await createReservation(payload).unwrap();
         console.log('✅ Reservation created successfully');
@@ -360,7 +365,10 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate }) {
       className="fixed inset-0 bg-black bg-opacity-50 flex items-start justify-center p-0 sm:p-4 z-50 overflow-y-auto"
       onClick={handleOverlayClick}
     >
-      <div className="bg-white rounded-none sm:rounded-2xl shadow-2xl w-full max-w-4xl h-[100dvh] sm:max-h-[95vh] sm:h-auto flex flex-col">
+      <div
+        className="bg-white rounded-none sm:rounded-2xl shadow-2xl w-full max-w-4xl h-[100dvh] sm:max-h-[95vh] sm:h-auto flex flex-col"
+        style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+      >
         <div className="p-4 sm:p-6 border-b border-gray-200 bg-gradient-to-r from-gray-50 to-gray-100 relative flex-shrink-0">
           <h2 className="text-lg sm:text-xl font-semibold text-gray-800">
             {isEditing ? 'Редактировать бронь' : 'Добавить бронь'}
@@ -439,7 +447,6 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate }) {
               <input
                 type="date"
                 value={formData.date}
-                disabled={!isEditing}
                 onChange={(e) => setFormData((prev) => ({ ...prev, date: e.target.value }))}
                 className="w-full px-3 py-2.5 sm:px-4 sm:py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 text-sm"
                 required
@@ -566,13 +573,19 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate }) {
           {/* ========== СЕКЦИЯ ТОВАРОВ ========== */}
           <div className="border-t pt-4 sm:pt-6">
             <h3 className="text-base sm:text-lg font-medium text-gray-800 mb-3">Товары (опционально)</h3>
-            <button
-              type="button"
-              onClick={() => setIsProductModalOpen(true)}
-              className="mb-3 px-3 py-1.5 sm:px-4 sm:py-2 bg-blue-600 text-white rounded text-sm sm:text-base hover:bg-blue-700"
-            >
-              Добавить товар
-            </button>
+            {!isEditing ? (
+              <button
+                type="button"
+                onClick={() => setIsProductModalOpen(true)}
+                className="mb-3 px-3 py-1.5 sm:px-4 sm:py-2 bg-blue-600 text-white rounded text-sm sm:text-base hover:bg-blue-700"
+              >
+                Добавить товар
+              </button>
+            ) : (
+              <div className="mb-3 text-xs text-gray-500">
+                В режиме редактирования добавление и изменение товаров недоступно.
+              </div>
+            )}
 
             {/* Список товаров со скроллом */}
             {formData.selectedProducts.length > 0 && (
@@ -594,18 +607,21 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate }) {
                           onChange={(e) => updateProductQuantity(item.id, e.target.value)}
                           onBlur={() => handleQuantityBlur(item.id)}
                           className="w-14 px-2 py-1 border rounded text-sm"
+                          disabled={isEditing}
                         />
                         <span className="text-sm text-gray-600">{item.unit_name}</span>
                       </div>
                       <div className="text-right">
                         <div className="text-sm font-medium">{(item.quantity * item.purchase_price).toFixed(2)} ₽</div>
-                        <button
-                          type="button"
-                          onClick={() => removeProduct(item.id)}
-                          className="text-red-600 text-xs hover:underline mt-1"
-                        >
-                          Удалить
-                        </button>
+                        {!isEditing && (
+                          <button
+                            type="button"
+                            onClick={() => removeProduct(item.id)}
+                            className="text-red-600 text-xs hover:underline mt-1"
+                          >
+                            Удалить
+                          </button>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -621,7 +637,10 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate }) {
           </div>
         </div>
 
-        <div className="p-4 sm:p-6 border-t border-gray-200 bg-gray-50 flex-shrink-0">
+        <div
+          className="p-4 sm:p-6 border-t border-gray-200 bg-gray-50 flex-shrink-0"
+          style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}
+        >
           <div className="flex flex-col sm:flex-row gap-3">
             <button
               type="submit"

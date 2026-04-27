@@ -200,7 +200,10 @@ function AdminReservationsNew() {
   });
 
   return (
-    <div className="px-1 py-2 md:p-4">
+    <div
+      className="px-0 py-2 md:p-4 overflow-x-hidden"
+      style={{ paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom))' }}
+    >
       <h2 className="text-xl md:text-2xl font-semibold text-gray-800 mb-4 md:mb-6">
         Записи на {formattedDate}
       </h2>
@@ -375,10 +378,10 @@ function AdminReservationsNew() {
       <div className="md:hidden space-y-4">
         {/* Табы для переключения между банями */}
         {bathsToDisplay.length > 1 && (
-          <div className="-mx-1 px-1 flex space-x-1 mb-3 border-b border-gray-200 overflow-x-auto">
+          <div className="flex space-x-1 mb-3 border-b border-gray-200 overflow-x-auto pb-1">
             <button
               onClick={() => handleSetActiveBath(null)}
-              className={`px-4 py-2.5 text-sm font-medium border-b-2 whitespace-nowrap transition-all ${
+              className={`px-3 py-2 text-sm font-medium border-b-2 whitespace-nowrap transition-all ${
                 !activeBathId 
                   ? 'border-blue-600 text-blue-600' 
                   : 'border-transparent text-gray-500'
@@ -390,7 +393,7 @@ function AdminReservationsNew() {
               <button
                 key={bath.bath_id}
                 onClick={() => handleSetActiveBath(bath.bath_id)}
-                className={`px-4 py-2.5 text-sm font-medium border-b-2 whitespace-nowrap transition-all ${
+                className={`px-3 py-2 text-sm font-medium border-b-2 whitespace-nowrap transition-all ${
                   activeBathId === bath.bath_id 
                     ? 'border-blue-600 text-blue-600' 
                     : 'border-transparent text-gray-500'
@@ -406,13 +409,13 @@ function AdminReservationsNew() {
           <div className="text-center py-8 text-gray-500">Нет доступных бань</div>
         ) : (
           filteredBaths.map((bath) => (
-            <div key={bath.bath_id} className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+            <div key={bath.bath_id} className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden mx-0.5">
               <div className="px-4 py-3 border-b border-gray-200 bg-white">
                 <h3 className="text-base font-semibold text-gray-900">
                   {bath.bathName}
                 </h3>
               </div>
-              <div className="p-3 space-y-3">
+              <div className="p-2.5 space-y-2.5">
                 {bath.bookings.length === 0 ? (
                   <p className="text-green-600 font-medium">Свободно весь день</p>
                 ) : (
@@ -421,7 +424,7 @@ function AdminReservationsNew() {
                     .map((booking) => (
                       <div
                         key={booking.reservation_id}
-                        className={`p-3 rounded-lg border ${booking.is_cleaning
+                        className={`p-2.5 rounded-lg border ${booking.is_cleaning
                             ? 'bg-indigo-50 border-indigo-200'
                             : 'bg-gray-50 border-gray-200'
                           }`}
@@ -444,7 +447,10 @@ function AdminReservationsNew() {
                               {booking.client_phone || '—'}
                             </div>
                             {booking.notes && (
-                              <div className="text-sm text-gray-600 mb-1">
+                              <div
+                                className="text-sm text-gray-600 mb-1"
+                                style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}
+                              >
                                 {booking.notes}
                               </div>
                             )}
@@ -453,7 +459,7 @@ function AdminReservationsNew() {
                               &nbsp;–&nbsp;
                               {new Date(booking.end_datetime).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}
                             </div>
-                            <div className="text-lg font-semibold text-gray-900 mb-2">
+                            <div className="text-base font-semibold text-gray-900 mb-2">
                               {booking.total_cost} ₽
                             </div>
                             <div className="flex flex-wrap gap-2 mb-3">
@@ -467,22 +473,22 @@ function AdminReservationsNew() {
                                 {booking.status || '—'}
                               </span>
                             </div>
-                            <div className="flex flex-col gap-2 mt-3">
+                            <div className="flex flex-col gap-1.5 mt-2.5">
                               <button
                                 onClick={() => handleViewBooking(booking)}
-                                className="w-full bg-blue-100 text-blue-800 py-3 rounded-lg text-sm font-medium hover:bg-blue-200 transition min-h-[44px]"
+                                className="w-full bg-blue-100 text-blue-800 py-2.5 rounded-lg text-sm font-medium hover:bg-blue-200 transition min-h-[40px]"
                               >
                                 Просмотр
                               </button>
                               <button
                                 onClick={() => handleEditBooking(booking)}
-                                className="w-full bg-green-100 text-green-800 py-3 rounded-lg text-sm font-medium hover:bg-green-200 transition min-h-[44px]"
+                                className="w-full bg-green-100 text-green-800 py-2.5 rounded-lg text-sm font-medium hover:bg-green-200 transition min-h-[40px]"
                               >
                                 Редактировать
                               </button>
                               <button
                                 onClick={() => handleDeleteBooking(booking.reservation_id)}
-                                className="w-full bg-red-100 text-red-800 py-3 rounded-lg text-sm font-medium hover:bg-red-200 transition min-h-[44px]"
+                                className="w-full bg-red-100 text-red-800 py-2.5 rounded-lg text-sm font-medium hover:bg-red-200 transition min-h-[40px]"
                               >
                                 Удалить
                               </button>

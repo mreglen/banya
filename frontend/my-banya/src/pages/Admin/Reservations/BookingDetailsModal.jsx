@@ -115,7 +115,10 @@ function BookingDetailsModal({ booking, onClose, onDelete }) {
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-start sm:items-center justify-center p-0 sm:p-4 z-50">
-      <div className="bg-white rounded-none sm:rounded-xl shadow-2xl w-full max-w-4xl h-[100dvh] sm:h-[95vh] flex flex-col">
+      <div
+        className="bg-white rounded-none sm:rounded-xl shadow-2xl w-full max-w-4xl h-[100dvh] sm:h-[95vh] flex flex-col"
+        style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+      >
         {/* Header */}
         <div className="p-4 sm:p-6 border-b border-gray-200 bg-gradient-to-r from-gray-50 to-gray-100 flex-shrink-0 relative">
           <h2 className="text-lg sm:text-xl font-semibold text-gray-800">Детали брони</h2>
@@ -364,7 +367,10 @@ function BookingDetailsModal({ booking, onClose, onDelete }) {
         </div>
 
         {/* Footer - Buttons */}
-        <div className="p-4 sm:p-6 border-t border-gray-200 flex flex-col sm:flex-row gap-3 flex-shrink-0">
+        <div
+          className="p-4 sm:p-6 border-t border-gray-200 flex flex-col sm:flex-row gap-3 flex-shrink-0"
+          style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}
+        >
           <button
             onClick={handlePrint}
             className="flex-1 bg-indigo-600 text-white py-2 px-4 rounded-lg hover:bg-indigo-700 transition font-medium"
