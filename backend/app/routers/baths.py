@@ -198,6 +198,7 @@ def delete_bath_photo(
 # добавить фото
 UPLOAD_DIR = Path("uploads/photos/baths/")
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+MAX_FILE_SIZE = 10 * 1024 * 1024  # 10 MB limit
 
 @router.post("/{bath_id}/upload", response_model=List[str])
 async def upload_bath_photos(
@@ -209,16 +210,21 @@ async def upload_bath_photos(
     if not db_bath:
         raise HTTPException(status_code=404, detail="Баня не найдена")
 
-    # Удаляем старые фото
+    # Удаляем старые фото перед загрузкой новых
     db.query(Photo).filter(Photo.bath_id == bath_id).delete()
 
     urls = []
     for file in files:
-        # Read original file
-        original_bytes = await file.read()
+        # Check file size
+        content = await file.read()
+        if len(content) > MAX_FILE_SIZE:
+            raise HTTPException(
+                status_code=413,
+                detail=f"Файл {file.filename} слишком большой. Максимальный размер: {MAX_FILE_SIZE // (1024*1024)} МБ"
+            )
         
         # Process: compress, convert to WebP, strip metadata
-        webp_bytes = process_image_to_webp(original_bytes)
+        webp_bytes = process_image_to_webp(content)
         
         # Generate hash-based filename
         file_hash = hashlib.sha256(webp_bytes).hexdigest()[:16]

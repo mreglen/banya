@@ -45,6 +45,8 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
   });
 
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
+  const [validationErrors, setValidationErrors] = useState({});
+  const [toast, setToast] = useState(null);
 
   const { data: baths = [], isLoading: isLoadingBaths } = useGetBathsQuery();
   const { data: stockProducts = [] } = useGetStockProductsQuery();
@@ -62,6 +64,12 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
     return unit ? unit.name : 'шт.';
   };
 
+  // Функция показа toast-уведомлений
+  const showToast = (message, type = 'error') => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 5000);
+  };
+
   useEffect(() => {
     if (!isEditing) {
       setFormData((prev) => ({
@@ -75,40 +83,45 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
 
   useEffect(() => {
     if (booking && statusOptions.length > 0) {
-      const start = new Date(booking.start_datetime);
-      const end = new Date(booking.end_datetime);
-      const date = start.toISOString().split('T')[0];
-      const start_time = start.toTimeString().slice(0, 5);
-      const end_time = end.toTimeString().slice(0, 5);
+      try {
+        const start = new Date(booking.start_datetime);
+        const end = new Date(booking.end_datetime);
+        const date = start.toISOString().split('T')[0];
+        const start_time = start.toTimeString().slice(0, 5);
+        const end_time = end.toTimeString().slice(0, 5);
 
-      const selectedProducts = (booking.products || []).map(product => {
-        const stockItem = stockProducts.find(p => p.id === product.product_id);
-        const unitName = findUnitName(stockItem?.unit_id); // ← ДОБАВЛЕНО
-        return {
-          id: product.product_id,
-          name: product.name,
-          purchase_price: product.purchase_price || 0,
-          available: stockItem?.total_quantity || 0,
-          unit_id: stockItem?.unit_id || null, // ← ДОБАВЛЕНО
-          unit_name: unitName, // ← ДОБАВЛЕНО
-          quantity: product.quantity,
-        };
-      });
+        const selectedProducts = (booking.products || []).map(product => {
+          const stockItem = stockProducts.find(p => p.id === product.product_id);
+          const unitName = findUnitName(stockItem?.unit_id); // ← ДОБАВЛЕНО
+          return {
+            id: product.product_id,
+            name: product.name,
+            purchase_price: product.purchase_price || 0,
+            available: stockItem?.total_quantity || 0,
+            unit_id: stockItem?.unit_id || null, // ← ДОБАВЛЕНО
+            unit_name: unitName, // ← ДОБАВЛЕНО
+            quantity: product.quantity,
+          };
+        });
 
-      const statusIdFromBooking = booking.status?.id ?? booking.status_id;
-      setFormData({
-        bath_id: booking.bath?.bath_id || booking.bath_id || '',
-        date,
-        start_time,
-        end_time,
-        client_name: booking.client_name || '',
-        client_phone: booking.client_phone || '',
-        client_email: booking.client_email || '',
-        notes: booking.notes || '',
-        guests: booking.guests || 1,
-        status_id: parseInt(statusIdFromBooking, 10) || 1,
-        selectedProducts,
-      });
+        const statusIdFromBooking = booking.status?.id ?? booking.status_id;
+        setFormData({
+          bath_id: booking.bath?.bath_id || booking.bath_id || '',
+          date,
+          start_time,
+          end_time,
+          client_name: booking.client_name || '',
+          client_phone: booking.client_phone || '',
+          client_email: booking.client_email || '',
+          notes: booking.notes || '',
+          guests: booking.guests || 1,
+          status_id: parseInt(statusIdFromBooking, 10) || 1,
+          selectedProducts,
+        });
+      } catch (error) {
+        console.error('Ошибка загрузки данных брони:', error);
+        showToast('Ошибка загрузки данных для редактирования', 'error');
+      }
     }
   }, [booking, stockProducts, units, findUnitName, statusOptions.length]); // ← ДОБАВЛЕНО units
 
@@ -245,34 +258,77 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
     }));
   };
 
+  // Функция валидации формы
+  const validateForm = () => {
+    const errors = {};
+    
+    // Проверка бани
+    if (!formData.bath_id) {
+      errors.bath_id = 'Выберите баню';
+    }
+    
+    // Проверка имени клиента
+    if (!formData.client_name || formData.client_name.trim() === '') {
+      errors.client_name = 'Введите имя клиента';
+    }
+    
+    // Проверка телефона - должен содержать 11 цифр
+    const phoneDigits = formData.client_phone.replace(/\D/g, '');
+    if (!formData.client_phone) {
+      errors.client_phone = 'Введите номер телефона';
+    } else if (phoneDigits.length < 11) {
+      errors.client_phone = `Номер введён не полностью (введено ${phoneDigits.length} из 11 цифр)`;
+    }
+    
+    // Проверка email (если введён)
+    if (formData.client_email && formData.client_email.trim() !== '') {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(formData.client_email)) {
+        errors.client_email = 'Неверный формат email';
+      }
+    }
+    
+    // Проверка даты и времени
+    const start_datetime = `${formData.date}T${formData.start_time}`;
+    const end_datetime = `${formData.date}T${formData.end_time}`;
+    if (new Date(start_datetime) >= new Date(end_datetime)) {
+      errors.end_time = 'Время окончания должно быть позже начала';
+    }
+    
+    // Проверка количества гостей
+    if (!formData.guests || formData.guests < 1) {
+      errors.guests = 'Минимум 1 гость';
+    }
+    
+    // Проверка товаров (количество)
+    formData.selectedProducts.forEach(product => {
+      if (!product.quantity || product.quantity < 1) {
+        errors[`product_${product.id}`] = 'Минимум 1';
+      } else if (product.quantity > product.available) {
+        errors[`product_${product.id}`] = `Превышает доступное количество (${product.available})`;
+      }
+    });
+    
+    setValidationErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     console.log('🔵 Form submitted');
 
+    // Сбрасываем предыдущие ошибки
+    setValidationErrors({});
+
+    // Запускаем валидацию
+    if (!validateForm()) {
+      console.warn('❌ Validation failed');
+      return;
+    }
+
     const start_datetime = `${formData.date}T${formData.start_time}`;
     const end_datetime = `${formData.date}T${formData.end_time}`;
     console.log('🟡 Datetime:', { start_datetime, end_datetime });
-
-    // Валидация обязательных полей
-    if (!formData.bath_id) {
-      console.warn('Validation failed: no bath_id');
-      return;
-    }
-
-    if (!formData.client_name || formData.client_name.trim() === '') {
-      console.warn('Validation failed: no client_name');
-      return;
-    }
-
-    if (!formData.client_phone || formData.client_phone.trim() === '') {
-      console.warn('Validation failed: no client_phone');
-      return;
-    }
-
-    if (new Date(start_datetime) >= new Date(end_datetime)) {
-      console.warn('Validation failed: end <= start');
-      return;
-    }
 
     // Нормализуем телефон перед отправкой
     let normalizedPhone = formData.client_phone;
@@ -284,9 +340,6 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
         normalizedPhone = '+7' + phoneDigits;
       } else if (phoneDigits.length === 11 && phoneDigits.startsWith('8')) {
         normalizedPhone = '+7' + phoneDigits.slice(1);
-      } else if (phoneDigits.length < 10) {
-        console.warn('Validation failed: invalid phone');
-        return;
       }
     }
 
@@ -316,6 +369,8 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
           ...payload,
         }).unwrap();
 
+        showToast('Бронь успешно обновлена', 'success');
+        
         if (onEditSuccess) {
           onEditSuccess();
         } else {
@@ -324,7 +379,8 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
       } else {
         await createReservation(payload).unwrap();
         console.log('✅ Reservation created successfully');
-        onClose();
+        showToast('Бронь успешно создана', 'success');
+        setTimeout(() => onClose(), 1000); // Закрыть через 1 секунду
       }
     } catch (error) {
       console.error('❌ Error:', error);
@@ -338,6 +394,7 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
         }
       }
       console.error('❌ ' + message);
+      showToast(message, 'error');
     }
   };
 
@@ -414,20 +471,31 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
                 Загрузка...
               </div>
             ) : (
-              <select
-                name="bath_id"
-                value={formData.bath_id}
-                onChange={handleChange}
-                className="w-full px-3 py-2.5 sm:px-4 sm:py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 text-sm sm:text-base"
-                required
-              >
-                <option value="">Выберите баню</option>
-                {baths.map((bath) => (
-                  <option key={bath.bath_id} value={bath.bath_id}>
-                    {bath.name}
-                  </option>
-                ))}
-              </select>
+              <>
+                <select
+                  name="bath_id"
+                  value={formData.bath_id}
+                  onChange={handleChange}
+                  className={`w-full px-3 py-2.5 sm:px-4 sm:py-3 border rounded-xl focus:ring-2 text-sm sm:text-base ${
+                    validationErrors.bath_id 
+                      ? 'border-red-500 focus:ring-red-500 bg-red-50' 
+                      : 'border-gray-300 focus:ring-blue-500'
+                  }`}
+                  required
+                >
+                  <option value="">Выберите баню</option>
+                  {baths.map((bath) => (
+                    <option key={bath.bath_id} value={bath.bath_id}>
+                      {bath.name}
+                    </option>
+                  ))}
+                </select>
+                {validationErrors.bath_id && (
+                  <p className="mt-1 text-xs text-red-600 flex items-center gap-1">
+                    <span>⚠</span> {validationErrors.bath_id}
+                  </p>
+                )}
+              </>
             )}
           </div>
 
@@ -463,7 +531,11 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
               <select
                 value={formData.end_time}
                 onChange={(e) => setFormData((prev) => ({ ...prev, end_time: e.target.value }))}
-                className="w-full px-3 py-2.5 sm:px-4 sm:py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 text-sm sm:text-base"
+                className={`w-full px-3 py-2.5 sm:px-4 sm:py-3 border rounded-xl focus:ring-2 text-sm sm:text-base ${
+                  validationErrors.end_time 
+                    ? 'border-red-500 focus:ring-red-500 bg-red-50' 
+                    : 'border-gray-300 focus:ring-blue-500'
+                }`}
                 required
               >
                 {getEndTimeOptions(formData.start_time).map((time) => (
@@ -472,6 +544,11 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
                   </option>
                 ))}
               </select>
+              {validationErrors.end_time && (
+                <p className="mt-1 text-xs text-red-600 flex items-center gap-1">
+                  <span>⚠</span> {validationErrors.end_time}
+                </p>
+              )}
             </div>
           </div>
 
@@ -484,9 +561,18 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
               value={formData.client_name}
               onChange={handleChange}
               placeholder="Иван Иванов"
-              className="w-full px-3 py-2.5 sm:px-4 sm:py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 text-sm sm:text-base"
+              className={`w-full px-3 py-2.5 sm:px-4 sm:py-3 border rounded-xl focus:ring-2 text-sm sm:text-base ${
+                validationErrors.client_name 
+                  ? 'border-red-500 focus:ring-red-500 bg-red-50' 
+                  : 'border-gray-300 focus:ring-blue-500'
+              }`}
               required
             />
+            {validationErrors.client_name && (
+              <p className="mt-1 text-xs text-red-600 flex items-center gap-1">
+                <span>⚠</span> {validationErrors.client_name}
+              </p>
+            )}
           </div>
 
           {/* Гости */}
@@ -531,9 +617,18 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
                 value={formData.client_phone}
                 onChange={handleChange}
                 placeholder="+7 (999) 123-45-67"
-                className="w-full px-3 py-2.5 sm:px-4 sm:py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 text-sm"
+                className={`w-full px-3 py-2.5 sm:px-4 sm:py-3 border rounded-xl focus:ring-2 text-sm ${
+                  validationErrors.client_phone 
+                    ? 'border-red-500 focus:ring-red-500 bg-red-50' 
+                    : 'border-gray-300 focus:ring-blue-500'
+                }`}
                 required
               />
+              {validationErrors.client_phone && (
+                <p className="mt-1 text-xs text-red-600 flex items-center gap-1">
+                  <span>⚠</span> {validationErrors.client_phone}
+                </p>
+              )}
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
@@ -543,8 +638,17 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
                 value={formData.client_email}
                 onChange={handleChange}
                 placeholder="ivan@example.com"
-                className="w-full px-3 py-2.5 sm:px-4 sm:py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 text-sm"
+                className={`w-full px-3 py-2.5 sm:px-4 sm:py-3 border rounded-xl focus:ring-2 text-sm ${
+                  validationErrors.client_email 
+                    ? 'border-red-500 focus:ring-red-500 bg-red-50' 
+                    : 'border-gray-300 focus:ring-blue-500'
+                }`}
               />
+              {validationErrors.client_email && (
+                <p className="mt-1 text-xs text-red-600 flex items-center gap-1">
+                  <span>⚠</span> {validationErrors.client_email}
+                </p>
+              )}
             </div>
           </div>
 
@@ -564,19 +668,13 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
           {/* ========== СЕКЦИЯ ТОВАРОВ ========== */}
           <div className="border-t pt-4 sm:pt-6">
             <h3 className="text-base sm:text-lg font-medium text-gray-800 mb-3">Товары (опционально)</h3>
-            {!isEditing ? (
-              <button
-                type="button"
-                onClick={() => setIsProductModalOpen(true)}
-                className="mb-3 px-3 py-1.5 sm:px-4 sm:py-2 bg-blue-600 text-white rounded text-sm sm:text-base hover:bg-blue-700"
-              >
-                Добавить товар
-              </button>
-            ) : (
-              <div className="mb-3 text-xs text-gray-500">
-                В режиме редактирования добавление и изменение товаров недоступно.
-              </div>
-            )}
+            <button
+              type="button"
+              onClick={() => setIsProductModalOpen(true)}
+              className="mb-3 px-3 py-1.5 sm:px-4 sm:py-2 bg-blue-600 text-white rounded text-sm sm:text-base hover:bg-blue-700"
+            >
+              Добавить товар
+            </button>
 
             {/* Список товаров со скроллом */}
             {formData.selectedProducts.length > 0 && (
@@ -597,22 +695,27 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
                           value={item.quantity}
                           onChange={(e) => updateProductQuantity(item.id, e.target.value)}
                           onBlur={() => handleQuantityBlur(item.id)}
-                          className="w-14 px-2 py-1 border rounded text-sm"
-                          disabled={isEditing}
+                          className={`w-14 px-2 py-1 border rounded text-sm ${
+                            validationErrors[`product_${item.id}`]
+                              ? 'border-red-500 bg-red-50'
+                              : 'border-gray-300'
+                          }`}
                         />
                         <span className="text-sm text-gray-600">{item.unit_name}</span>
                       </div>
                       <div className="text-right">
                         <div className="text-sm font-medium">{(item.quantity * item.purchase_price).toFixed(2)} ₽</div>
-                        {!isEditing && (
-                          <button
-                            type="button"
-                            onClick={() => removeProduct(item.id)}
-                            className="text-red-600 text-xs hover:underline mt-1"
-                          >
-                            Удалить
-                          </button>
+                        {/* Показывать ошибку валидации */}
+                        {validationErrors[`product_${item.id}`] && (
+                          <p className="text-xs text-red-600 mt-1">{validationErrors[`product_${item.id}`]}</p>
                         )}
+                        <button
+                          type="button"
+                          onClick={() => removeProduct(item.id)}
+                          className="text-red-600 text-xs hover:underline mt-1"
+                        >
+                          Удалить
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -657,6 +760,19 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
             onClose={() => setIsProductModalOpen(false)}
             onSelect={handleSelectProduct}
           />
+        )}
+
+        {/* Toast уведомления */}
+        {toast && (
+          <div className={`fixed top-4 right-4 z-[60] p-4 rounded-lg shadow-lg max-w-sm ${
+            toast.type === 'error' ? 'bg-red-500 text-white' : 'bg-green-500 text-white'
+          }`}>
+            <div className="flex items-start gap-2">
+              <span className="text-xl">{toast.type === 'error' ? '❌' : '✅'}</span>
+              <p className="text-sm">{toast.message}</p>
+              <button onClick={() => setToast(null)} className="ml-2 text-lg">×</button>
+            </div>
+          </div>
         )}
       </div>
     </div>,

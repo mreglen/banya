@@ -8,11 +8,43 @@ from app.websocket import websocket_endpoint
 from fastapi.middleware.cors import CORSMiddleware
 import os
 from pathlib import Path
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.requests import Request
+from starlette.responses import Response
+
+
+# Middleware to increase request body size limit (50 MB)
+class MaxBodySizeMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        request._receive = self._receive_with_limit(request, call_next)
+        response = await call_next(request)
+        return response
+    
+    def _receive_with_limit(self, request, call_next):
+        original_receive = request.receive
+        max_body_size = 50 * 1024 * 1024  # 50 MB
+        
+        async def receive_with_limit():
+            message = await original_receive()
+            if message["type"] == "http.request":
+                body = message.get("body", b"")
+                if len(body) > max_body_size:
+                    from fastapi import HTTPException
+                    raise HTTPException(
+                        status_code=413,
+                        detail=f"Request body too large. Maximum size is {max_body_size // (1024*1024)} MB"
+                    )
+            return message
+        
+        return receive_with_limit
 
 
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title='Бани')
+
+# Add middleware to increase body size limit
+app.add_middleware(MaxBodySizeMiddleware)
 
 # CORS configuration - restrict to specific origins for security
 ALLOWED_ORIGINS = os.getenv(

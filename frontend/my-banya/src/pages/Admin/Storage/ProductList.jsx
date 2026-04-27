@@ -1,8 +1,10 @@
 // src/pages/Admin/Storage/ProductList.jsx
 import React from 'react';
 import { useDispatch, useSelector } from 'react-redux';
+import { useNavigate } from 'react-router-dom';
 import { useGetUnitsOfMeasurementQuery } from '../../../redux/slices/productsApiSlice';
 import { markForDeletion, unmarkForDeletion } from '../../../redux/slices/deletionRequestsSlice';
+import ActionDropdown from '../../../components/UI/ActionDropdown/ActionDropdown';
 
 const truncateDescription = (str, maxLength = 50) => {
     if (!str) return '—';
@@ -64,6 +66,7 @@ const ProductList = ({
     searchQuery = '',
 }) => {
     const dispatch = useDispatch();
+    const navigate = useNavigate();
     const deletionArray = useSelector(state => state.deletionRequests);
     const { data: units = [] } = useGetUnitsOfMeasurementQuery();
 
@@ -125,7 +128,7 @@ const ProductList = ({
                                 <th className="px-4 py-3 w-[25%]">Описание</th>
                                 <th className="px-4 py-3 w-[10%] text-right">Остаток</th>
                                 <th className="px-4 py-3 w-[10%] text-right">Цена закупки</th>
-                                <th className="px-4 py-3 w-[5%] text-center">Удаление</th>
+                                <th className="px-4 py-3 w-[10%] text-center">Действия</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-200 text-sm">
@@ -145,18 +148,33 @@ const ProductList = ({
                                         <td className="px-4 py-3 text-gray-700 w-[25%]">{truncateDescription(product.description, 50)}</td>
                                         <td className={`px-4 py-3 w-[10%] text-right ${(product.total_quantity || 0) < (product.min_stock || 0) ? 'text-red-600 font-semibold' : 'text-gray-900'}`}>{(product.total_quantity || 0)} {unitName}</td>
                                         <td className="px-4 py-3 text-gray-900 w-[10%] text-right">{(product.last_purchase_price || 0).toFixed(2)} ₽</td>
-                                        <td className="px-4 py-3 w-[5%] text-center">
-                                            <input
-                                                type="checkbox"
-                                                checked={markedForDeletion}
-                                                onChange={(e) => {
-                                                    if (e.target.checked) {
-                                                        dispatch(markForDeletion(product.id));
-                                                    } else {
-                                                        dispatch(unmarkForDeletion(product.id));
-                                                    }
-                                                }}
-                                                className="rounded border-gray-300 text-red-600"
+                                        <td className="px-4 py-3 w-[10%] text-center">
+                                            <ActionDropdown
+                                                buttonText="⋮"
+                                                actions={[
+                                                    {
+                                                        label: 'Редактировать',
+                                                        icon: '✏️',
+                                                        color: 'blue',
+                                                        onClick: (e) => {
+                                                            e.stopPropagation();
+                                                            handleEdit(product.id);
+                                                        },
+                                                    },
+                                                    {
+                                                        label: markedForDeletion ? 'Снять пометку' : 'Пометить на удаление',
+                                                        icon: markedForDeletion ? '✓' : '🗑️',
+                                                        color: markedForDeletion ? 'green' : 'red',
+                                                        onClick: (e) => {
+                                                            e.stopPropagation();
+                                                            if (markedForDeletion) {
+                                                                dispatch(unmarkForDeletion(product.id));
+                                                            } else {
+                                                                dispatch(markForDeletion(product.id));
+                                                            }
+                                                        },
+                                                    },
+                                                ]}
                                             />
                                         </td>
                                     </tr>
@@ -190,21 +208,29 @@ const ProductList = ({
                                         <span>{(product.last_purchase_price || 0).toFixed(2)} ₽</span>
                                     </div>
                                     <div className="flex justify-end items-center mt-2">
-                                        <label className="flex items-center">
-                                            <span className="mr-2 text-xs">Удалить</span>
-                                            <input
-                                                type="checkbox"
-                                                checked={markedForDeletion}
-                                                onChange={(e) => {
-                                                    if (e.target.checked) {
-                                                        dispatch(markForDeletion(product.id));
-                                                    } else {
-                                                        dispatch(unmarkForDeletion(product.id));
-                                                    }
-                                                }}
-                                                className="rounded border-gray-300 text-red-600"
-                                            />
-                                        </label>
+                                        <ActionDropdown
+                                            buttonText="Действия"
+                                            actions={[
+                                                {
+                                                    label: 'Редактировать',
+                                                    icon: '✏️',
+                                                    color: 'blue',
+                                                    onClick: () => handleEdit(product.id),
+                                                },
+                                                {
+                                                    label: markedForDeletion ? 'Снять пометку' : 'Пометить на удаление',
+                                                    icon: markedForDeletion ? '✓' : '🗑️',
+                                                    color: markedForDeletion ? 'green' : 'red',
+                                                    onClick: () => {
+                                                        if (markedForDeletion) {
+                                                            dispatch(unmarkForDeletion(product.id));
+                                                        } else {
+                                                            dispatch(markForDeletion(product.id));
+                                                        }
+                                                    },
+                                                },
+                                            ]}
+                                        />
                                     </div>
                                 </div>
                             );

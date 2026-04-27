@@ -9,6 +9,50 @@ import {
 } from '../../../redux/slices/apiSlice';
 import { useGetPromotionsQuery } from '../../../redux/slices/promotionsApiSlice';
 
+const MAX_FILES = 5;
+const MAX_FILE_SIZE_MB = 5;
+const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
+
+const compressImageFile = (file, maxWidth = 1920, quality = 0.82) =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        const ratio = Math.min(1, maxWidth / img.width);
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.round(img.width * ratio);
+        canvas.height = Math.round(img.height * ratio);
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          reject(new Error('Canvas is not supported'));
+          return;
+        }
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        canvas.toBlob(
+          (blob) => {
+            if (!blob) {
+              reject(new Error('Image compression failed'));
+              return;
+            }
+            const compressed = new File(
+              [blob],
+              file.name.replace(/\.[^.]+$/, '.webp'),
+              { type: 'image/webp' }
+            );
+            resolve(compressed);
+          },
+          'image/webp',
+          quality
+        );
+      };
+      img.onerror = () => reject(new Error('Image load failed'));
+      img.src = reader.result;
+    };
+    reader.onerror = () => reject(new Error('File read failed'));
+    reader.readAsDataURL(file);
+  });
+
 function BathForm() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -18,7 +62,7 @@ function BathForm() {
   // Для фото используем базовый URL сервера (без /api)
   const SERVER_BASE_URL = process.env.REACT_APP_API_URL ? process.env.REACT_APP_API_URL.replace('/api', '') : (window.location.origin || 'http://127.0.0.1:8000');
 
-  const { data: bath, isLoading: isLoadingBath } = useGetBathByIdQuery(bathId, { skip: !isEditing });
+  const { data: bath, isLoading: isLoadingBath, refetch: refetchBath } = useGetBathByIdQuery(bathId, { skip: !isEditing });
   const [createBath] = useCreateBathMutation();
   const [updateBath] = useUpdateBathMutation();
   const [uploadPhotos] = useUploadBathPhotosMutation();
@@ -38,6 +82,7 @@ function BathForm() {
   const [selectedFiles, setSelectedFiles] = useState([]);
   const [isSaving, setIsSaving] = useState(false);
   const [selectedPromotionIds, setSelectedPromotionIds] = useState([]);
+  const [uploadProgress, setUploadProgress] = useState(null); // Track upload progress
 
   // Заполняем форму данными при редактировании
   useEffect(() => {
@@ -72,6 +117,8 @@ function BathForm() {
     }
 
     setIsSaving(true);
+    setUploadProgress(0);
+    
     try {
       let resultBathId = bathId;
 
@@ -106,8 +153,24 @@ function BathForm() {
 
       // Загружаем фото если есть
       if (selectedFiles.length > 0 && resultBathId) {
+        setUploadProgress(10);
         const filesToUpload = selectedFiles.map(item => item.file);
-        await uploadPhotos({ bath_id: resultBathId, files: filesToUpload }).unwrap();
+        
+        try {
+          await uploadPhotos({ bath_id: resultBathId, files: filesToUpload }).unwrap();
+          setUploadProgress(100);
+        } catch (uploadErr) {
+          console.error('Ошибка загрузки фото:', uploadErr);
+          setUploadProgress(null);
+          
+          // Check if it's a 413 error
+          if (uploadErr.status === 413) {
+            alert('Ошибка: Файлы слишком большие. Максимальный размер: 10 МБ на файл');
+          } else {
+            alert('Произошла ошибка при загрузке фото');
+          }
+          return; // Don't navigate away if upload fails
+        }
       }
 
       // Возвращаемся к списку
@@ -117,22 +180,42 @@ function BathForm() {
       alert('Произошла ошибка при сохранении бани');
     } finally {
       setIsSaving(false);
+      setUploadProgress(null);
     }
   };
 
-  const handleFileChange = (e) => {
+  const handleFileChange = async (e) => {
     const files = Array.from(e.target.files);
-    if (files.length + selectedFiles.length > 5) {
-      alert('Можно загрузить не более 5 фото');
+    if (files.length + selectedFiles.length > MAX_FILES) {
+      alert(`Можно загрузить не более ${MAX_FILES} фото`);
       return;
     }
-    
-    const newFiles = files.map(file => ({
-      file,
-      preview: URL.createObjectURL(file)
-    }));
-    
-    setSelectedFiles(prev => [...prev, ...newFiles]);
+
+    try {
+      const processedFiles = await Promise.all(
+        files.map(async (file) => {
+          const preparedFile = file.type === 'image/webp' && file.size <= MAX_FILE_SIZE_BYTES
+            ? file
+            : await compressImageFile(file);
+
+          if (preparedFile.size > MAX_FILE_SIZE_BYTES) {
+            throw new Error(`Файл "${file.name}" превышает ${MAX_FILE_SIZE_MB} МБ даже после сжатия`);
+          }
+
+          return {
+            file: preparedFile,
+            preview: URL.createObjectURL(preparedFile),
+          };
+        })
+      );
+
+      setSelectedFiles(prev => [...prev, ...processedFiles]);
+    } catch (err) {
+      console.error('Ошибка обработки изображений:', err);
+      alert(err.message || 'Не удалось подготовить изображения к загрузке');
+    } finally {
+      e.target.value = '';
+    }
   };
 
   const removePreview = (index) => {
@@ -151,8 +234,7 @@ function BathForm() {
 
     try {
       await deletePhoto({ bath_id: bathId, photo_id: photoId }).unwrap();
-      // Refetch bath data to update the photos list
-      window.location.reload();
+      await refetchBath();
     } catch (err) {
       console.error('Ошибка удаления фото:', err);
       alert('Произошла ошибка при удалении фото');
@@ -319,20 +401,35 @@ function BathForm() {
           {/* Загрузка фото */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Загрузить фото (до 5 шт.)
+              Загрузить фото (до 5 шт., макс. 10 МБ каждое)
             </label>
             <input
               type="file"
               multiple
               accept="image/*"
               onChange={handleFileChange}
-              className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500"
+              disabled={isSaving}
+              className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 disabled:opacity-50"
             />
             
             {/* Превью загруженных фото */}
             {selectedFiles.length > 0 && (
               <div className="mt-3">
-                <p className="text-sm text-gray-600 mb-2">Выбранные фото:</p>
+                <div className="flex justify-between items-center mb-2">
+                  <p className="text-sm text-gray-600">Выбранные фото:</p>
+                  {!isSaving && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        selectedFiles.forEach(item => URL.revokeObjectURL(item.preview));
+                        setSelectedFiles([]);
+                      }}
+                      className="text-sm text-red-600 hover:text-red-700 font-medium transition"
+                    >
+                      Удалить все
+                    </button>
+                  )}
+                </div>
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
                   {selectedFiles.map((item, idx) => (
                     <div key={idx} className="relative group">
@@ -341,15 +438,34 @@ function BathForm() {
                         alt={`Превью ${idx + 1}`}
                         className="w-full h-32 object-cover rounded-lg border border-gray-200"
                       />
-                      <button
-                        type="button"
-                        onClick={() => removePreview(idx)}
-                        className="absolute top-1 right-1 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm opacity-0 group-hover:opacity-100 transition shadow-md"
-                      >
-                        ×
-                      </button>
+                      {!isSaving && (
+                        <button
+                          type="button"
+                          onClick={() => removePreview(idx)}
+                          className="absolute top-1 right-1 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm shadow-md hover:bg-red-600 transition opacity-0 group-hover:opacity-100"
+                          title="Убрать из загрузки"
+                        >
+                          ×
+                        </button>
+                      )}
                     </div>
                   ))}
+                </div>
+              </div>
+            )}
+            
+            {/* Upload progress bar */}
+            {uploadProgress !== null && (
+              <div className="mt-3">
+                <div className="flex justify-between items-center mb-1">
+                  <span className="text-sm text-gray-600">Загрузка фото...</span>
+                  <span className="text-sm font-medium text-gray-700">{uploadProgress}%</span>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-2.5">
+                  <div
+                    className="bg-green-600 h-2.5 rounded-full transition-all duration-300"
+                    style={{ width: `${uploadProgress}%` }}
+                  ></div>
                 </div>
               </div>
             )}
@@ -363,7 +479,7 @@ function BathForm() {
               </label>
               <div className="flex flex-wrap gap-4">
                 {bath.photos.map((photo, idx) => (
-                  <div key={photo.photo_id} className="relative group">
+                  <div key={photo.photo_id} className="relative">
                     <img
                       src={`${SERVER_BASE_URL}${photo.image_url}`}
                       alt={`Фото ${idx + 1}`}
@@ -389,7 +505,13 @@ function BathForm() {
               disabled={isSaving}
               className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-xl font-medium shadow transition disabled:opacity-50"
             >
-              {isSaving ? 'Сохранение...' : (isEditing ? 'Сохранить изменения' : 'Добавить баню')}
+              {isSaving ? (
+                uploadProgress !== null
+                  ? `Загрузка фото... ${uploadProgress}%`
+                  : 'Сохранение...'
+              ) : (
+                isEditing ? 'Сохранить изменения' : 'Добавить баню'
+              )}
             </button>
             <button
               type="button"
