@@ -75,7 +75,7 @@ const CategoryModal = ({
       setPhotoDeleted(false);
 
       // Для фото используем базовый URL сервера (без /api)
-      const baseUrl = process.env.REACT_APP_API_URL?.replace('/api', '') || 'http://127.0.0.1:8000';
+      const baseUrl = process.env.REACT_APP_API_URL ? process.env.REACT_APP_API_URL.replace('/api', '') : (window.location.origin || 'http://127.0.0.1:8000');
       const imageUrl = category?.photos?.[0]?.image_url;
       const cleanImageUrl = imageUrl?.startsWith('/') ? imageUrl.slice(1) : imageUrl;
       setCurrentImageUrl(cleanImageUrl ? `${baseUrl}/${cleanImageUrl}` : null);

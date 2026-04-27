@@ -1,7 +1,7 @@
 import apiClient from '../../utils/apiClient';
 
 // Используем базовый apiClient напрямую - он уже имеет все интерсепторы
-const ADMIN_BASE_URL = `${apiClient.defaults.baseURL}/admin`;
+const ADMIN_BASE_URL = `/api/admin`;
 
 export const login = async (credentials) => {
   const formData = new FormData();

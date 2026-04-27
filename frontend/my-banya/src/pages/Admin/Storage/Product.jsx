@@ -55,7 +55,7 @@ function Product() {
       // Устанавливаем превью существующих фото
       if (product.photos?.length) {
         // Для фото используем базовый URL сервера (без /api)
-        const baseUrl = process.env.REACT_APP_API_URL?.replace('/api', '') || 'http://127.0.0.1:8000';
+        const baseUrl = process.env.REACT_APP_API_URL ? process.env.REACT_APP_API_URL.replace('/api', '') : (window.location.origin || 'http://127.0.0.1:8000');
         const fullUrls = product.photos.map(photo => {
           const url = photo.image_url;
           return url.startsWith('/')

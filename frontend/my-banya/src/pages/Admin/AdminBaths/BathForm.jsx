@@ -16,7 +16,7 @@ function BathForm() {
   const bathId = isEditing ? parseInt(id) : null;
 
   // Для фото используем базовый URL сервера (без /api)
-  const SERVER_BASE_URL = process.env.REACT_APP_API_URL?.replace('/api', '') || 'http://127.0.0.1:8000';
+  const SERVER_BASE_URL = process.env.REACT_APP_API_URL ? process.env.REACT_APP_API_URL.replace('/api', '') : (window.location.origin || 'http://127.0.0.1:8000');
 
   const { data: bath, isLoading: isLoadingBath } = useGetBathByIdQuery(bathId, { skip: !isEditing });
   const [createBath] = useCreateBathMutation();

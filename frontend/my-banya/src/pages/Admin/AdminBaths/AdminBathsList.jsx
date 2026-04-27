@@ -8,7 +8,7 @@ function AdminBathsList() {
   const { data: baths, isLoading, error } = useGetBathsQuery();
   
   // Для фото используем базовый URL сервера (без /api)
-  const SERVER_BASE_URL = process.env.REACT_APP_API_URL?.replace('/api', '') || 'http://127.0.0.1:8000';
+  const SERVER_BASE_URL = process.env.REACT_APP_API_URL ? process.env.REACT_APP_API_URL.replace('/api', '') : (window.location.origin || 'http://127.0.0.1:8000');
 
   if (isLoading) return <AdminBathsSkeleton />;
   if (error) return <div className="p-8 text-red-500">Ошибка: {error.toString()}</div>;

@@ -8,7 +8,7 @@ import 'swiper/css/navigation';
 import 'swiper/css/pagination';
 
 function SliderBaths() {
-  const SERVER_BASE_URL = process.env.REACT_APP_API_URL?.replace('/api', '') || 'http://127.0.0.1:8000';
+  const SERVER_BASE_URL = process.env.REACT_APP_API_URL ? process.env.REACT_APP_API_URL.replace('/api', '') : (window.location.origin || 'http://127.0.0.1:8000');
   const { data: baths = [], isLoading, error } = useGetBathsQuery();
 
   if (isLoading) {
