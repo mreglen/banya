@@ -63,7 +63,7 @@ function ChatPage() {
     if (!sent) {
       try {
         const response = await fetch(
-          `${process.env.REACT_APP_API_URL || 'http://localhost:8000/api'}/support/tickets/${id}/messages`,
+          `${process.env.REACT_APP_API_URL || '/api'}/support/tickets/${id}/messages`,
           {
             method: 'POST',
             headers: {
@@ -165,7 +165,9 @@ function ChatPage() {
 
   if (!ticket) return null;
 
-  const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
+  const API_URL = process.env.REACT_APP_API_URL
+    ? process.env.REACT_APP_API_URL.replace('/api', '')
+    : '';
   const attachmentImages = ticket.attachments?.map(
     (attachment) => `${API_URL}${attachment.file_path}`
   ) || [];

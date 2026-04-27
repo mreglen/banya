@@ -2,7 +2,9 @@ import { useEffect, useRef, useCallback } from 'react';
 import { useDispatch } from 'react-redux';
 import { supportApi } from '../redux/supportApiSlice';
 
-const WS_URL = process.env.REACT_APP_API_URL?.replace('http', 'ws')?.replace('/api', '') || 'ws://localhost:8000';
+const WS_URL = process.env.REACT_APP_API_URL
+  ? process.env.REACT_APP_API_URL.replace('http', 'ws').replace('/api', '')
+  : `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}`;
 
 /**
  * WebSocket хук для чата поддержки
