@@ -422,7 +422,7 @@ function Admin() {
           }
         >
           <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 5.636l-3.54 3.54m0 0l3.54 3.54m0 0l-3.54 3.54m0 0l3.54 3.54m0 0l-3.54 3.54M12 6v6m0 0v6m0-6h6m-6 0H6" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9a3.75 3.75 0 117.544 0c0 1.505-.844 2.43-1.913 3.098-.903.564-1.587 1.082-1.587 1.902M12 17h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
           Поддержка
         </NavLink>
