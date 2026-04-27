@@ -1,5 +1,4 @@
-import { useLocation } from 'react-router-dom';
-import { useEffect, useState, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import ReservationsFilters from '../Reservations/ReservationsFilters';
 import BookingDetailsModal from '../Reservations/BookingDetailsModal';
 import AddBookingModal from '../Reservations/AddBookingModal';
@@ -20,7 +19,6 @@ function AdminReservations() {
   const [editingBooking, setEditingBooking] = useState(null);
   const [activeBathId, setActiveBathId] = useState(null);
   const [deleteReservation] = useDeleteReservationMutation();
-  const location = useLocation();
 
   const { data: baths = [], isLoading: isLoadingBaths } = useGetBathsQuery();
   
@@ -37,10 +35,6 @@ function AdminReservations() {
   } = useGetReservationsByDateQuery({
     date: filters.date || today,
   });
-
-  useEffect(() => {
-    refetchReservations();
-  }, [location.pathname, refetchReservations]);
 
   const timeSlots = useMemo(() => {
     const slots = [];

@@ -444,7 +444,7 @@ function Admin() {
 
       {/* Main Content */}
       <main className="flex-1 md:ml-0 ml-0 pt-16 md:pt-0 p-4 md:p-8 pb-20 md:pb-8">
-        <Outlet key={location.pathname} />
+        <Outlet />
       </main>
 
       {/* Mobile Sidebar */}

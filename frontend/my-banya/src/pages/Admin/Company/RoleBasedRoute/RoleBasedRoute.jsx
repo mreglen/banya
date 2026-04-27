@@ -1,6 +1,7 @@
 // RoleBasedRoute.jsx
 import { useSelector } from 'react-redux';
 import { Navigate } from 'react-router-dom';
+import { memo } from 'react';
 
 function RoleBasedRoute({ children, requiredPermission }) {
   const { user } = useSelector((state) => state.auth);
@@ -28,4 +29,4 @@ function RoleBasedRoute({ children, requiredPermission }) {
   return children;
 }
 
-export default RoleBasedRoute;
+export default memo(RoleBasedRoute);
