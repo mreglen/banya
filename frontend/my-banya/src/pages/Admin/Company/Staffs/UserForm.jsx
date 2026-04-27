@@ -42,10 +42,14 @@ function UserForm() {
   const [showPassword, setShowPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
 
-  // Группировка прав по категориям
+  // Группировка прав по категориям (исключая 'clients')
   const groupedPermissions = useMemo(() => {
     const grouped = {};
     permissions.forEach(perm => {
+      // Скрываем права, связанные с клиентами, но оставляем их в БД
+      if (perm.category === 'clients') {
+        return;
+      }
       if (!grouped[perm.category]) {
         grouped[perm.category] = [];
       }
@@ -203,6 +207,7 @@ function UserForm() {
           permission_ids: selectedPermissions,
         };
         if (!payload.password) delete payload.password;
+        console.log('📤 Updating user payload:', payload);
         await updateUser({ user_id: Number(id), ...payload }).unwrap();
       } else {
         const payload = {
@@ -210,6 +215,7 @@ function UserForm() {
           phone: normalizedPhone,
           permission_ids: selectedPermissions,
         };
+        console.log('📤 Creating user payload:', payload);
         await createUser(payload).unwrap();
         const returnTo = location.state?.fromDocument?.returnTo;
         if (returnTo) {
@@ -219,8 +225,10 @@ function UserForm() {
       }
       navigate('/admin/company/user');
     } catch (err) {
-      console.error('Ошибка сохранения:', err);
-      alert('Не удалось сохранить пользователя. Проверьте данные и повторите попытку.');
+      console.error('❌ Ошибка сохранения:', err);
+      console.error('📥 Error details:', err.data || err.error || err.message);
+      const errorMessage = err.data?.detail || err.error || 'Не удалось сохранить пользователя. Проверьте данные и повторите попытку.';
+      alert(errorMessage);
     }
   };
 

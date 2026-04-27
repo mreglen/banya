@@ -1,4 +1,4 @@
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 import { useEffect, useState, useMemo } from 'react';
 import ReservationsFilters from '../Reservations/ReservationsFilters';
 import BookingDetailsModal from '../Reservations/BookingDetailsModal';
@@ -8,10 +8,7 @@ import { useGetBathsQuery } from '../../../redux/slices/apiSlice';
 import { useGetSettingsQuery } from '../../../redux/slices/settingsApiSlice';
 import {
   useGetReservationsByDateQuery,
-  useCreateReservationMutation,
-  useUpdateReservationMutation,
   useDeleteReservationMutation,
-  useGetReservationStatusesQuery,
 } from '../../../redux/slices/reservationSlice';
 
 

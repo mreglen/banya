@@ -46,7 +46,7 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate }) {
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
 
   const { data: baths = [], isLoading: isLoadingBaths } = useGetBathsQuery();
-  const { data: stockProducts = [], isLoading: isLoadingStock } = useGetStockProductsQuery();
+  const { data: stockProducts = [] } = useGetStockProductsQuery();
   const { data: units = [], isLoading: isLoadingUnits } = useGetUnitsOfMeasurementQuery(); // ← ДОБАВЛЕНО
   const {
     data: statusOptions = [],
@@ -109,7 +109,7 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate }) {
         selectedProducts,
       });
     }
-  }, [booking, stockProducts, units]); // ← ДОБАВЛЕНО units
+  }, [booking, stockProducts, units, findUnitName, statusOptions.length]); // ← ДОБАВЛЕНО units
 
   useEffect(() => {
     if (formData.end_time <= formData.start_time) {
@@ -118,7 +118,7 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate }) {
         setFormData(prev => ({ ...prev, end_time: options[0] }));
       }
     }
-  }, [formData.start_time]);
+  }, [formData.start_time, formData.end_time]);
 
   const getEndTimeOptions = (startTime) => {
     const allOptions = generateTimeOptions();
@@ -507,7 +507,7 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate }) {
               {formData.bath_id && (
                 <div className="text-xs sm:text-sm text-gray-600 bg-blue-50 px-3 py-2 rounded-lg">
                   {(() => {
-                    const selectedBath = baths.find((b) => b.bath_id == formData.bath_id);
+                    const selectedBath = baths.find((b) => b.bath_id === formData.bath_id);
                     if (!selectedBath) return null;
                     return (
                       <>

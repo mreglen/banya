@@ -362,6 +362,13 @@ class AuditLog(Base):
     ip_address = Column(String(45), nullable=True)
     user_agent = Column(String(500), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    # Новые поля для детальной информации
+    summary = Column(Text, nullable=True)  # Человеко-читаемое описание
+    bath_name = Column(String(100), nullable=True)
+    client_name = Column(String(100), nullable=True)
+    event_datetime = Column(DateTime(timezone=True), nullable=True)
+    product_list = Column(Text, nullable=True)  # "Веник дубовый x2, Чай x1"
 
     user = relationship("User")
 

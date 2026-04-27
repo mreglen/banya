@@ -2,7 +2,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   useGetCategoriesQuery,
-  useGetProductsQuery,
   useGetStockProductsQuery,
   useCreateCategoryMutation,
   useCreateProductMutation,

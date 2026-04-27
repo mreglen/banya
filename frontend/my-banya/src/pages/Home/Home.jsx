@@ -1,3 +1,4 @@
+import { Helmet } from 'react-helmet-async';
 import ListBaths from "./ListBaths/ListBaths";
 import KitchenPreview from "./KitchenPreview/KitchenPreview";
 import MassagesPreview from "./MassagesPreview/MassagesPreview";
@@ -8,6 +9,44 @@ import ContactSection from "./ContactSection/ContactSection";
 function Home() {
     return (
         <div>
+            <Helmet>
+                <title>Николаевские бани - Русские бани на дровах в Екатеринбурге</title>
+                <meta name="description" content="Николаевские бани в Екатеринбурге - настоящие русские бани на дровах с вековыми традициями. Бронирование онлайн, парение с вениками, отдых для души и тела." />
+                <meta name="keywords" content="бани Екатеринбург, русская баня, баня на дровах, парение, веники, отдых, Николаевские бани, бронирование бани" />
+                
+                {/* Open Graph */}
+                <meta property="og:title" content="Николаевские бани - Русские бани на дровах в Екатеринбурге" />
+                <meta property="og:description" content="Настоящие русские бани на дровах с вековыми традициями. Восстанавливаем силы и душевное тепло." />
+                <meta property="og:type" content="website" />
+                <meta property="og:url" content="https://nikolaevskie-bani.ru/" />
+                <meta property="og:image" content="%PUBLIC_URL%/img/Logo.png" />
+                <meta property="og:locale" content="ru_RU" />
+                
+                {/* Twitter */}
+                <meta name="twitter:card" content="summary_large_image" />
+                <meta name="twitter:title" content="Николаевские бани - Русские бани на дровах в Екатеринбурге" />
+                <meta name="twitter:description" content="Настоящие русские бани на дровах с вековыми традициями." />
+                
+                {/* Schema.org structured data */}
+                <script type="application/ld+json">
+                    {JSON.stringify({
+                        "@context": "https://schema.org",
+                        "@type": "LocalBusiness",
+                        "name": "Николаевские бани",
+                        "description": "Настоящие русские бани на дровах с вековыми традициями",
+                        "url": "https://nikolaevskie-bani.ru/",
+                        "telephone": "+73433448755",
+                        "email": "nikolaevskiebani@yandex.ru",
+                        "address": {
+                            "@type": "PostalAddress",
+                            "streetAddress": "ул. Кизеловская, 18",
+                            "addressLocality": "Екатеринбург",
+                            "addressCountry": "RU"
+                        },
+                        "priceRange": "₽₽"
+                    })}
+                </script>
+            </Helmet>
             <div
                 className="relative w-full min-h-screen flex items-center bg-cover bg-center bg-no-repeat bg-fixed"
                 style={{

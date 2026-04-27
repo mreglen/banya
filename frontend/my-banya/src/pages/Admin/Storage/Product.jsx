@@ -137,7 +137,7 @@ function Product() {
     }
   };
 
-  const selectedCategory = categories.find(c => c.id == form.category_id);
+  const selectedCategory = categories.find(c => c.id === form.category_id);
   const selectedUnit = units.find(u => u.id === form.unit_id);
 
   if (isLoadingProduct || isLoadingCategories || isLoadingUnits) { // ← ДОБАВЛЕНО isLoadingUnits

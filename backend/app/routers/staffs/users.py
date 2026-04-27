@@ -74,15 +74,20 @@ def create_user(
     db.commit()
     db.refresh(db_user)
 
-    # Асинхронное логирование создания пользователя
+    # Асинхронное логирование создания пользователя с детальной информацией
+    summary = f"Создал сотрудника: {user_data.full_name} ({user_data.email})"
+    
+    from app.audit_logger import log_detailed_action
     background_tasks.add_task(
-        log_action,
+        log_detailed_action,
         db=SessionLocal(),
         user_id=current_user.user_id,
         action="CREATE",
         entity_type="user",
         entity_id=db_user.user_id,
         details={"email": user_data.email, "full_name": user_data.full_name},
+        summary=summary,
+        client_name=user_data.full_name,
         ip_address=get_client_ip(request),
         user_agent=request.headers.get("user-agent")
     )
@@ -128,15 +133,20 @@ def update_user(
     db.commit()
     db.refresh(db_user)
 
-    # Асинхронное логирование обновления пользователя
+    # Асинхронное логирование обновления пользователя с детальной информацией
+    summary = f"Изменил сотрудника: {db_user.full_name} ({db_user.email})"
+    
+    from app.audit_logger import log_detailed_action
     background_tasks.add_task(
-        log_action,
+        log_detailed_action,
         db=SessionLocal(),
         user_id=current_user.user_id,
         action="UPDATE",
         entity_type="user",
         entity_id=user_id,
         details={"email": db_user.email, "full_name": db_user.full_name},
+        summary=summary,
+        client_name=db_user.full_name,
         ip_address=get_client_ip(request),
         user_agent=request.headers.get("user-agent")
     )
@@ -163,15 +173,20 @@ def delete_user(
     db.delete(db_user)
     db.commit()
 
-    # Асинхронное логирование удаления пользователя
+    # Асинхронное логирование удаления пользователя с детальной информацией
+    summary = f"Удалил сотрудника: {user_full_name} ({user_email})"
+    
+    from app.audit_logger import log_detailed_action
     background_tasks.add_task(
-        log_action,
+        log_detailed_action,
         db=SessionLocal(),
         user_id=current_user.user_id,
         action="DELETE",
         entity_type="user",
         entity_id=user_id,
         details={"email": user_email, "full_name": user_full_name},
+        summary=summary,
+        client_name=user_full_name,
         ip_address=get_client_ip(request),
         user_agent=request.headers.get("user-agent")
     )

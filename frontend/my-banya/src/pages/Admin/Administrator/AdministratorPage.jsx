@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useSelector } from 'react-redux';
 import { Navigate } from 'react-router-dom';
 import { useGetAuditLogsQuery, useGetUsersQuery } from '../../../redux/slices/apiSlice';
+import AuditLogDetailsModal from './AuditLogDetailsModal';
 
 function AdministratorPage() {
   const { user } = useSelector((state) => state.auth);
@@ -16,6 +17,7 @@ function AdministratorPage() {
     user_id: '',
   });
   const { data: auditLogs = [], isLoading, error } = useGetAuditLogsQuery(filters);
+  const [selectedLog, setSelectedLog] = useState(null);
 
   // Проверка: только для администраторов
   if (!user?.is_admin) {
@@ -73,41 +75,6 @@ function AdministratorPage() {
         <h1 className="text-3xl font-bold text-gray-800 mb-8">
           🔐 Панель администратора
         </h1>
-
-        {/* Информация о системе */}
-        <div className="bg-white rounded-2xl shadow-lg p-8 mb-8">
-          <div className="mb-6">
-            <h2 className="text-xl font-semibold text-gray-700 mb-2">
-              Информация о системе
-            </h2>
-            <p className="text-gray-600">
-              Добро пожаловать в панель управления системой. Здесь вы можете управлять настройками системы.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8">
-            <div className="bg-blue-50 border border-blue-200 rounded-xl p-6">
-              <h3 className="text-lg font-medium text-blue-800 mb-2">
-                👤 Администратор
-              </h3>
-              <p className="text-blue-600 text-sm">
-                Email: {user?.email}
-              </p>
-              <p className="text-blue-600 text-sm">
-                Имя: {user?.full_name}
-              </p>
-            </div>
-
-            <div className="bg-green-50 border border-green-200 rounded-xl p-6">
-              <h3 className="text-lg font-medium text-green-800 mb-2">
-                ⚙️ Статус системы
-              </h3>
-              <p className="text-green-600 text-sm">
-                Система работает нормально
-              </p>
-            </div>
-          </div>
-        </div>
 
         {/* Журнал аудита */}
         <div className="bg-white rounded-2xl shadow-lg p-8">
@@ -223,7 +190,11 @@ function AdministratorPage() {
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {auditLogs.map((log) => (
-                    <tr key={log.id} className="hover:bg-gray-50">
+                    <tr 
+                      key={log.id} 
+                      className="hover:bg-gray-50 cursor-pointer transition-colors"
+                      onClick={() => setSelectedLog(log)}
+                    >
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                         {formatDate(log.created_at)}
                       </td>
@@ -249,6 +220,14 @@ function AdministratorPage() {
                 </tbody>
               </table>
             </div>
+          )}
+
+          {/* Модальное окно деталей */}
+          {selectedLog && (
+            <AuditLogDetailsModal 
+              log={selectedLog} 
+              onClose={() => setSelectedLog(null)} 
+            />
           )}
 
           {/* Пагинация */}

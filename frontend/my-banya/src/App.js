@@ -1,13 +1,12 @@
 import { useEffect } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
+import { useDispatch } from 'react-redux';
 import { setCredentials, logOut } from './redux/slices/authSlice';
 import { getProfile } from './redux/slices/adminApi';
 import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
+import { HelmetProvider } from 'react-helmet-async';
 import Header from './components/Header/Header';
 import Home from './pages/Home/Home';
 import Booking from './pages/Booking/Booking';
-import Baths from './pages/Baths/Baths';
-import Contacts from './pages/Contacts/Contacts';
 import BathsCard from './pages/Baths/BathsCard/BathsCard';
 import AdminLogin from './pages/Admin/AdminLogin/AdminLogin';
 import PrivateRoute from './components/PrivateRoute';
@@ -71,7 +70,7 @@ function AppWithLayout() {
           }
         });
     }
-  }, [dispatch]);
+  }, [dispatch, token]);
 
   return (
     <>
@@ -130,9 +129,11 @@ function AppWithLayout() {
 
 function App() {
   return (
-    <BrowserRouter>
-      <AppWithLayout />
-    </BrowserRouter>
+    <HelmetProvider>
+      <BrowserRouter>
+        <AppWithLayout />
+      </BrowserRouter>
+    </HelmetProvider>
   );
 }
 

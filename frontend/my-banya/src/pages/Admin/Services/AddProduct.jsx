@@ -14,9 +14,7 @@ function AddProduct() {
   const [cost, setCost] = useState('');
   const [selectedCategoryId, setSelectedCategoryId] = useState(null);
   const [selectedSubcategoryId, setSelectedSubcategoryId] = useState(null);
-  const [images, setImages] = useState([]);
   const [tempImagePreviews, setTempImagePreviews] = useState([]);
-
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
 
   // --- СТАТИЧЕСКИЕ ДАННЫЕ ИЗ localStorage ---
@@ -36,7 +34,6 @@ function AddProduct() {
   }, []);
 
   const fromDocument = location.state?.fromDocument;
-  const currentUrl = window.location.pathname + window.location.search;
 
   const handleImageChange = (e) => {
     const files = Array.from(e.target.files);
@@ -47,7 +44,6 @@ function AddProduct() {
         newPreviews.push(reader.result);
         if (newPreviews.length === files.length) {
           setTempImagePreviews(prev => [...prev, ...newPreviews]);
-          setImages(prev => [...prev, ...files]);
         }
       };
       reader.readAsDataURL(file);
@@ -56,12 +52,6 @@ function AddProduct() {
 
   const removeImage = (indexToRemove) => {
     setTempImagePreviews(prev => prev.filter((_, index) => index !== indexToRemove));
-    setImages(prev => prev.filter((_, index) => index !== indexToRemove));
-  };
-
-  const handleCategorySelect = (selected) => {
-    setSelectedCategoryId(selected.id);
-    setSelectedSubcategoryId(null);
   };
 
   const saveProductToStorage = (product) => {
@@ -121,7 +111,7 @@ function AddProduct() {
     }
   };
 
-  const selectedCategory = categories.find(c => c.id == selectedCategoryId);
+  const selectedCategory = categories.find(c => c.id === selectedCategoryId);
 
   if (isLoading) {
     return <div className="min-h-screen flex items-center justify-center">Загрузка категорий...</div>;

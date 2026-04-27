@@ -70,22 +70,23 @@ function Promotions() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 p-8">
+    <div className="min-h-screen bg-gray-50 p-4 md:p-8">
       <div className="max-w-6xl mx-auto">
         {/* Header */}
-        <div className="flex justify-between items-center mb-8">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-800">Акции</h1>
-            <p className="text-gray-600 mt-1">Управление акциями и специальными предложениями</p>
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 md:mb-8 gap-4">
+          <div className="flex-1">
+            <h1 className="text-2xl md:text-3xl font-bold text-gray-800">Акции</h1>
+            <p className="text-sm md:text-base text-gray-600 mt-1">Управление акциями и специальными предложениями</p>
           </div>
           <button
             onClick={handleAdd}
-            className="bg-green-600 hover:bg-green-700 text-white py-3 px-6 rounded-xl font-medium transition flex items-center gap-2"
+            className="w-full sm:w-auto bg-green-600 hover:bg-green-700 text-white py-2.5 px-4 md:py-3 md:px-6 rounded-xl font-medium transition flex items-center justify-center gap-2 text-sm md:text-base"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
             </svg>
-            Добавить акцию
+            <span className="hidden sm:inline">Добавить акцию</span>
+            <span className="sm:hidden">Добавить</span>
           </button>
         </div>
 
@@ -107,60 +108,61 @@ function Promotions() {
             </button>
           </div>
         ) : (
-          <div className="grid gap-6">
+          <div className="grid gap-4 md:gap-6">
             {promotions.map((promotion) => (
               <div
                 key={promotion.id}
-                className="bg-white rounded-xl shadow-lg p-6 border border-gray-200 hover:shadow-xl transition"
+                className="bg-white rounded-xl shadow-lg border border-gray-200 hover:shadow-xl transition"
               >
-                <div className="flex justify-between items-start gap-4">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-3">
-                      <h3 className="text-xl font-semibold text-gray-800">{promotion.name}</h3>
-                      <span
-                        className={`px-3 py-1 rounded-full text-xs font-medium ${
-                          promotion.is_active
-                            ? 'bg-green-100 text-green-800'
-                            : 'bg-gray-100 text-gray-600'
-                        }`}
-                      >
-                        {promotion.is_active ? 'Активна' : 'Неактивна'}
-                      </span>
-                    </div>
-                    
-                    {promotion.description && (
-                      <p className="text-gray-600 mb-4">{promotion.description}</p>
-                    )}
-                    
-                    <div className="space-y-2 text-sm">
-                      <div>
-                        <span className="font-medium text-gray-700">Условия: </span>
-                        <span className="text-gray-600">{formatConditions(promotion)}</span>
+                <div className="p-4 md:p-6">
+                  {/* Информация об акции */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex flex-col sm:flex-row items-start justify-between gap-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex flex-wrap items-center gap-2 md:gap-3 mb-2 md:mb-3">
+                          <h3 className="text-base md:text-xl font-semibold text-gray-800 break-words">{promotion.name}</h3>
+                          <span
+                            className={`px-2 py-0.5 md:px-3 md:py-1 rounded-full text-xs font-medium whitespace-nowrap ${
+                              promotion.is_active
+                                ? 'bg-green-100 text-green-800'
+                                : 'bg-gray-100 text-gray-600'
+                            }`}
+                          >
+                            {promotion.is_active ? 'Активна' : 'Неактивна'}
+                          </span>
+                        </div>
+                        
+                        <div className="space-y-1.5 md:space-y-2 text-xs md:text-sm">
+                          <div>
+                            <span className="font-medium text-gray-700">Условия: </span>
+                            <span className="text-gray-600">{formatConditions(promotion)}</span>
+                          </div>
+                          <div>
+                            <span className="font-medium text-gray-700">Подарки: </span>
+                            <span className="text-gray-600">{formatGifts(promotion)}</span>
+                          </div>
+                        </div>
                       </div>
-                      <div>
-                        <span className="font-medium text-gray-700">Подарки: </span>
-                        <span className="text-gray-600">{formatGifts(promotion)}</span>
+                      
+                      <div className="flex-shrink-0">
+                        <ActionDropdown
+                          actions={[
+                            {
+                              label: 'Редактировать',
+                              icon: '✏️',
+                              color: 'blue',
+                              onClick: () => handleEdit(promotion),
+                            },
+                            {
+                              label: 'Удалить',
+                              icon: '🗑️',
+                              color: 'red',
+                              onClick: () => handleDelete(promotion.id),
+                            },
+                          ]}
+                        />
                       </div>
                     </div>
-                  </div>
-                  
-                  <div>
-                    <ActionDropdown
-                      actions={[
-                        {
-                          label: 'Редактировать',
-                          icon: '✏️',
-                          color: 'blue',
-                          onClick: () => handleEdit(promotion),
-                        },
-                        {
-                          label: 'Удалить',
-                          icon: '🗑️',
-                          color: 'red',
-                          onClick: () => handleDelete(promotion.id),
-                        },
-                      ]}
-                    />
                   </div>
                 </div>
               </div>

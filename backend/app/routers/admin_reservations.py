@@ -237,15 +237,40 @@ def create_reservation(
             print(f"Ошибка при отправке email: {e}")
             # Не прерываем создание брони, если email не отправился
 
-    # Асинхронное логирование создания бронирования
+    # Асинхронное логирование создания бронирования с детальной информацией
+    # Получить название бани
+    bath = db.query(models.Bath).filter(models.Bath.bath_id == db_reservation.bath_id).first()
+    
+    # Сформировать список товаров
+    product_names = []
+    if reservation.products:
+        for item in reservation.products:
+            product = db.query(models.Product).filter(models.Product.id == item.product_id).first()
+            if product:
+                product_names.append(f"{product.name} x{item.quantity}")
+    
+    product_list_str = ", ".join(product_names) if product_names else None
+    
+    # Человеко-читаемое описание
+    start_dt = db_reservation.start_datetime
+    summary = f"Создал бронь на {start_dt.strftime('%d.%m.%Y %H:%M')}, баня: {bath.name if bath else 'Не указано'}, клиент: {reservation.client_name}"
+    if product_list_str:
+        summary += f", товары: {product_list_str}"
+    
+    from app.audit_logger import log_detailed_action
     background_tasks.add_task(
-        log_action,
+        log_detailed_action,
         db=SessionLocal(),
         user_id=current_user.user_id,
         action="CREATE",
         entity_type="reservation",
         entity_id=db_reservation.reservation_id,
         details={"client_name": reservation.client_name, "bath_id": reservation.bath_id},
+        summary=summary,
+        bath_name=bath.name if bath else None,
+        client_name=reservation.client_name,
+        event_datetime=start_dt,
+        product_list=product_list_str,
         ip_address=get_client_ip(request),
         user_agent=request.headers.get("user-agent")
     )
@@ -557,15 +582,38 @@ def update_reservation(
                        .filter(models.ReservationStatus.id == db_reservation.status_id)
                        .first()).status_name
 
-        # Асинхронное логирование обновления бронирования
+        # Асинхронное логирование обновления бронирования с детальной информацией
+        bath = db.query(models.Bath).filter(models.Bath.bath_id == db_reservation.bath_id).first()
+        
+        # Сформировать список товаров
+        product_names = []
+        for rp in db_reservation.reservation_products:
+            if rp.product:
+                product_names.append(f"{rp.product.name} x{rp.quantity}")
+        
+        product_list_str = ", ".join(product_names) if product_names else None
+        
+        # Человеко-читаемое описание
+        start_dt = db_reservation.start_datetime
+        end_dt = db_reservation.end_datetime
+        summary = f"Изменил бронь #{id} на {start_dt.strftime('%d.%m.%Y %H:%M')}-{end_dt.strftime('%H:%M')}, баня: {bath.name if bath else 'Не указано'}, клиент: {db_reservation.client_name}"
+        if product_list_str:
+            summary += f", товары: {product_list_str}"
+        
+        from app.audit_logger import log_detailed_action
         background_tasks.add_task(
-            log_action,
+            log_detailed_action,
             db=SessionLocal(),
             user_id=current_user.user_id,
             action="UPDATE",
             entity_type="reservation",
             entity_id=id,
             details={"client_name": db_reservation.client_name},
+            summary=summary,
+            bath_name=bath.name if bath else None,
+            client_name=db_reservation.client_name,
+            event_datetime=start_dt,
+            product_list=product_list_str,
             ip_address=get_client_ip(request),
             user_agent=request.headers.get("user-agent")
         )
@@ -620,15 +668,27 @@ def delete_reservation(
     db.delete(reservation)
     db.commit()
 
-    # Асинхронное логирование удаления бронирования
+    # Асинхронное логирование удаления бронирования с детальной информацией
+    bath = db.query(models.Bath).filter(models.Bath.bath_id == reservation.bath_id).first()
+    
+    # Человеко-читаемое описание
+    start_dt = reservation.start_datetime
+    end_dt = reservation.end_datetime
+    summary = f"Удалил бронь #{id} на {start_dt.strftime('%d.%m.%Y %H:%M')}-{end_dt.strftime('%H:%M')}, баня: {bath.name if bath else 'Не указано'}, клиент: {reservation.client_name}"
+    
+    from app.audit_logger import log_detailed_action
     background_tasks.add_task(
-        log_action,
+        log_detailed_action,
         db=SessionLocal(),
         user_id=current_user.user_id,
         action="DELETE",
         entity_type="reservation",
         entity_id=id,
         details={"client_name": reservation.client_name},
+        summary=summary,
+        bath_name=bath.name if bath else None,
+        client_name=reservation.client_name,
+        event_datetime=start_dt,
         ip_address=get_client_ip(request),
         user_agent=request.headers.get("user-agent")
     )

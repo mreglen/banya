@@ -72,6 +72,7 @@ function Storage() {
       }
     };
     handleAddProductFromState();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   if (isLoadingCategories || isLoadingProducts) {

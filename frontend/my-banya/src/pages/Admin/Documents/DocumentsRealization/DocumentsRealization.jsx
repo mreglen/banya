@@ -1,7 +1,6 @@
 // src/pages/Admin/Documents/DocumentsRealization/DocumentsRealization.jsx
 
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import {
     useGetRealizationDocumentsQuery,
     useDeleteRealizationDocumentMutation,
@@ -11,8 +10,6 @@ import ActionDropdown from '../../../../components/UI/ActionDropdown/ActionDropd
 import DocumentsRealizationSkeleton from './DocumentsRealizationSkeleton';
 
 function DocumentsRealization() {
-    const navigate = useNavigate();
-
     const {
         data: realizations = [],
         isLoading,

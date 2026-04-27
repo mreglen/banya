@@ -1,5 +1,3 @@
-import CustomButton from "../../../components/UI/CustomButton/CustomButton";
-
 function MassagesPreview() {
     const handleClick = (e) => {
         e.preventDefault();

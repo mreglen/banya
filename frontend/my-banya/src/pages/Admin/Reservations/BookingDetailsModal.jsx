@@ -14,7 +14,7 @@ function BookingDetailsModal({ booking, onClose, onDelete }) {
   const [selectedStatusId, setSelectedStatusId] = useState(null);
   const [isSavingStatus, setIsSavingStatus] = useState(false);
   
-  const { data: baths = [], isLoading: isLoadingBaths } = useGetBathsQuery();
+  const { data: baths = [] } = useGetBathsQuery();
   const { data: units = [] } = useGetUnitsOfMeasurementQuery();
   const { data: statusOptions = [] } = useGetReservationStatusesQuery();
   const [updateReservation] = useUpdateReservationMutation();

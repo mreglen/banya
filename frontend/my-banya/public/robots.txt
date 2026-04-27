@@ -1,3 +1,9 @@
-# https://www.robotstxt.org/robotstxt.html
+# Роботы для индексации сайта Николаевские бани
 User-agent: *
-Disallow:
+Allow: /
+
+# Запрет индексации админ-панели
+Disallow: /admin/
+
+# Sitemap
+Sitemap: https://nikolaevskie.ru/sitemap.xml

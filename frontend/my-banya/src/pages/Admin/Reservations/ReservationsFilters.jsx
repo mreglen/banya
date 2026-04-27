@@ -9,7 +9,7 @@ function ReservationsFilters({ onApply, onAddBooking }) {
 
   useEffect(() => {
     onApply({ date });
-  }, [date]);
+  }, [date, onApply]);
 
   const handleDateChange = (e) => {
     const newDate = e.target.value;

@@ -21,7 +21,9 @@ class PhotoOut(BaseModel):
     photo_id: int
     image_url: str
     bath_id: Optional[int] = None
-    # massage_id: Optional[int] = None  <-- УДАЛЕНО
+    product_id: Optional[int] = None
+    category_id: Optional[int] = None
+    promotion_id: Optional[int] = None
 
     class Config:
         from_attributes = True
@@ -557,6 +559,13 @@ class AuditLogResponse(BaseModel):
     user_agent: Optional[str]
     created_at: datetime
     user_full_name: Optional[str] = None
+    
+    # Новые поля для детальной информации
+    summary: Optional[str] = None
+    bath_name: Optional[str] = None
+    client_name: Optional[str] = None
+    event_datetime: Optional[datetime] = None
+    product_list: Optional[str] = None
 
     class Config:
         from_attributes = True

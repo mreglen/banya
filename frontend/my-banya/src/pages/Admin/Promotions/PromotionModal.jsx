@@ -128,7 +128,7 @@ function PromotionModal({ isOpen, onClose, promotion = null }) {
       )
     }));
   };
-
+  
   // Отправка формы
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -148,10 +148,13 @@ function PromotionModal({ isOpen, onClose, promotion = null }) {
         }))
       };
 
+      let resultId;
       if (isEditing) {
         await updatePromotion({ id: promotion.id, ...payload }).unwrap();
+        resultId = promotion.id;
       } else {
-        await createPromotion(payload).unwrap();
+        const result = await createPromotion(payload).unwrap();
+        resultId = result.id;
       }
       
       onClose();
@@ -173,7 +176,7 @@ function PromotionModal({ isOpen, onClose, promotion = null }) {
 
   return (
     <div 
-      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50"
+      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-3 md:p-4 z-50"
       onClick={onClose}
     >
       <div 
@@ -181,8 +184,8 @@ function PromotionModal({ isOpen, onClose, promotion = null }) {
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="p-6 border-b border-gray-200 bg-gradient-to-r from-gray-50 to-gray-100 flex-shrink-0 flex justify-between items-center">
-          <h2 className="text-xl font-semibold text-gray-800">
+        <div className="p-4 md:p-6 border-b border-gray-200 bg-gradient-to-r from-gray-50 to-gray-100 flex-shrink-0 flex justify-between items-center">
+          <h2 className="text-lg md:text-xl font-semibold text-gray-800">
             {isEditing ? 'Редактировать акцию' : 'Добавить акцию'}
           </h2>
           <button
@@ -195,7 +198,7 @@ function PromotionModal({ isOpen, onClose, promotion = null }) {
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-6">
+        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4 md:space-y-6">
           
           {/* Шаг 1: Выбор шаблона (только при создании) */}
           {!isEditing && !template && (
@@ -214,10 +217,10 @@ function PromotionModal({ isOpen, onClose, promotion = null }) {
                     key={t.id}
                     type="button"
                     onClick={() => handleTemplateSelect(t.id)}
-                    className="w-full p-4 border border-gray-200 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition text-left"
+                    className="w-full p-3 md:p-4 border border-gray-200 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition text-left"
                   >
-                    <div className="font-medium text-gray-800">{t.label}</div>
-                    <div className="text-sm text-gray-500 mt-1">{t.desc}</div>
+                    <div className="font-medium text-gray-800 text-sm md:text-base">{t.label}</div>
+                    <div className="text-xs md:text-sm text-gray-500 mt-1">{t.desc}</div>
                   </button>
                 ))}
               </div>
@@ -235,7 +238,7 @@ function PromotionModal({ isOpen, onClose, promotion = null }) {
                   name="name"
                   value={formData.name}
                   onChange={handleChange}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 md:px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm md:text-base"
                   required
                 />
               </div>
@@ -248,13 +251,13 @@ function PromotionModal({ isOpen, onClose, promotion = null }) {
                   value={formData.description}
                   onChange={handleChange}
                   rows="3"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 md:px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm md:text-base"
                 />
               </div>
 
               {/* Условия */}
-              <div className="border-t border-gray-200 pt-6">
-                <h3 className="text-lg font-medium text-gray-800 mb-4">Условия акции</h3>
+              <div className="border-t border-gray-200 pt-4 md:pt-6">
+                <h3 className="text-base md:text-lg font-medium text-gray-800 mb-3 md:mb-4">Условия акции</h3>
                 
                 <div className="space-y-4">
                   {/* Минимум часов */}
@@ -339,7 +342,7 @@ function PromotionModal({ isOpen, onClose, promotion = null }) {
 
                   {/* Период действия */}
                   {(template === 'period' || template === 'combined') && (
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
                           Дата начала
@@ -349,7 +352,7 @@ function PromotionModal({ isOpen, onClose, promotion = null }) {
                           name="valid_from"
                           value={formData.valid_from}
                           onChange={handleChange}
-                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                          className="w-full px-3 md:px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm md:text-base"
                         />
                       </div>
                       <div>
@@ -361,7 +364,7 @@ function PromotionModal({ isOpen, onClose, promotion = null }) {
                           name="valid_until"
                           value={formData.valid_until}
                           onChange={handleChange}
-                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                          className="w-full px-3 md:px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm md:text-base"
                         />
                       </div>
                     </div>
@@ -370,8 +373,8 @@ function PromotionModal({ isOpen, onClose, promotion = null }) {
               </div>
 
               {/* Подарки */}
-              <div className="border-t border-gray-200 pt-6">
-                <h3 className="text-lg font-medium text-gray-800 mb-4">Подарки</h3>
+              <div className="border-t border-gray-200 pt-4 md:pt-6">
+                <h3 className="text-base md:text-lg font-medium text-gray-800 mb-3 md:mb-4">Подарки</h3>
                 
                 <div className="space-y-4">
                   {/* Доп. время */}
@@ -454,17 +457,17 @@ function PromotionModal({ isOpen, onClose, promotion = null }) {
 
         {/* Footer */}
         {(isEditing || template) && (
-          <div className="p-6 border-t border-gray-200 flex gap-3 flex-shrink-0">
+          <div className="p-4 md:p-6 border-t border-gray-200 flex gap-2 md:gap-3 flex-shrink-0">
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 bg-gray-200 text-gray-800 py-2 px-4 rounded-lg hover:bg-gray-300 transition font-medium"
+              className="flex-1 bg-gray-200 text-gray-800 py-2 px-3 md:py-2 md:px-4 rounded-lg hover:bg-gray-300 transition font-medium text-sm md:text-base"
             >
               Отмена
             </button>
             <button
               onClick={handleSubmit}
-              className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition font-medium"
+              className="flex-1 bg-blue-600 text-white py-2 px-3 md:py-2 md:px-4 rounded-lg hover:bg-blue-700 transition font-medium text-sm md:text-base"
             >
               {isEditing ? 'Сохранить' : 'Создать'}
             </button>

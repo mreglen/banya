@@ -16,6 +16,42 @@ function Admin() {
   const [isDocumentsOpen, setIsDocumentsOpen] = useState(false);
   const [isStorageOpen, setIsStorageOpen] = useState(false);
 
+  // Map of routes to page titles
+  const getPageTitle = () => {
+    const path = location.pathname;
+    
+    const pageTitles = {
+      '/admin/': 'Главная',
+      '/admin/administrator': 'Администратор',
+      '/admin/reservations': 'Бронирование',
+      '/admin/company/user': 'Сотрудники',
+      '/admin/company/partner': 'Поставщики',
+      '/admin/documents/entrance': 'Поступление',
+      '/admin/documents/realization': 'Реализация',
+      '/admin/documents/product-requests': 'Заявки на товар',
+      '/admin/storage/nomenclature': 'Номенклатура',
+      '/admin/settings': 'Настройки',
+      '/admin/deletion-requests': 'Запросы на удаление',
+      '/admin/bookings': 'Заявки с сайта',
+      '/admin/baths': 'Бани',
+      '/admin/promotions': 'Акции',
+    };
+
+    // Check for exact match first
+    if (pageTitles[path]) {
+      return pageTitles[path];
+    }
+
+    // Check for partial matches
+    for (const [route, title] of Object.entries(pageTitles)) {
+      if (path.startsWith(route)) {
+        return title;
+      }
+    }
+
+    return 'Админ панель';
+  };
+
   // Автооткрытие секций при навигации (десктоп)
   useEffect(() => {
     setIsCompanyOpen(location.pathname.startsWith('/admin/company'));
@@ -91,8 +127,7 @@ function Admin() {
         )}
 
         {/* Компания */}
-        {(hasAccess('/admin/company/client') ||
-          hasAccess('/admin/company/user') ||
+        {(hasAccess('/admin/company/user') ||
           hasAccess('/admin/company/partner')) && (
             <div>
               <button
@@ -120,22 +155,6 @@ function Admin() {
 
               {isCompanyOpen && (
                 <div className="ml-4 mt-1 space-y-1">
-                  {hasAccess('/admin/company/client') && (
-                    <NavLink
-                      to="/admin/company/client"
-                      className={({ isActive }) =>
-                        `flex items-center px-4 py-2 rounded-lg text-sm transition ${isActive
-                          ? 'bg-green-100 text-green-800 font-medium'
-                          : 'text-gray-600 hover:bg-green-50 hover:text-green-700'
-                        }`
-                      }
-                    >
-                      <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                      </svg>
-                      Клиенты
-                    </NavLink>
-                  )}
                   {hasAccess('/admin/company/user') && (
                     <NavLink
                       to="/admin/company/user"
@@ -303,25 +322,6 @@ function Admin() {
           </div>
         )}
 
-        {/* Настройки - только для директора и админа */}
-        {(user?.is_director || user?.is_admin) && (
-          <NavLink
-            to="/admin/settings"
-            className={({ isActive }) =>
-              `flex items-center px-4 py-3 rounded-xl transition ${isActive
-                ? 'bg-blue-100 text-blue-800 border border-blue-200 font-medium'
-                : 'text-gray-700 hover:bg-blue-50 hover:text-blue-700'
-              }`
-            }
-          >
-            <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-            </svg>
-            Настройки
-          </NavLink>
-        )}
-
         {hasAccess('/admin/deletion-requests') && (
           <NavLink
             to="/admin/deletion-requests"
@@ -389,6 +389,25 @@ function Admin() {
             Акции
           </NavLink>
         )}
+
+        {/* Настройки - только для директора и админа */}
+        {(user?.is_director || user?.is_admin) && (
+          <NavLink
+            to="/admin/settings"
+            className={({ isActive }) =>
+              `flex items-center px-4 py-3 rounded-xl transition ${isActive
+                ? 'bg-blue-100 text-blue-800 border border-blue-200 font-medium'
+                : 'text-gray-700 hover:bg-blue-50 hover:text-blue-700'
+              }`
+            }
+          >
+            <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+            Настройки
+          </NavLink>
+        )}
       </nav>
 
       <div className="p-4 border-t border-gray-200">
@@ -420,12 +439,12 @@ function Admin() {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
           </svg>
         </button>
-        <h1 className="ml-4 text-lg font-bold">Админ панель</h1>
+        <h1 className="ml-4 text-lg font-bold">{getPageTitle()}</h1>
       </header>
 
       {/* Main Content */}
       <main className="flex-1 md:ml-0 ml-0 pt-16 md:pt-0 p-4 md:p-8 pb-20 md:pb-8">
-        <Outlet />
+        <Outlet key={location.pathname} />
       </main>
 
       {/* Mobile Sidebar */}

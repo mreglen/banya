@@ -57,7 +57,13 @@ async def get_audit_logs(
             "ip_address": log.ip_address,
             "user_agent": log.user_agent,
             "created_at": log.created_at,
-            "user_full_name": log.user.full_name if log.user else None
+            "user_full_name": log.user.full_name if log.user else None,
+            # Новые поля для детальной информации
+            "summary": log.summary,
+            "bath_name": log.bath_name,
+            "client_name": log.client_name,
+            "event_datetime": log.event_datetime,
+            "product_list": log.product_list,
         }
         result.append(log_dict)
     

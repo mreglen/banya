@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useCreateBookingMutation, useGetBathsQuery } from '../../redux/slices/apiSlice';
 
 function Booking() {
-  const [createBooking, { isLoading, isSuccess, isError, error }] = useCreateBookingMutation();
+  const [createBooking, { isLoading, isError, error }] = useCreateBookingMutation();
   const { data: baths = [], isLoading: isLoadingBaths } = useGetBathsQuery();
 
   const [formData, setFormData] = useState({

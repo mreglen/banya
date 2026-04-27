@@ -1,3 +1,4 @@
+import { Helmet } from 'react-helmet-async';
 import { useGetBathsQuery } from '../../redux/slices/apiSlice';
 import CustomButton from '../../components/UI/CustomButton/CustomButton';
 
@@ -23,6 +24,18 @@ function Baths() {
 
   return (
     <section className="py-16 px-6 bg-gray-50 min-h-screen mt-28">
+      <Helmet>
+        <title>Наши бани - Николаевские бани в Екатеринбурге</title>
+        <meta name="description" content="Выберите свою баню в Николаевских банях Екатеринбурга. Каждая баня - особая атмосфера, температура и ритуал. Русские бани на дровах." />
+        <meta name="keywords" content="бани Екатеринбург, выбрать баню, русская баня, парилка, бани на дровах" />
+        
+        {/* Open Graph */}
+        <meta property="og:title" content="Наши бани - Николаевские бани" />
+        <meta property="og:description" content="Каждая баня - особая атмосфера, температура и ритуал. Выберите свою." />
+        <meta property="og:type" content="website" />
+        <meta property="og:url" content="https://nikolaevskie-bani.ru/baths" />
+        <meta property="og:locale" content="ru_RU" />
+      </Helmet>
       <div className="text-center mb-14 max-w-3xl mx-auto">
         <h1 className="text-4xl sm:text-5xl font-light text-gray-800 mb-4">Наши бани</h1>
         <p className="text-lg text-gray-600 font-extralight">

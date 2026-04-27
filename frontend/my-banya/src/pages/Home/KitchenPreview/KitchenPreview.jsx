@@ -1,5 +1,3 @@
-import CustomButton from "../../../components/UI/CustomButton/CustomButton";
-
 function KitchenPreview() {
   const handleClick = (e) => {
     e.preventDefault();

@@ -60,6 +60,7 @@ function BathForm() {
     return () => {
       selectedFiles.forEach(item => URL.revokeObjectURL(item.preview));
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleSubmit = async (e) => {
