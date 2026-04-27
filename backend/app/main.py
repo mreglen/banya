@@ -1,9 +1,10 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, WebSocket
 from fastapi.staticfiles import StaticFiles  
 from app.database import Base, engine
 from app.routers import api_router
 from app.routers import promotions
 from app.routers import audit_logs
+from app.websocket import websocket_endpoint
 from fastapi.middleware.cors import CORSMiddleware
 import os
 from pathlib import Path
@@ -38,3 +39,8 @@ app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 app.include_router(api_router)
 app.include_router(promotions.router, prefix="/api", tags=["promotions"])
 app.include_router(audit_logs.router)
+
+# WebSocket endpoint для чата поддержки
+@app.websocket("/ws/support/{ticket_id}")
+async def websocket_support_endpoint(websocket: WebSocket, ticket_id: int, token: str = None):
+    await websocket_endpoint(websocket, ticket_id, token=token)

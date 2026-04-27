@@ -597,3 +597,76 @@ class RealizationDocumentRead(RealizationDocumentBase):
     
     class Config:
         from_attributes = True
+
+
+# === Чат поддержки ===
+class SupportTicketCreate(BaseModel):
+    title: str
+    description: str
+
+
+class SupportTicketUpdate(BaseModel):
+    status: str  # pending/closed
+
+
+class SupportTicketAttachmentResponse(BaseModel):
+    id: int
+    ticket_id: int
+    file_path: str
+    created_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+
+class SupportMessageCreate(BaseModel):
+    message: str
+
+
+class SupportMessageResponse(BaseModel):
+    id: int
+    ticket_id: int
+    user_id: int
+    message: str
+    is_from_admin: bool
+    created_at: datetime
+    user_full_name: str
+    
+    class Config:
+        from_attributes = True
+
+
+class SupportTicketResponse(BaseModel):
+    id: int
+    user_id: int
+    title: str
+    description: str
+    status: str
+    created_at: datetime
+    updated_at: datetime
+    closed_at: Optional[datetime] = None
+    user_full_name: str
+    user_email: str
+    user_phone: str
+    messages: List[SupportMessageResponse] = []
+    attachments: List[SupportTicketAttachmentResponse] = []
+    admin_has_replied: bool = False
+    
+    class Config:
+        from_attributes = True
+
+
+class SupportTicketListItem(BaseModel):
+    id: int
+    user_id: int
+    title: str
+    status: str
+    created_at: datetime
+    updated_at: datetime
+    user_full_name: str
+    user_email: str
+    message_count: int = 0
+    last_message_at: Optional[datetime] = None
+    
+    class Config:
+        from_attributes = True

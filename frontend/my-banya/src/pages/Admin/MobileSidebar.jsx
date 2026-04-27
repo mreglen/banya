@@ -315,6 +315,18 @@ function MobileSidebar({ isOpen, onClose }) {
             </NavLink>
           )}
 
+          {/* Поддержка - доступно всем */}
+          <NavLink
+            to="/admin/support"
+            className="flex items-center px-4 py-3 text-gray-700 hover:bg-indigo-50 rounded-xl"
+            onClick={onClose}
+          >
+            <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 5.636l-3.54 3.54m0 0l3.54 3.54m0 0l-3.54 3.54m0 0l3.54 3.54m0 0l-3.54 3.54M12 6v6m0 0v6m0-6h6m-6 0H6" />
+            </svg>
+            Поддержка
+          </NavLink>
+
           <button
             onClick={() => {
               localStorage.removeItem('access_token');

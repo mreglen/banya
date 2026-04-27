@@ -37,6 +37,9 @@ import PasswordResetComplete from './pages/Admin/AdminLogin/PasswordResetComplet
 import AdministratorPage from './pages/Admin/Administrator/AdministratorPageNew';
 import Promotions from './pages/Admin/Promotions/Promotions';
 import SettingsPage from './pages/Admin/Settings/SettingsPage';
+import SupportPage from './pages/Admin/Support/SupportPage';
+import CreateTicketForm from './pages/Admin/Support/CreateTicketForm';
+import ChatPage from './pages/Admin/Support/ChatPage';
 
 
 
@@ -115,6 +118,9 @@ function AppWithLayout() {
           <Route path="deletion-requests" element={<RoleBasedRoute requiredPermission="staff:manage"><DeletionRequestsPage /></RoleBasedRoute>} />
           <Route path="add-product" element={<RoleBasedRoute requiredPermission="storage:manage"><AddProduct /></RoleBasedRoute>} />
           <Route path="settings" element={<SettingsPage />} />
+          <Route path="support" element={<SupportPage />} />
+          <Route path="support/create" element={<CreateTicketForm />} />
+          <Route path="support/ticket/:id" element={<ChatPage />} />
         </Route>
 
 

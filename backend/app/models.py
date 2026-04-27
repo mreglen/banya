@@ -399,3 +399,46 @@ class RealizationDocumentItem(Base):
 
     document = relationship("RealizationDocument", back_populates="items")
     product = relationship("Product")
+
+
+# === Чат поддержки ===
+class SupportTicket(Base):
+    __tablename__ = "support_tickets"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.user_id"), nullable=False)
+    title = Column(String(200), nullable=False)  # Заголовок вопроса
+    description = Column(Text, nullable=False)  # Описание проблемы
+    status = Column(String(20), default="pending")  # pending/closed
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    closed_at = Column(DateTime(timezone=True), nullable=True)
+    
+    user = relationship("User")
+    messages = relationship("SupportMessage", back_populates="ticket", cascade="all, delete-orphan")
+    attachments = relationship("SupportTicketAttachment", back_populates="ticket", cascade="all, delete-orphan")
+
+
+class SupportMessage(Base):
+    __tablename__ = "support_messages"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    ticket_id = Column(Integer, ForeignKey("support_tickets.id", ondelete="CASCADE"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.user_id"), nullable=False)
+    message = Column(Text, nullable=False)
+    is_from_admin = Column(Boolean, default=False)  # Кто отправил
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    ticket = relationship("SupportTicket", back_populates="messages")
+    user = relationship("User")
+
+
+class SupportTicketAttachment(Base):
+    __tablename__ = "support_ticket_attachments"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    ticket_id = Column(Integer, ForeignKey("support_tickets.id", ondelete="CASCADE"), nullable=False)
+    file_path = Column(String(500), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    ticket = relationship("SupportTicket", back_populates="attachments")
