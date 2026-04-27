@@ -61,12 +61,18 @@ app.add_middleware(
 )
 
 # Mount static files directories
-app.mount("/img", StaticFiles(directory="public/img"), name="static_images")
+# Use absolute path based on this file's location
+BASE_DIR = Path(__file__).resolve().parent.parent
+
+# Mount public images
+public_img_dir = BASE_DIR / "public" / "img"
+if public_img_dir.exists():
+    app.mount("/img", StaticFiles(directory=str(public_img_dir)), name="static_images")
 
 # Mount uploads directory for bath photos
-uploads_dir = Path("uploads")
+uploads_dir = BASE_DIR / "uploads"
 uploads_dir.mkdir(parents=True, exist_ok=True)
-app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
+app.mount("/uploads", StaticFiles(directory=str(uploads_dir)), name="uploads")
 
 app.include_router(api_router)
 app.include_router(promotions.router, prefix="/api", tags=["promotions"])
