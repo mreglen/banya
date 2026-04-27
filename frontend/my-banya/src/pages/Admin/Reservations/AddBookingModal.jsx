@@ -27,7 +27,7 @@ const generateTimeOptions = () => {
 function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess }) {
   const isEditing = !!booking;
   const today = new Date().toISOString().split('T')[0];
-  const [updateReservation] = useUpdateReservationMutation();
+  const [updateReservation, { isLoading: isUpdating }] = useUpdateReservationMutation();
   const [createReservation, { isLoading: isCreating }] = useCreateReservationMutation();
 
   const [formData, setFormData] = useState({
@@ -311,25 +311,15 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
     try {
       console.log('🚀 Sending request...');
       if (isEditing) {
-        const updatedReservation = await updateReservation({
+        await updateReservation({
           id: booking.reservation_id,
           ...payload,
         }).unwrap();
 
-        const statusObj = statusOptions.find(s => s.id === formData.status_id);
-        const updatedStatus = statusObj ? statusObj.status_name : 'Неизвестно';
-
-        const updatedBooking = {
-          ...booking,
-          ...updatedReservation,
-          status: updatedStatus,
-          status_id: formData.status_id
-        };
-
         if (onEditSuccess) {
-          onEditSuccess(updatedBooking);
+          onEditSuccess();
         } else {
-          onClose(updatedBooking);
+          onClose();
         }
       } else {
         await createReservation(payload).unwrap();
@@ -352,6 +342,7 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
   };
 
   if (!isOpen) return null;
+  const isSubmitting = isCreating || isUpdating;
 
   const totalProductCost = formData.selectedProducts.reduce(
     (sum, p) => sum + p.quantity * p.purchase_price,
@@ -644,10 +635,10 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
           <div className="flex flex-col sm:flex-row gap-3">
             <button
               type="submit"
-              disabled={isCreating || isLoadingUnits}
-              className="flex-1 bg-green-600 text-white py-2.5 sm:py-3 px-4 rounded-xl font-medium text-sm sm:text-base hover:bg-green-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={isSubmitting || isLoadingUnits}
+              className="flex-1 bg-green-600 text-white py-2.5 sm:py-3 px-4 rounded-xl font-medium text-sm sm:text-base hover:bg-green-700 active:bg-green-800 transition disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {isCreating ? 'Сохранение...' : isEditing ? 'Сохранить изменения' : 'Создать бронь'}
+              {isSubmitting ? 'Сохранение...' : isEditing ? 'Сохранить изменения' : 'Создать бронь'}
             </button>
             <button
               type="button"
