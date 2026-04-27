@@ -357,10 +357,10 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate }) {
 
   return createPortal(
     <div
-      className="fixed inset-0 bg-black bg-opacity-50 flex items-start justify-center p-2 sm:p-4 z-50 overflow-y-auto"
+      className="fixed inset-0 bg-black bg-opacity-50 flex items-start justify-center p-0 sm:p-4 z-50 overflow-y-auto"
       onClick={handleOverlayClick}
     >
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[95vh] flex flex-col">
+      <div className="bg-white rounded-none sm:rounded-2xl shadow-2xl w-full max-w-4xl h-[100dvh] sm:max-h-[95vh] sm:h-auto flex flex-col">
         <div className="p-4 sm:p-6 border-b border-gray-200 bg-gradient-to-r from-gray-50 to-gray-100 relative flex-shrink-0">
           <h2 className="text-lg sm:text-xl font-semibold text-gray-800">
             {isEditing ? 'Редактировать бронь' : 'Добавить бронь'}

@@ -40,6 +40,7 @@ import SettingsPage from './pages/Admin/Settings/SettingsPage';
 import SupportPage from './pages/Admin/Support/SupportPage';
 import CreateTicketForm from './pages/Admin/Support/CreateTicketForm';
 import ChatPage from './pages/Admin/Support/ChatPage';
+import ReservationPrintDocument from './pages/Admin/Reservations/ReservationPrintDocument';
 
 
 
@@ -94,6 +95,7 @@ function AppWithLayout() {
 
           <Route path="administrator" element={<AdministratorPage />} />
           <Route path="reservations" element={<RoleBasedRoute requiredPermission="reservations:view"><AdminReservations /></RoleBasedRoute>} />
+          <Route path="reservations/print/:id" element={<RoleBasedRoute requiredPermission="reservations:view"><ReservationPrintDocument /></RoleBasedRoute>} />
           <Route path="bookings" element={<RoleBasedRoute requiredPermission="bookings:view"><AdminBookings /></RoleBasedRoute>} />
           <Route path="baths" element={<RoleBasedRoute requiredPermission="baths:view"><AdminBathsList /></RoleBasedRoute>} />
           <Route path="baths/add" element={<RoleBasedRoute requiredPermission="baths:manage"><BathForm /></RoleBasedRoute>} />

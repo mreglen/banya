@@ -54,6 +54,10 @@ export const reservationApiSlice = createApi({
             },
             providesTags: [{ type: 'Reservations', id: 'ALL' }],
         }),
+        getReservationById: builder.query({
+            query: (id) => `/admin/reservations/${id}`,
+            providesTags: (result, error, id) => [{ type: 'Reservations', id }],
+        }),
     }),
 });
 
@@ -64,5 +68,6 @@ export const {
     useDeleteReservationMutation,
     useGetReservationStatusesQuery,
     useGetAllReservationsQuery,
+    useGetReservationByIdQuery,
 
 } = reservationApiSlice;

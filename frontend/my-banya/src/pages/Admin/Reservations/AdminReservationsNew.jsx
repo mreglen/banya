@@ -200,7 +200,7 @@ function AdminReservationsNew() {
   });
 
   return (
-    <div className="p-2 md:p-4">
+    <div className="px-1 py-2 md:p-4">
       <h2 className="text-xl md:text-2xl font-semibold text-gray-800 mb-4 md:mb-6">
         Записи на {formattedDate}
       </h2>
@@ -372,10 +372,10 @@ function AdminReservationsNew() {
       </div>
 
       {/* Mobile View */}
-      <div className="md:hidden space-y-6">
+      <div className="md:hidden space-y-4">
         {/* Табы для переключения между банями */}
         {bathsToDisplay.length > 1 && (
-          <div className="flex space-x-1 mb-4 border-b border-gray-200 overflow-x-auto">
+          <div className="-mx-1 px-1 flex space-x-1 mb-3 border-b border-gray-200 overflow-x-auto">
             <button
               onClick={() => handleSetActiveBath(null)}
               className={`px-4 py-2.5 text-sm font-medium border-b-2 whitespace-nowrap transition-all ${
@@ -412,7 +412,7 @@ function AdminReservationsNew() {
                   {bath.bathName}
                 </h3>
               </div>
-              <div className="p-4 space-y-4">
+              <div className="p-3 space-y-3">
                 {bath.bookings.length === 0 ? (
                   <p className="text-green-600 font-medium">Свободно весь день</p>
                 ) : (
@@ -421,7 +421,7 @@ function AdminReservationsNew() {
                     .map((booking) => (
                       <div
                         key={booking.reservation_id}
-                        className={`p-4 rounded-lg border ${booking.is_cleaning
+                        className={`p-3 rounded-lg border ${booking.is_cleaning
                             ? 'bg-indigo-50 border-indigo-200'
                             : 'bg-gray-50 border-gray-200'
                           }`}

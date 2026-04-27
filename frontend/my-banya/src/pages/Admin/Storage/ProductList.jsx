@@ -61,6 +61,7 @@ const ProductList = ({
     storageData,
     handleEdit,
     filterType,
+    searchQuery = '',
 }) => {
     const dispatch = useDispatch();
     const deletionArray = useSelector(state => state.deletionRequests);
@@ -79,9 +80,23 @@ const ProductList = ({
     );
 
     // Применить фильтр
-    const finalProducts = filterType === 'min_stock'
+    const lowStockFilteredProducts = filterType === 'min_stock'
         ? filteredProducts.filter(p => (p.total_quantity || 0) < (p.min_stock || 0))
         : filteredProducts;
+
+    const normalizedSearch = searchQuery.trim().toLowerCase();
+    const finalProducts = normalizedSearch
+        ? lowStockFilteredProducts.filter((product) => {
+            const categoryName = (findCategoryName(categoriesTree, product.category_id) || '').toLowerCase();
+            const name = (product.name || '').toLowerCase();
+            const description = (product.description || '').toLowerCase();
+            return (
+                name.includes(normalizedSearch) ||
+                description.includes(normalizedSearch) ||
+                categoryName.includes(normalizedSearch)
+            );
+        })
+        : lowStockFilteredProducts;
 
     return (
         <div className="bg-white rounded-xl shadow-md overflow-hidden">
@@ -95,7 +110,9 @@ const ProductList = ({
 
             {finalProducts.length === 0 ? (
                 <div className="p-6 sm:p-8 text-center">
-                    <p className="text-gray-500">Нет товаров в выбранной категории</p>
+                    <p className="text-gray-500">
+                        {searchQuery.trim() ? 'По запросу ничего не найдено' : 'Нет товаров в выбранной категории'}
+                    </p>
                 </div>
             ) : (
                 <div className="overflow-x-auto">

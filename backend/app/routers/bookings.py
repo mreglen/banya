@@ -1,6 +1,6 @@
 # app/routers/bookings.py
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from datetime import datetime
 from typing import List
@@ -96,3 +96,16 @@ def get_all_bookings(db: Session = Depends(database.get_db)):
         }
         result.append(booking_data)
     return result
+
+
+@router.put("/{booking_id}/mark-read", status_code=status.HTTP_200_OK)
+def mark_booking_as_read(booking_id: int, db: Session = Depends(database.get_db)):
+    booking = db.query(models.Booking).filter(models.Booking.booking_id == booking_id).first()
+    if not booking:
+        raise HTTPException(status_code=404, detail="Заявка не найдена")
+
+    if not booking.is_read:
+        booking.is_read = True
+        db.commit()
+
+    return {"booking_id": booking.booking_id, "is_read": booking.is_read}

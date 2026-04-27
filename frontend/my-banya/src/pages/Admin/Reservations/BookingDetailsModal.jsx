@@ -96,6 +96,10 @@ function BookingDetailsModal({ booking, onClose, onDelete }) {
     }
   };
 
+  const handlePrint = () => {
+    window.open(`/admin/reservations/print/${booking.reservation_id}`, '_blank', 'noopener,noreferrer');
+  };
+
   if (isEditing) {
     return (
       <AddBookingModal
@@ -110,14 +114,14 @@ function BookingDetailsModal({ booking, onClose, onDelete }) {
   }
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl h-[95vh] flex flex-col">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-start sm:items-center justify-center p-0 sm:p-4 z-50">
+      <div className="bg-white rounded-none sm:rounded-xl shadow-2xl w-full max-w-4xl h-[100dvh] sm:h-[95vh] flex flex-col">
         {/* Header */}
-        <div className="p-6 border-b border-gray-200 bg-gradient-to-r from-gray-50 to-gray-100 flex-shrink-0">
-          <h2 className="text-xl font-semibold text-gray-800">Детали брони</h2>
+        <div className="p-4 sm:p-6 border-b border-gray-200 bg-gradient-to-r from-gray-50 to-gray-100 flex-shrink-0 relative">
+          <h2 className="text-lg sm:text-xl font-semibold text-gray-800">Детали брони</h2>
           <button
             onClick={onClose}
-            className="absolute top-6 right-6 text-gray-500 hover:text-gray-700 text-2xl"
+            className="absolute top-3 right-4 sm:top-6 sm:right-6 text-gray-500 hover:text-gray-700 text-2xl"
           >
             ×
           </button>
@@ -125,7 +129,7 @@ function BookingDetailsModal({ booking, onClose, onDelete }) {
 
         {/* Content - Scrollable */}
         <div className="flex-1 overflow-y-auto">
-          <div className="p-6 space-y-4 text-sm">
+          <div className="p-4 sm:p-6 space-y-4 text-sm">
             <div><strong>Клиент:</strong> {booking.client_name}</div>
             <div><strong>Телефон:</strong> {booking.client_phone}</div>
             {booking.client_email && <div><strong>Email:</strong> {booking.client_email}</div>}
@@ -173,13 +177,13 @@ function BookingDetailsModal({ booking, onClose, onDelete }) {
               </div>
             )}
             
-            <div>
-              <strong>Статус:</strong>{' '}
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+              <strong>Статус:</strong>
               <select
                 value={selectedStatusId || ''}
                 onChange={handleStatusChange}
                 disabled={isSavingStatus}
-                className={`ml-2 px-3 py-1 rounded-lg border text-sm font-medium transition-colors ${
+                className={`w-full sm:w-auto sm:min-w-[220px] px-3 py-2 rounded-lg border text-sm font-medium transition-colors ${
                   isSavingStatus
                     ? 'bg-gray-100 text-gray-500 cursor-not-allowed'
                     : 'bg-white border-gray-300 hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 cursor-pointer'
@@ -244,8 +248,8 @@ function BookingDetailsModal({ booking, onClose, onDelete }) {
           </div>
 
           {/* 💰 Чек */}
-          <div className="p-6 bg-gray-50 border-t border-gray-200">
-          <h3 className="text-lg font-medium text-gray-800 mb-4">Чек</h3>
+          <div className="p-4 sm:p-6 bg-gray-50 border-t border-gray-200">
+          <h3 className="text-base sm:text-lg font-medium text-gray-800 mb-4">Чек</h3>
           <div className="space-y-2 text-sm">
             <div className="flex justify-between">
               <span>Баня ({bathName}):</span>
@@ -293,8 +297,8 @@ function BookingDetailsModal({ booking, onClose, onDelete }) {
                 <div className="pt-2 border-t border-gray-200 mt-2">
                   <span className="font-medium">Товары:</span>
                 </div>
-                <div className="pl-4 space-y-1">
-                  <div className="grid grid-cols-12 gap-2 text-xs font-medium text-gray-500 pb-1">
+                <div className="pl-0 sm:pl-4 space-y-2">
+                  <div className="hidden sm:grid grid-cols-12 gap-2 text-xs font-medium text-gray-500 pb-1">
                     <div className="col-span-4">Название</div>
                     <div className="col-span-2">Размер</div>
                     <div className="col-span-2 text-right">Цена за шт</div>
@@ -302,12 +306,23 @@ function BookingDetailsModal({ booking, onClose, onDelete }) {
                     <div className="col-span-2 text-right">Итого</div>
                   </div>
                   {booking.products.map((product, idx) => (
-                    <div key={idx} className="grid grid-cols-12 gap-2 text-sm">
-                      <div className="col-span-4 text-gray-700">{product.name}</div>
-                      <div className="col-span-2 text-gray-600">{getUnitName(product.unit_id)}</div>
-                      <div className="col-span-2 text-right text-gray-600">{product.purchase_price?.toLocaleString()} ₽</div>
-                      <div className="col-span-2 text-right text-gray-600">{product.quantity}</div>
-                      <div className="col-span-2 text-right font-medium">{(product.purchase_price * product.quantity).toLocaleString()} ₽</div>
+                    <div key={idx}>
+                      <div className="sm:hidden rounded-lg border border-gray-200 bg-white p-2 text-sm">
+                        <div className="font-medium text-gray-800">{product.name}</div>
+                        <div className="text-xs text-gray-600 mt-1">
+                          {product.quantity} {getUnitName(product.unit_id)} x {product.purchase_price?.toLocaleString()} ₽
+                        </div>
+                        <div className="text-right font-semibold mt-1">
+                          {(product.purchase_price * product.quantity).toLocaleString()} ₽
+                        </div>
+                      </div>
+                      <div className="hidden sm:grid grid-cols-12 gap-2 text-sm">
+                        <div className="col-span-4 text-gray-700">{product.name}</div>
+                        <div className="col-span-2 text-gray-600">{getUnitName(product.unit_id)}</div>
+                        <div className="col-span-2 text-right text-gray-600">{product.purchase_price?.toLocaleString()} ₽</div>
+                        <div className="col-span-2 text-right text-gray-600">{product.quantity}</div>
+                        <div className="col-span-2 text-right font-medium">{(product.purchase_price * product.quantity).toLocaleString()} ₽</div>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -349,7 +364,13 @@ function BookingDetailsModal({ booking, onClose, onDelete }) {
         </div>
 
         {/* Footer - Buttons */}
-        <div className="p-6 border-t border-gray-200 flex flex-col sm:flex-row gap-3 flex-shrink-0">
+        <div className="p-4 sm:p-6 border-t border-gray-200 flex flex-col sm:flex-row gap-3 flex-shrink-0">
+          <button
+            onClick={handlePrint}
+            className="flex-1 bg-indigo-600 text-white py-2 px-4 rounded-lg hover:bg-indigo-700 transition font-medium"
+          >
+            Печать
+          </button>
           <button
             onClick={() => setIsEditing(true)}
             className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition font-medium"

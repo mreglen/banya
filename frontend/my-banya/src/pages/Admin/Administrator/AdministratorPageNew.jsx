@@ -104,16 +104,16 @@ function AdministratorPageNew() {
 
   // 4. Рендер
   return (
-    <div className="min-h-screen bg-gray-50 p-8">
+    <div className="min-h-screen bg-gray-50 p-3 sm:p-4 md:p-8">
       <div className="max-w-7xl mx-auto">
         {/* Заголовок */}
-        <h1 className="text-3xl font-bold text-gray-800 mb-8">
+        <h1 className="text-2xl md:text-3xl font-bold text-gray-800 mb-4 md:mb-8">
           🔐 Панель администратора
         </h1>
 
         {/* Журнал аудита */}
-        <div className="bg-white rounded-2xl shadow-lg p-8">
-          <h2 className="text-2xl font-bold text-gray-800 mb-6">
+        <div className="bg-white rounded-2xl shadow-lg p-4 sm:p-5 md:p-8">
+          <h2 className="text-xl md:text-2xl font-bold text-gray-800 mb-4 md:mb-6">
             📋 Журнал аудита
           </h2>
 
@@ -199,7 +199,35 @@ function AdministratorPageNew() {
               Нет данных для отображения
             </div>
           ) : (
-            <div className="overflow-x-auto">
+            <>
+            <div className="md:hidden space-y-3">
+              {auditLogs.map((log) => (
+                <button
+                  key={log.id}
+                  type="button"
+                  className="w-full text-left border border-gray-200 rounded-xl p-3 bg-white active:bg-gray-50 transition-colors"
+                  onClick={() => setSelectedLog(log)}
+                >
+                  <div className="flex items-start justify-between gap-2 mb-2">
+                    <span className="text-xs text-gray-500">{formatDate(log.created_at)}</span>
+                    <span className={`px-2 py-1 text-xs font-semibold rounded-full ${getActionColor(log.action)}`}>
+                      {log.action}
+                    </span>
+                  </div>
+                  <div className="text-sm font-medium text-gray-900 mb-1">
+                    {log.user_full_name || 'Неизвестно'}
+                  </div>
+                  <div className="text-sm text-gray-700 mb-1">
+                    {getEntityTypeName(log.entity_type)}{log.entity_id ? ` #${log.entity_id}` : ''}
+                  </div>
+                  <div className="text-xs text-gray-500">
+                    IP: {log.ip_address || '-'}
+                  </div>
+                </button>
+              ))}
+            </div>
+
+            <div className="hidden md:block overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
@@ -255,6 +283,7 @@ function AdministratorPageNew() {
                 </tbody>
               </table>
             </div>
+            </>
           )}
 
           {/* Модальное окно деталей */}
@@ -267,21 +296,21 @@ function AdministratorPageNew() {
 
           {/* Пагинация */}
           {auditLogs.length > 0 && (
-            <div className="mt-6 flex items-center justify-between">
+            <div className="mt-6 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
               <button
                 onClick={handlePreviousPage}
                 disabled={filters.skip === 0}
-                className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full sm:w-auto px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Предыдущая
               </button>
-              <span className="text-sm text-gray-700">
+              <span className="text-center text-sm text-gray-700">
                 Показано {auditLogs.length} записей
               </span>
               <button
                 onClick={handleNextPage}
                 disabled={auditLogs.length < filters.limit}
-                className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full sm:w-auto px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Следующая
               </button>
