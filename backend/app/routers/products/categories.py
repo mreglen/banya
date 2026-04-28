@@ -64,15 +64,29 @@ def update_category(
     if not db_category:
         raise HTTPException(status_code=404, detail="Category not found")
 
+    # Debug logging
+    print(f"Updating category {category_id}")
+    print(f"Received data: {category_update.model_dump()}")
+    print(f"Exclude unset: {category_update.model_dump(exclude_unset=True)}")
+
     # Обновляем основные поля
     update_data = category_update.model_dump(exclude_unset=True)
-    for field in ["name", "parent_id", "is_visible_on_website"]:
-        if field in update_data:
-            value = update_data[field]
-            # Защита от циклической ссылки
-            if field == "parent_id" and value == category_id:
-                raise HTTPException(status_code=400, detail="Cannot set self as parent")
-            setattr(db_category, field, value)
+    
+    # Explicitly handle is_visible_on_website to allow False values
+    if "is_visible_on_website" in update_data:
+        print(f"Setting is_visible_on_website to: {update_data['is_visible_on_website']}")
+        db_category.is_visible_on_website = update_data["is_visible_on_website"]
+    
+    # Handle name
+    if "name" in update_data:
+        db_category.name = update_data["name"]
+    
+    # Handle parent_id with cycle protection
+    if "parent_id" in update_data:
+        value = update_data["parent_id"]
+        if value == category_id:
+            raise HTTPException(status_code=400, detail="Cannot set self as parent")
+        db_category.parent_id = value
 
     # Обработка фото: если photo_urls передан — заменяем все
     if category_update.photo_urls is not None:

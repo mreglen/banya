@@ -1,4 +1,30 @@
+import { useState, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
+
 function ContactSection() {
+    const navigate = useNavigate();
+    const clickCountRef = useRef(0);
+    const timerRef = useRef(null);
+
+    const handleIconClick = (e) => {
+        // Don't prevent default or stop propagation - keep it invisible
+        clickCountRef.current += 1;
+
+        if (clickCountRef.current === 1) {
+            // Start timer on first click
+            timerRef.current = setTimeout(() => {
+                clickCountRef.current = 0;
+            }, 500); // 500ms window for triple click
+        }
+
+        if (clickCountRef.current === 3) {
+            // Triple click detected - navigate to admin
+            clearTimeout(timerRef.current);
+            clickCountRef.current = 0;
+            navigate('/admin');
+        }
+    };
+
     const handleClick = (e) => {
         e.preventDefault();
         const element = document.getElementById('booking');
@@ -11,7 +37,11 @@ function ContactSection() {
         <section id="contacts" className="bg-gray-900 py-20 md:py-28">
             <div className="max-w-6xl mx-auto px-6">
                 <div className="text-center mb-16">
-                    <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-blue-900/30 mb-6">
+                    <div 
+                        className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-blue-900/30 mb-6 cursor-pointer"
+                        onClick={handleIconClick}
+                        style={{ WebkitTapHighlightColor: 'transparent', userSelect: 'none' }}
+                    >
                         <svg className="w-8 h-8 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />

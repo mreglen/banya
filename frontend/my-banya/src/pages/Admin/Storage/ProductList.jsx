@@ -117,7 +117,7 @@ const ProductList = ({
         : lowStockFilteredProducts;
 
     return (
-        <div className="bg-white rounded-xl shadow-md overflow-hidden">
+        <div className="bg-white rounded-xl shadow-md">
             <div className="p-4 border-b">
                 <h2 className="text-base sm:text-lg font-semibold">
                     {selectedCategoryPath.length > 0
@@ -165,7 +165,7 @@ const ProductList = ({
                                         <td className="px-4 py-3 text-gray-700 w-[25%]">{truncateDescription(product.description, 50)}</td>
                                         <td className={`px-4 py-3 w-[10%] text-right ${(product.total_quantity || 0) < (product.min_stock || 0) ? 'text-red-600 font-semibold' : 'text-gray-900'}`}>{(product.total_quantity || 0)} {unitName}</td>
                                         <td className="px-4 py-3 text-gray-900 w-[10%] text-right">{(product.last_purchase_price || 0).toFixed(2)} ₽</td>
-                                        <td className="px-4 py-3 w-[10%] text-center">
+                                        <td className="px-4 py-3 w-[10%] text-center overflow-visible">
                                             <ActionDropdown
                                                 buttonText="⋮"
                                                 actions={[

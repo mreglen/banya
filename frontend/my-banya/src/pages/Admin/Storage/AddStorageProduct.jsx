@@ -208,14 +208,24 @@ const AddStorageProduct = () => {
               Цена для сайта (₽)
             </label>
             <input
-              type="number"
+              type="text"
               id="website_price"
               name="website_price"
               value={formData.website_price ?? 0}
-              onChange={handleInputChange}
-              min="0"
-              step="0.01"
+              onChange={(e) => {
+                const value = e.target.value;
+                // Allow only digits and decimal point
+                if (/^\d*\.?\d*$/.test(value) || value === '') {
+                  setFormData(prev => ({ ...prev, website_price: value === '' ? 0 : value }));
+                }
+              }}
+              onBlur={(e) => {
+                // Convert to number on blur
+                const value = parseFloat(e.target.value) || 0;
+                setFormData(prev => ({ ...prev, website_price: value }));
+              }}
               className="w-full p-2 border border-gray-300 rounded"
+              placeholder="0"
             />
           </div>
 

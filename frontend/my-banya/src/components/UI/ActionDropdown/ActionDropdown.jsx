@@ -14,7 +14,9 @@ import { useState, useRef, useEffect } from 'react';
  */
 function ActionDropdown({ actions, buttonText = 'Действия' }) {
   const [isOpen, setIsOpen] = useState(false);
+  const [position, setPosition] = useState('down');
   const dropdownRef = useRef(null);
+  const buttonRef = useRef(null);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -29,6 +31,23 @@ function ActionDropdown({ actions, buttonText = 'Действия' }) {
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, []);
+
+  // Calculate position when dropdown opens
+  useEffect(() => {
+    if (isOpen && buttonRef.current) {
+      const buttonRect = buttonRef.current.getBoundingClientRect();
+      const dropdownHeight = 200; // Approximate height
+      const viewportHeight = window.innerHeight;
+      const spaceBelow = viewportHeight - buttonRect.bottom;
+      const spaceAbove = buttonRect.top;
+
+      if (spaceBelow < dropdownHeight && spaceAbove > spaceBelow) {
+        setPosition('up');
+      } else {
+        setPosition('down');
+      }
+    }
+  }, [isOpen]);
 
   const handleAction = (action) => {
     if (action.disabled) return;
@@ -52,6 +71,7 @@ function ActionDropdown({ actions, buttonText = 'Действия' }) {
     <div className="relative inline-block text-left" ref={dropdownRef}>
       {/* Main button */}
       <button
+        ref={buttonRef}
         onClick={(e) => {
           e.stopPropagation();
           setIsOpen(!isOpen);
@@ -71,7 +91,11 @@ function ActionDropdown({ actions, buttonText = 'Действия' }) {
 
       {/* Dropdown menu - appears above all content */}
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-2xl border border-gray-200 py-1 z-[9999]">
+        <div 
+          className={`absolute right-0 w-48 bg-white rounded-xl shadow-2xl border border-gray-200 py-1 z-[9999] ${
+            position === 'up' ? 'bottom-full mb-2' : 'top-full mt-2'
+          }`}
+        >
           {actions.map((action, index) => (
             <button
               key={index}

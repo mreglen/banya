@@ -340,13 +340,29 @@ function Product() {
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Цена для сайта (₽)</label>
               <input
-                type="number"
+                type="text"
                 name="website_price"
                 value={form.website_price}
-                onChange={handleChange}
-                min="0"
-                step="0.01"
+                onChange={(e) => {
+                  const value = e.target.value;
+                  // Allow only digits and decimal point
+                  if (/^\d*\.?\d*$/.test(value) || value === '') {
+                    setForm(prev => ({
+                      ...prev,
+                      website_price: value === '' ? 0 : value
+                    }));
+                  }
+                }}
+                onBlur={(e) => {
+                  // Convert to number on blur
+                  const value = parseFloat(e.target.value) || 0;
+                  setForm(prev => ({
+                    ...prev,
+                    website_price: value
+                  }));
+                }}
                 className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="0"
               />
             </div>
 
