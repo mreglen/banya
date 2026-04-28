@@ -3,8 +3,8 @@ from sqlalchemy.orm import Session, joinedload
 from typing import List, Optional
 from pathlib import Path
 from app.database import get_db
-from app.models import Category, Photo
-from app.schemas import Category as CategorySchema, CategoryCreate, CategoryUpdate
+from app.models import Category, Photo, Product
+from app.schemas import Category as CategorySchema, CategoryCreate, CategoryUpdate, WebsiteCategoryPreview, WebsiteCategoryProduct
 
 router = APIRouter(prefix="/admin/categories", tags=["categories"])
 
@@ -36,7 +36,8 @@ def get_category(category_id: int, db: Session = Depends(get_db)):
 def create_category(category: CategoryCreate, db: Session = Depends(get_db)):
     db_category = Category(
         name=category.name,
-        parent_id=category.parent_id
+        parent_id=category.parent_id,
+        is_visible_on_website=category.is_visible_on_website
     )
     db.add(db_category)
     db.commit()
@@ -65,7 +66,7 @@ def update_category(
 
     # Обновляем основные поля
     update_data = category_update.model_dump(exclude_unset=True)
-    for field in ["name", "parent_id"]:
+    for field in ["name", "parent_id", "is_visible_on_website"]:
         if field in update_data:
             value = update_data[field]
             # Защита от циклической ссылки
@@ -128,3 +129,61 @@ async def upload_category_photos(
 
     db.commit()
     return urls
+
+
+@router.get("/website/preview", response_model=List[WebsiteCategoryPreview])
+def get_website_categories_preview(db: Session = Depends(get_db)):
+    categories = (
+        db.query(Category)
+        .options(joinedload(Category.photos))
+        .filter(Category.is_visible_on_website.is_(True))
+        .order_by(Category.id.asc())
+        .all()
+    )
+
+    category_ids = [category.id for category in categories]
+    if not category_ids:
+        return []
+
+    products_by_category = {}
+    products = (
+        db.query(Product)
+        .options(joinedload(Product.photos))
+        .filter(
+            Product.category_id.in_(category_ids),
+            Product.is_visible_on_website.is_(True),
+        )
+        .order_by(Product.id.asc())
+        .all()
+    )
+
+    for product in products:
+        products_by_category.setdefault(product.category_id, []).append(product)
+
+    response = []
+    for category in categories:
+        category_products = products_by_category.get(category.id, [])
+        if not category_products:
+            continue
+
+        website_products = [
+            WebsiteCategoryProduct(
+                id=product.id,
+                name=product.name,
+                description=product.description,
+                price=product.website_price if (product.website_price and product.website_price > 0) else product.last_purchase_price,
+                photos=product.photos,
+            )
+            for product in category_products
+        ]
+
+        response.append(
+            WebsiteCategoryPreview(
+                id=category.id,
+                name=category.name,
+                photos=category.photos,
+                products=website_products,
+            )
+        )
+
+    return response

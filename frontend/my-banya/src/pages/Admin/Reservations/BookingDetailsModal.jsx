@@ -140,8 +140,20 @@ function BookingDetailsModal({ booking, onClose, onDelete }) {
             <div><strong>Гостей:</strong> {booking.guests}</div>
             <div>
               <strong>Время:</strong>{' '}
-              {new Date(booking.start_datetime).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })} —{' '}
-              {new Date(booking.end_datetime).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}
+              {new Date(booking.start_datetime).toLocaleString('ru-RU', { 
+                day: '2-digit', 
+                month: '2-digit', 
+                year: 'numeric',
+                hour: '2-digit', 
+                minute: '2-digit' 
+              })} —{' '}
+              {new Date(booking.end_datetime).toLocaleString('ru-RU', { 
+                day: '2-digit', 
+                month: '2-digit', 
+                year: 'numeric',
+                hour: '2-digit', 
+                minute: '2-digit' 
+              })}
             </div>
             
             {/* Комментарии с кнопкой "Читать дальше" */}

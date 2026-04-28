@@ -17,7 +17,7 @@ import ProductSelectionModal from '../../Admin/Documents/DocumentsEntrance/Produ
 
 const generateTimeOptions = () => {
   const options = [];
-  for (let hour = 9; hour <= 23; hour++) {
+  for (let hour = 0; hour <= 23; hour++) {
     options.push(`${hour.toString().padStart(2, '0')}:00`);
     options.push(`${hour.toString().padStart(2, '0')}:30`);
   }
@@ -33,8 +33,9 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
   const [formData, setFormData] = useState({
     bath_id: '',
     date: today,
-    start_time: '09:00',
-    end_time: '10:00',
+    end_date: today,
+    start_time: '00:00',
+    end_time: '01:00',
     client_name: '',
     client_phone: '',
     client_email: '',
@@ -75,8 +76,9 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
       setFormData((prev) => ({
         ...prev,
         date: today,
-        start_time: '09:00',
-        end_time: '10:00',
+        end_date: today,
+        start_time: '00:00',
+        end_time: '01:00',
       }));
     }
   }, [isEditing, today]);
@@ -87,6 +89,7 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
         const start = new Date(booking.start_datetime);
         const end = new Date(booking.end_datetime);
         const date = start.toISOString().split('T')[0];
+        const end_date = end.toISOString().split('T')[0];
         const start_time = start.toTimeString().slice(0, 5);
         const end_time = end.toTimeString().slice(0, 5);
 
@@ -108,6 +111,7 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
         setFormData({
           bath_id: booking.bath?.bath_id || booking.bath_id || '',
           date,
+          end_date,
           start_time,
           end_time,
           client_name: booking.client_name || '',
@@ -134,8 +138,15 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
     }
   }, [formData.start_time, formData.end_time]);
 
-  const getEndTimeOptions = (startTime) => {
+  const getEndTimeOptions = (startTime, endDate, startDate) => {
     const allOptions = generateTimeOptions();
+    
+    // Если дата окончания больше даты начала, показать все времена
+    if (endDate > startDate) {
+      return allOptions;
+    }
+    
+    // Иначе только времена после времени начала
     return allOptions.filter(time => time > startTime);
   };
 
@@ -290,9 +301,16 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
     
     // Проверка даты и времени
     const start_datetime = `${formData.date}T${formData.start_time}`;
-    const end_datetime = `${formData.date}T${formData.end_time}`;
+    const end_datetime = `${formData.end_date}T${formData.end_time}`;
+    
+    // Проверка что дата окончания не раньше даты начала
+    if (formData.end_date < formData.date) {
+      errors.end_date = 'Дата окончания не может быть раньше даты начала';
+    }
+    
+    // Проверка что конец позже начала
     if (new Date(start_datetime) >= new Date(end_datetime)) {
-      errors.end_time = 'Время окончания должно быть позже начала';
+      errors.end_time = 'Дата/время окончания должны быть позже начала';
     }
     
     // Проверка количества гостей
@@ -313,6 +331,31 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
     return Object.keys(errors).length === 0;
   };
 
+  // Функция расчета длительности
+  const calculateDuration = () => {
+    const start = new Date(`${formData.date}T${formData.start_time}`);
+    const end = new Date(`${formData.end_date}T${formData.end_time}`);
+    
+    const diffMs = end - start;
+    
+    if (diffMs <= 0) return '0 мин';
+    
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    const diffHours = Math.floor((diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+    const diffMinutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+    
+    if (diffDays > 0) {
+      if (diffHours === 0 && diffMinutes === 0) {
+        return `${diffDays} дн.`;
+      }
+      return `${diffDays} дн. ${diffHours} ч ${diffMinutes} мин`;
+    }
+    
+    if (diffHours === 0) return `${diffMinutes} мин`;
+    if (diffMinutes === 0) return `${diffHours} ч`;
+    return `${diffHours} ч ${diffMinutes} мин`;
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     console.log('🔵 Form submitted');
@@ -327,7 +370,7 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
     }
 
     const start_datetime = `${formData.date}T${formData.start_time}`;
-    const end_datetime = `${formData.date}T${formData.end_time}`;
+    const end_datetime = `${formData.end_date}T${formData.end_time}`;
     console.log('🟡 Datetime:', { start_datetime, end_datetime });
 
     // Нормализуем телефон перед отправкой
@@ -502,7 +545,7 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
           {/* Дата и время */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Дата *</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Дата начала *</label>
               <input
                 type="date"
                 value={formData.date}
@@ -512,7 +555,18 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Начало *</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Дата окончания *</label>
+              <input
+                type="date"
+                value={formData.end_date}
+                onChange={(e) => setFormData((prev) => ({ ...prev, end_date: e.target.value }))}
+                className="w-full px-3 py-2.5 sm:px-4 sm:py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 text-sm"
+                min={formData.date}
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Время начала *</label>
               <select
                 value={formData.start_time}
                 onChange={(e) => setFormData((prev) => ({ ...prev, start_time: e.target.value }))}
@@ -526,8 +580,8 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
                 ))}
               </select>
             </div>
-            <div className="sm:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-2">Окончание *</label>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Время окончания *</label>
               <select
                 value={formData.end_time}
                 onChange={(e) => setFormData((prev) => ({ ...prev, end_time: e.target.value }))}
@@ -538,7 +592,7 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
                 }`}
                 required
               >
-                {getEndTimeOptions(formData.start_time).map((time) => (
+                {getEndTimeOptions(formData.start_time, formData.end_date, formData.date).map((time) => (
                   <option key={time} value={time}>
                     {time}
                   </option>
@@ -550,6 +604,18 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
                 </p>
               )}
             </div>
+          </div>
+
+          {/* Подсказка о длительности */}
+          <div className={`text-xs px-3 py-2 rounded-lg ${
+            formData.end_date > formData.date
+              ? 'bg-purple-50 text-purple-700 border border-purple-200'
+              : 'bg-blue-50 text-gray-600'
+          }`}>
+            {formData.end_date > formData.date && (
+              <div className="font-medium mb-1">📅 Бронирование на несколько дней</div>
+            )}
+            <div>Длительность: {calculateDuration()}</div>
           </div>
 
           {/* Имя клиента */}

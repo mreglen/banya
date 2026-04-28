@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
 import { HelmetProvider } from 'react-helmet-async';
 import Header from './components/Header/Header';
 import Home from './pages/Home/Home';
+import WebsiteCategoryProductsPage from './pages/Home/WebsiteCategoryProductsPage/WebsiteCategoryProductsPage';
 import Booking from './pages/Booking/Booking';
 import BathsCard from './pages/Baths/BathsCard/BathsCard';
 import AdminLogin from './pages/Admin/AdminLogin/AdminLogin';
@@ -81,6 +82,7 @@ function AppWithLayout() {
       {!hideHeader && <Header />}
       <Routes>
         <Route path="/" element={<Home />} />
+        <Route path="/categories/:categoryId/products" element={<WebsiteCategoryProductsPage />} />
         <Route path="/baths/:id" element={<BathsCard />} />
         {/* Оставляем как резерв, но убираем из меню */}
         <Route path="/booking" element={<Booking />} />

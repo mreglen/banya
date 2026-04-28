@@ -28,7 +28,7 @@ function Header() {
       { threshold: 0.3 }
     );
 
-    const sections = ['baths', 'kitchen', 'massages', 'booking', 'contacts'];
+    const sections = ['baths', 'booking', 'contacts'];
     sections.forEach(id => {
       const el = document.getElementById(id);
       if (el) observer.observe(el);
@@ -51,8 +51,6 @@ function Header() {
 
   const navLinks = [
     { title: 'Бани', anchor: '#baths', sectionId: 'baths' },
-    { title: 'Кухня', anchor: '#kitchen', sectionId: 'kitchen' },
-    { title: 'Массаж', anchor: '#massages', sectionId: 'massages' },
     { title: 'Контакты', anchor: '#contacts', sectionId: 'contacts' },
   ];
 

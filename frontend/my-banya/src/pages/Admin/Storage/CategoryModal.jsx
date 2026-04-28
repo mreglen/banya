@@ -13,6 +13,7 @@ const CategoryModal = ({
   const [imageFile, setImageFile] = useState(null);
   const [currentImageUrl, setCurrentImageUrl] = useState(null);
   const [photoDeleted, setPhotoDeleted] = useState(false);
+  const [isVisibleOnWebsite, setIsVisibleOnWebsite] = useState(false);
   const [expanded, setExpanded] = useState(new Set());
   const fileInputRef = useRef(null);
 
@@ -71,6 +72,7 @@ const CategoryModal = ({
     if (isOpen) {
       setName(category?.name || '');
       setSelectedParentId(category?.parent_id ?? null);
+      setIsVisibleOnWebsite(Boolean(category?.is_visible_on_website));
       setImageFile(null);
       setPhotoDeleted(false);
 
@@ -100,6 +102,7 @@ const CategoryModal = ({
       id: category?.id,
       name,
       parent_id: selectedParentId,
+      is_visible_on_website: isVisibleOnWebsite,
       imageFile,
       deletePhoto: photoDeleted,
     });
@@ -142,6 +145,17 @@ const CategoryModal = ({
               </label>
               {renderCategoryTree(categoriesTree)}
             </div>
+          </div>
+
+          <div className="mb-4">
+            <label className="inline-flex items-center gap-2 cursor-pointer text-sm text-gray-700">
+              <input
+                type="checkbox"
+                checked={isVisibleOnWebsite}
+                onChange={(e) => setIsVisibleOnWebsite(e.target.checked)}
+              />
+              <span>Отображать категорию на сайте</span>
+            </label>
           </div>
 
           {/* Превью фото */}

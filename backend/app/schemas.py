@@ -313,6 +313,7 @@ class ProductBase(BaseModel):
     description: Optional[str] = None
     is_visible_on_website: bool = False
     category_id: Optional[int] = None
+    website_price: float = 0.0
     min_stock: float = 0.0
 
 class ProductCreate(ProductBase):
@@ -341,6 +342,7 @@ class Product(ProductBase):
 class CategoryBase(BaseModel):
     name: str
     parent_id: Optional[int] = None
+    is_visible_on_website: bool = False
 
 class CategoryCreate(CategoryBase):
     photo_urls: Optional[List[str]] = None
@@ -348,6 +350,7 @@ class CategoryCreate(CategoryBase):
 class CategoryUpdate(BaseModel):
     name: Optional[str] = None
     parent_id: Optional[int] = None
+    is_visible_on_website: Optional[bool] = None
     photo_urls: Optional[List[str]] = None
 
 class Category(CategoryBase):
@@ -359,6 +362,27 @@ class Category(CategoryBase):
         from_attributes = True
 
 Category.model_rebuild()
+
+
+class WebsiteCategoryProduct(BaseModel):
+    id: int
+    name: str
+    description: Optional[str] = None
+    price: Optional[float] = None
+    photos: List[ProductPhotoOut] = []
+
+    class Config:
+        from_attributes = True
+
+
+class WebsiteCategoryPreview(BaseModel):
+    id: int
+    name: str
+    photos: List[PhotoOut] = []
+    products: List[WebsiteCategoryProduct] = []
+
+    class Config:
+        from_attributes = True
 
 
 # === Приходные документы ===

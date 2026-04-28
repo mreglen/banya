@@ -16,8 +16,8 @@ import {
 
 const STATUS_STYLES = {
   'В ожидании': 'bg-amber-50 text-amber-800 border-amber-200',
-  'в работе': 'bg-blue-50 text-blue-800 border-blue-200',
-  'закрыт': 'bg-gray-50 text-gray-800 border-gray-200',
+  'в работе': 'bg-purple-50 text-purple-800 border-purple-200',
+  'закрыт': 'bg-rose-50 text-rose-800 border-rose-200',
   'Подтверждено': 'bg-sky-50 text-sky-800 border-sky-200',
   'Завершено': 'bg-emerald-50 text-emerald-800 border-emerald-200',
   'Отменено': 'bg-gray-50 text-gray-800 border-gray-200',
@@ -41,6 +41,18 @@ const getStatusStyle = (status) => {
 const getTodayDate = () => new Date().toISOString().split('T')[0];
 
 const INITIAL_FILTERS = { date: getTodayDate() };
+
+const getLocalDayStart = (dateString) => {
+  const [year, month, day] = dateString.split('-').map(Number);
+  return new Date(year, month - 1, day, 0, 0, 0, 0);
+};
+
+const getLocalDayBounds = (dateString) => {
+  const dayStart = getLocalDayStart(dateString);
+  const dayEnd = new Date(dayStart);
+  dayEnd.setDate(dayEnd.getDate() + 1);
+  return { dayStart, dayEnd };
+};
 
 // ============================================================
 // ОСНОВНОЙ КОМПОНЕНТ
@@ -74,9 +86,11 @@ function AdminReservationsNew() {
   const timeSlots = useMemo(() => {
     const slots = [];
     const interval = bookingInterval;
-    for (let hour = 9; hour < 24; hour++) {
+    const dayStart = getLocalDayStart(filters.date);
+
+    for (let hour = 0; hour < 24; hour++) {
       for (let minute = 0; minute < 60; minute += interval) {
-        const slotStart = new Date(filters.date);
+        const slotStart = new Date(dayStart);
         slotStart.setHours(hour, minute, 0, 0);
         
         const slotEnd = new Date(slotStart.getTime() + interval * 60000);
@@ -107,10 +121,19 @@ function AdminReservationsNew() {
 
       const realBookings = (Array.isArray(reservations) ? reservations : []).filter(res => {
         if (!res || !res.bath_id || !res.start_datetime) return false;
+        // Проверяем пересечение с выбранным днем
         const bookingStart = new Date(res.start_datetime);
-        const bookingDate = bookingStart.toLocaleDateString('en-CA');
-        return res.bath_id === bathId && bookingDate === filters.date;
+        const bookingEnd = new Date(res.end_datetime);
+        const { dayStart: filterDateStart, dayEnd: filterDateEnd } = getLocalDayBounds(filters.date);
+        
+        // Бронь пересекается с выбранным днем
+        return res.bath_id === bathId && 
+               bookingStart < filterDateEnd && 
+               bookingEnd > filterDateStart;
       });
+
+      // Сортируем бронирования по времени начала
+      realBookings.sort((a, b) => new Date(a.start_datetime) - new Date(b.start_datetime));
 
       const bookingsWithCleaning = [];
       realBookings.forEach(booking => {
@@ -120,7 +143,9 @@ function AdminReservationsNew() {
         const cleaningStart = new Date(endDateTime);
         const cleaningEnd = new Date(endDateTime.getTime() + cleaningMinutes * 60000);
 
+        // Показываем уборку если она начинается в выбранный день
         const cleaningDate = cleaningStart.toLocaleDateString('en-CA');
+        
         if (cleaningDate === filters.date) {
           bookingsWithCleaning.push({
             ...booking,
@@ -273,20 +298,25 @@ function AdminReservationsNew() {
                        
                         <tbody>
                           {timeSlots.map((slot, idx) => {
+                            // Находим бронирования, которые пересекаются с этим слотом
                             const overlappingItems = bath.bookings.filter(item => {
                               const start = new Date(item.start_datetime);
                               const end = new Date(item.end_datetime);
-                              return start < slot.end && end > slot.start;
+                              
+                              // Ограничиваем бронирование пределами текущего дня
+                              const { dayStart, dayEnd } = getLocalDayBounds(filters.date);
+                              
+                              const effectiveStart = start < dayStart ? dayStart : start;
+                              const effectiveEnd = end > dayEnd ? dayEnd : end;
+                              
+                              // Проверяем пересечение с слотом
+                              const overlaps = effectiveStart < slot.end && effectiveEnd > slot.start;
+                              
+                              return overlaps;
                             });
 
-                            const itemStartsHere = bath.bookings.find(item => {
-                              const start = new Date(item.start_datetime);
-                              return start >= slot.start && start < slot.end;
-                            });
-
-                            const activeItem = overlappingItems[0];
-                            
-                            if (!activeItem) {
+                            // Если нет бронирований - показываем "Свободно"
+                            if (overlappingItems.length === 0) {
                               return (
                                 <tr key={idx} className="hover:bg-gray-25 transition-colors">
                                   <td className="px-6 py-0 relative bg-gray-50" style={{ height: '56px', overflow: 'visible' }}>
@@ -298,67 +328,112 @@ function AdminReservationsNew() {
                               );
                             }
 
+                            // Сортируем по времени начала
+                            overlappingItems.sort((a, b) => new Date(a.start_datetime) - new Date(b.start_datetime));
+
+                            // Берем первое бронирование для отображения
+                            const activeItem = overlappingItems[0];
                             const itemStart = new Date(activeItem.start_datetime);
                             const itemEnd = new Date(activeItem.end_datetime);
                             
-                            const minutesFromSlotStart = (itemStart - slot.start) / 60000;
-                            const durationMinutes = (itemEnd - itemStart) / 60000;
+                            // Ограничиваем бронирование пределами текущего дня
+                            const { dayStart, dayEnd } = getLocalDayBounds(filters.date);
+                            
+                            const effectiveStart = itemStart < dayStart ? dayStart : itemStart;
+                            const effectiveEnd = itemEnd > dayEnd ? dayEnd : itemEnd;
+                            
+                            // Проверяем, начинается ли бронирование в этом слоте
+                            const bookingStartsInThisSlot = effectiveStart >= slot.start && effectiveStart < slot.end;
+                            
+                            if (!bookingStartsInThisSlot) {
+                              // Проверяем, продолжается ли эта бронь через этот слот
+                              const bookingContinuesThroughSlot = effectiveStart < slot.start && effectiveEnd > slot.start;
+                              
+                              if (bookingContinuesThroughSlot) {
+                                // Бронь продолжается через этот слот - не показываем ничего
+                                return (
+                                  <tr key={idx} className="hover:bg-gray-25 transition-colors">
+                                    <td className="px-6 py-0 relative bg-gray-50" style={{ height: '56px', overflow: 'hidden' }}>
+                                    </td>
+                                  </tr>
+                                );
+                              }
+                              
+                              // Бронь не начинается и не продолжается - показываем "Свободно"
+                              return (
+                                <tr key={idx} className="hover:bg-gray-25 transition-colors">
+                                  <td className="px-6 py-0 relative bg-gray-50" style={{ height: '56px', overflow: 'visible' }}>
+                                    <div className="absolute inset-0 flex items-center justify-center text-emerald-600 text-xs font-medium bg-emerald-50 rounded border border-emerald-100">
+                                      Свободно
+                                    </div>
+                                  </td>
+                                </tr>
+                              );
+                            }
+                            
+                            // Бронирование начинается в этом слоте - рассчитываем позицию и высоту
+                            const minutesFromSlotStart = (effectiveStart - slot.start) / 60000;
+                            const durationMinutes = (effectiveEnd - effectiveStart) / 60000;
                             const slotMinutes = (slot.end - slot.start) / 60000;
                             
                             const topPercent = minutesFromSlotStart > 0 ? (minutesFromSlotStart / slotMinutes) * 100 : 0;
+                            // Высота может быть больше 100% - бронирование растягивается на множество слотов
                             const heightPercent = (durationMinutes / slotMinutes) * 100;
+
+                            // Tooltip с полным временем
+                            const tooltipText = activeItem.is_cleaning 
+                              ? 'Уборка' 
+                              : `${activeItem.client_name} • ${formatTime(itemStart)} – ${formatTime(itemEnd)}`;
 
                             return (
                               <tr key={idx} className="hover:bg-gray-25 transition-colors">
                                 <td className="px-6 py-0 relative bg-gray-50" style={{ height: '56px', overflow: 'visible' }}>
-                                  {itemStartsHere ? (
-                                    <div
-                                      className={`absolute inset-x-0 rounded-lg px-2 py-1 cursor-pointer hover:shadow transition-all duration-200 group border-2 ${getStatusStyle(activeItem.is_cleaning ? 'Уборка' : activeItem.status)}`}
-                                      style={{
-                                        top: `${topPercent}%`,
-                                        height: `${heightPercent}%`,
-                                        zIndex: 10,
-                                        display: 'flex',
-                                        flexDirection: 'column',
-                                        justifyContent: 'center',
-                                        alignItems: 'center',
-                                        textAlign: 'center',
-                                        gap: '2px',
-                                      }}
-                                      title={activeItem.is_cleaning ? 'Уборка' : `${activeItem.client_name} • ${formatTime(new Date(activeItem.start_datetime))} – ${formatTime(new Date(activeItem.end_datetime))}`}
-                                      onClick={() => !activeItem.is_cleaning && handleViewBooking(activeItem)}
-                                    >
-                                      <div className={`w-1 rounded-full absolute left-0 top-1 bottom-1 group-hover:w-2 transition-all duration-200 ${
-                                        activeItem.is_cleaning
-                                          ? 'bg-orange-500'
-                                          : activeItem.status === 'в ожидании'
-                                            ? 'bg-amber-500'
-                                            : activeItem.status === 'в работе'
-                                              ? 'bg-blue-500'
-                                              : activeItem.status === 'закрыт'
-                                                ? 'bg-gray-500'
-                                                : activeItem.status === 'Подтверждено'
-                                                  ? 'bg-sky-500'
-                                                  : 'bg-gray-400'
-                                      }`}></div>
-                                      {activeItem.is_cleaning ? (
-                                        <div className="font-medium text-xs">Уборка</div>
-                                      ) : (
-                                        <>
-                                          <div className="font-medium truncate w-full text-xs">{activeItem.client_name || '—'}</div>
-                                          <div className={`px-2 py-0.5 rounded text-xs font-medium ${
-                                            activeItem.status === 'в ожидании' ? 'bg-amber-100 text-amber-800' :
-                                            activeItem.status === 'в работе' ? 'bg-blue-100 text-blue-800' :
-                                            activeItem.status === 'закрыт' ? 'bg-gray-100 text-gray-800' :
-                                            activeItem.status === 'Подтверждено' ? 'bg-sky-100 text-sky-800' :
-                                            'bg-gray-100 text-gray-800'
-                                          }`}>
-                                            {activeItem.status || '—'}
-                                          </div>
-                                        </>
-                                      )}
-                                    </div>
-                                  ) : null}
+                                  <div
+                                    className={`absolute inset-x-0 rounded-lg px-2 py-1 cursor-pointer hover:shadow transition-all duration-200 group border-2 ${getStatusStyle(activeItem.is_cleaning ? 'Уборка' : activeItem.status)}`}
+                                    style={{
+                                      top: `${topPercent}%`,
+                                      height: `${heightPercent}%`,
+                                      zIndex: 10,
+                                      display: 'flex',
+                                      flexDirection: 'column',
+                                      justifyContent: 'center',
+                                      alignItems: 'center',
+                                      textAlign: 'center',
+                                      gap: '2px',
+                                    }}
+                                    title={tooltipText}
+                                    onClick={() => !activeItem.is_cleaning && handleViewBooking(activeItem)}
+                                  >
+                                    <div className={`w-1 rounded-full absolute left-0 top-1 bottom-1 group-hover:w-2 transition-all duration-200 ${
+                                      activeItem.is_cleaning
+                                        ? 'bg-orange-500'
+                                        : activeItem.status === 'в ожидании'
+                                          ? 'bg-amber-500'
+                                          : activeItem.status === 'в работе'
+                                            ? 'bg-purple-500'
+                                            : activeItem.status === 'закрыт'
+                                              ? 'bg-rose-500'
+                                              : activeItem.status === 'Подтверждено'
+                                                ? 'bg-sky-500'
+                                                : 'bg-gray-400'
+                                    }`}></div>
+                                    {activeItem.is_cleaning ? (
+                                      <div className="font-medium text-xs">Уборка</div>
+                                    ) : (
+                                      <>
+                                        <div className="font-medium truncate w-full text-xs">{activeItem.client_name || '—'}</div>
+                                        <div className={`px-2 py-0.5 rounded text-xs font-medium ${
+                                          activeItem.status === 'в ожидании' ? 'bg-amber-100 text-amber-800' :
+                                          activeItem.status === 'в работе' ? 'bg-purple-100 text-purple-800' :
+                                          activeItem.status === 'закрыт' ? 'bg-rose-100 text-rose-800' :
+                                          activeItem.status === 'Подтверждено' ? 'bg-sky-100 text-sky-800' :
+                                          'bg-gray-100 text-gray-800'
+                                        }`}>
+                                          {activeItem.status || '—'}
+                                        </div>
+                                      </>
+                                    )}
+                                  </div>
                                 </td>
                               </tr>
                             );
@@ -424,7 +499,8 @@ function AdminReservationsNew() {
                     .map((booking) => (
                       <div
                         key={booking.reservation_id}
-                        className={`p-2.5 rounded-lg border ${booking.is_cleaning
+                        className={`p-2.5 rounded-lg border ${
+                          booking.is_cleaning
                             ? 'bg-indigo-50 border-indigo-200'
                             : 'bg-gray-50 border-gray-200'
                           }`}
@@ -465,8 +541,8 @@ function AdminReservationsNew() {
                             <div className="flex flex-wrap gap-2 mb-3">
                               <span className={`px-2.5 py-1 text-xs rounded font-medium ${
                                 booking.status === 'в ожидании' ? 'bg-amber-100 text-amber-800' :
-                                booking.status === 'в работе' ? 'bg-blue-100 text-blue-800' :
-                                booking.status === 'закрыт' ? 'bg-gray-100 text-gray-800' :
+                                booking.status === 'в работе' ? 'bg-purple-100 text-purple-800' :
+                                booking.status === 'закрыт' ? 'bg-rose-100 text-rose-800' :
                                 booking.status === 'Подтверждено' ? 'bg-sky-100 text-sky-800' :
                                 'bg-gray-100 text-gray-800'
                               }`}>

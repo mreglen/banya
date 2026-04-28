@@ -1,6 +1,7 @@
 from fastapi import FastAPI, WebSocket
 from fastapi.staticfiles import StaticFiles  
 from app.database import Base, engine
+from app import models  # noqa: F401 - важно для регистрации моделей в metadata
 from app.routers import api_router
 from app.routers import promotions
 from app.routers import audit_logs
@@ -8,6 +9,7 @@ from app.websocket import websocket_endpoint
 from fastapi.middleware.cors import CORSMiddleware
 import os
 from pathlib import Path
+from sqlalchemy import text
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import Response
@@ -40,6 +42,25 @@ class MaxBodySizeMiddleware(BaseHTTPMiddleware):
 
 
 Base.metadata.create_all(bind=engine)
+
+# Backward-compatible schema patch for existing databases.
+with engine.begin() as connection:
+    connection.execute(
+        text(
+            """
+            ALTER TABLE categories
+            ADD COLUMN IF NOT EXISTS is_visible_on_website BOOLEAN NOT NULL DEFAULT FALSE
+            """
+        )
+    )
+    connection.execute(
+        text(
+            """
+            ALTER TABLE products
+            ADD COLUMN IF NOT EXISTS website_price DOUBLE PRECISION NOT NULL DEFAULT 0
+            """
+        )
+    )
 
 app = FastAPI(title='Бани')
 

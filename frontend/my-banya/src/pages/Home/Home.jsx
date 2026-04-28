@@ -1,7 +1,6 @@
 import { Helmet } from 'react-helmet-async';
 import ListBaths from "./ListBaths/ListBaths";
-import KitchenPreview from "./KitchenPreview/KitchenPreview";
-import MassagesPreview from "./MassagesPreview/MassagesPreview";
+import WebsiteCategoriesPreview from "./WebsiteCategoriesPreview/WebsiteCategoriesPreview";
 import Booking from "../Booking/Booking";
 import ContactSection from "./ContactSection/ContactSection";
 
@@ -97,8 +96,7 @@ function Home() {
             </div>
 
             <ListBaths />
-            <KitchenPreview />
-            <MassagesPreview />
+            <WebsiteCategoriesPreview />
             <Booking />
             <ContactSection />
         </div>

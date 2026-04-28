@@ -128,6 +128,7 @@ class Category(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, nullable=False)
+    is_visible_on_website = Column(Boolean, nullable=False, default=False)
     parent_id = Column(Integer, ForeignKey("categories.id"), nullable=True)
 
     children = relationship("Category", back_populates="parent", cascade="all, delete-orphan")
@@ -146,6 +147,7 @@ class Product(Base):
     category_id = Column(Integer, ForeignKey("categories.id"), nullable=True)
     total_quantity = Column(Float, default=0)
     last_purchase_price = Column(Float, default=0.0)
+    website_price = Column(Float, default=0.0)
     min_stock = Column(Float, default=0.0)
     unit_id = Column(Integer, ForeignKey("units_of_measurement.id"), nullable=True)
 

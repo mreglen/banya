@@ -18,6 +18,7 @@ const AddStorageProduct = () => {
     description: '',
     categoryPath: null,
     unit_id: '',
+    website_price: 0,
   });
 
   const [images, setImages] = useState([]);
@@ -90,6 +91,8 @@ const AddStorageProduct = () => {
       } else {
         productData.unit_id = null;
       }
+
+      productData.website_price = Number(formData.website_price) || 0;
 
       const createdProduct = await createProduct(productData).unwrap();
       const productId = createdProduct.id;
@@ -183,6 +186,22 @@ const AddStorageProduct = () => {
                 ))}
               </select>
             )}
+          </div>
+
+          <div className="mb-5">
+            <label htmlFor="website_price" className="block text-sm font-medium text-gray-700 mb-1">
+              Цена для сайта (₽)
+            </label>
+            <input
+              type="number"
+              id="website_price"
+              name="website_price"
+              value={formData.website_price ?? 0}
+              onChange={handleInputChange}
+              min="0"
+              step="0.01"
+              className="w-full p-2 border border-gray-300 rounded"
+            />
           </div>
 
           {/* Фотографии */}

@@ -122,7 +122,10 @@ export const productsApiSlice = createApi({
                 method: 'PUT',
                 body: productData,
             }),
-            invalidatesTags: (result, error, arg) => [{ type: 'Product', id: arg.id }],
+            invalidatesTags: (result, error, arg) => [
+                { type: 'Product', id: 'LIST' },
+                { type: 'Product', id: arg.id }
+            ],
         }),
         uploadProductPhotos: builder.mutation({
             query: ({ productId, formData }) => ({

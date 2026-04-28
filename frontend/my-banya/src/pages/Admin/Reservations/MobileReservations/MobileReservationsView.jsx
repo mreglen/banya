@@ -12,8 +12,9 @@ function MobileReservationsView({ baths, onEdit, onDelete, onView }) {
   const getStatusColor = (status) => {
     switch (status) {
       case 'в ожидании': return 'bg-yellow-100 text-yellow-800';
-      case 'в работе': return 'bg-blue-100 text-blue-800';
+      case 'в работе': return 'bg-purple-100 text-purple-800';
       case 'выполнен': return 'bg-green-100 text-green-800';
+      case 'закрыт': return 'bg-rose-100 text-rose-800';
       default: return 'bg-gray-100 text-gray-800';
     }
   };

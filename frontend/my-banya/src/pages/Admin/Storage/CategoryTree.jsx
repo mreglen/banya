@@ -129,18 +129,18 @@ const CategoryTree = ({
   };
 
   const handleModalSubmit = async (data) => {
-    const { id, name, parent_id, imageFile, deletePhoto } = data;
+    const { id, name, parent_id, is_visible_on_website, imageFile, deletePhoto } = data;
 
     try {
       let categoryId;
 
       if (id) {
         // Редактирование
-        await updateCategory({ id, name, parent_id }).unwrap();
+        await updateCategory({ id, name, parent_id, is_visible_on_website }).unwrap();
         categoryId = id;
       } else {
         // Создание
-        const result = await createCategory({ name, parent_id }).unwrap();
+        const result = await createCategory({ name, parent_id, is_visible_on_website }).unwrap();
         categoryId = result.id;
       }
 

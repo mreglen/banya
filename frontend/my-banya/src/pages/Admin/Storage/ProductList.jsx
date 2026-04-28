@@ -2,7 +2,7 @@
 import React from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
-import { useGetUnitsOfMeasurementQuery } from '../../../redux/slices/productsApiSlice';
+import { useGetUnitsOfMeasurementQuery, useUpdateProductMutation } from '../../../redux/slices/productsApiSlice';
 import { markForDeletion, unmarkForDeletion } from '../../../redux/slices/deletionRequestsSlice';
 import ActionDropdown from '../../../components/UI/ActionDropdown/ActionDropdown';
 
@@ -22,6 +22,20 @@ const findCategoryName = (categories, categoryId) => {
     }
     return null;
 };
+
+const findCategoryById = (categories, categoryId) => {
+    for (const cat of categories) {
+        if (cat.id === categoryId) return cat;
+        if (cat.children?.length) {
+            const found = findCategoryById(cat.children, categoryId);
+            if (found) return found;
+        }
+    }
+    return null;
+};
+
+const isWebsiteToggleAction = (actionLabel) =>
+    actionLabel === 'Отображать на сайте' || actionLabel === 'Скрыть с сайта';
 
 const getProductsForSelectedCategory = (selectedCategoryPath, categoriesTree, storageData) => {
     if (selectedCategoryPath.length === 0) return storageData;
@@ -69,6 +83,7 @@ const ProductList = ({
     const navigate = useNavigate();
     const deletionArray = useSelector(state => state.deletionRequests);
     const { data: units = [] } = useGetUnitsOfMeasurementQuery();
+    const [updateProduct] = useUpdateProductMutation();
 
     const findUnitName = (unitId) => {
         if (!unitId) return 'шт.';
@@ -136,6 +151,8 @@ const ProductList = ({
                                 const categoryName = findCategoryName(categoriesTree, product.category_id);
                                 const markedForDeletion = deletionArray.includes(product.id);
                                 const unitName = findUnitName(product.unit_id);
+                                const category = findCategoryById(categoriesTree, product.category_id);
+                                const isWebsiteCategory = Boolean(category?.is_visible_on_website);
 
                                 return (
                                     <tr
@@ -162,6 +179,22 @@ const ProductList = ({
                                                         },
                                                     },
                                                     {
+                                                        label: product.is_visible_on_website ? 'Скрыть с сайта' : 'Отображать на сайте',
+                                                        icon: product.is_visible_on_website ? '🙈' : '🌐',
+                                                        color: product.is_visible_on_website ? 'gray' : 'green',
+                                                        onClick: async () => {
+                                                            try {
+                                                                await updateProduct({
+                                                                    ...product,
+                                                                    is_visible_on_website: !product.is_visible_on_website,
+                                                                }).unwrap();
+                                                            } catch (err) {
+                                                                console.error('Ошибка обновления отображения товара на сайте:', err);
+                                                                alert('Не удалось обновить отображение товара на сайте');
+                                                            }
+                                                        },
+                                                    },
+                                                    {
                                                         label: markedForDeletion ? 'Снять пометку' : 'Пометить на удаление',
                                                         icon: markedForDeletion ? '✓' : '🗑️',
                                                         color: markedForDeletion ? 'green' : 'red',
@@ -174,7 +207,7 @@ const ProductList = ({
                                                             }
                                                         },
                                                     },
-                                                ]}
+                                                ].filter((action) => isWebsiteCategory || !isWebsiteToggleAction(action.label))}
                                             />
                                         </td>
                                     </tr>
@@ -189,6 +222,8 @@ const ProductList = ({
                             const categoryName = findCategoryName(categoriesTree, product.category_id);
                             const markedForDeletion = deletionArray.includes(product.id);
                             const unitName = findUnitName(product.unit_id);
+                            const category = findCategoryById(categoriesTree, product.category_id);
+                            const isWebsiteCategory = Boolean(category?.is_visible_on_website);
 
                             return (
                                 <div
@@ -218,6 +253,22 @@ const ProductList = ({
                                                     onClick: () => handleEdit(product.id),
                                                 },
                                                 {
+                                                    label: product.is_visible_on_website ? 'Скрыть с сайта' : 'Отображать на сайте',
+                                                    icon: product.is_visible_on_website ? '🙈' : '🌐',
+                                                    color: product.is_visible_on_website ? 'gray' : 'green',
+                                                    onClick: async () => {
+                                                        try {
+                                                            await updateProduct({
+                                                                ...product,
+                                                                is_visible_on_website: !product.is_visible_on_website,
+                                                            }).unwrap();
+                                                        } catch (err) {
+                                                            console.error('Ошибка обновления отображения товара на сайте:', err);
+                                                            alert('Не удалось обновить отображение товара на сайте');
+                                                        }
+                                                    },
+                                                },
+                                                {
                                                     label: markedForDeletion ? 'Снять пометку' : 'Пометить на удаление',
                                                     icon: markedForDeletion ? '✓' : '🗑️',
                                                     color: markedForDeletion ? 'green' : 'red',
@@ -229,7 +280,7 @@ const ProductList = ({
                                                         }
                                                     },
                                                 },
-                                            ]}
+                                            ].filter((action) => isWebsiteCategory || !isWebsiteToggleAction(action.label))}
                                         />
                                     </div>
                                 </div>

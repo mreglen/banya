@@ -57,6 +57,10 @@ export const apiSlice = createApi({
           : [{ type: 'Baths', id: 'LIST' }],
     }),
 
+    getWebsiteCategoriesPreview: builder.query({
+      query: () => '/admin/categories/website/preview',
+    }),
+
     createBath: builder.mutation({
       query: (body) => ({
         url: '/baths/',
@@ -345,6 +349,7 @@ export const {
 
   useGetBathsQuery,
   useGetBathByIdQuery,
+  useGetWebsiteCategoriesPreviewQuery,
   useCreateBathMutation,
   useUpdateBathMutation,
   useDeleteBathMutation,

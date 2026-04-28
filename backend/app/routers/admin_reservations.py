@@ -61,9 +61,11 @@ def get_reservations(
         start_of_day = datetime.combine(target_date, datetime.min.time())
         end_of_day = datetime.combine(target_date, datetime.max.time())
 
+        # Используем логику пересечения: бронь пересекается с днем, если
+        # она начинается ДО конца дня и заканчивается ПОСЛЕ начала дня
         query = query.filter(
-            models.Reservation.start_datetime >= start_of_day,
-            models.Reservation.end_datetime <= end_of_day
+            models.Reservation.start_datetime < end_of_day,
+            models.Reservation.end_datetime > start_of_day
         )
 
     if bath_id is not None:

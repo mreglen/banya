@@ -33,6 +33,7 @@ function Product() {
     category_id: null,
     total_quantity: 0,
     last_purchase_price: 0.0,
+    website_price: 0.0,
     min_stock: 0.0,
     unit_id: null, // ← ДОБАВЛЕНО
   });
@@ -49,6 +50,7 @@ function Product() {
         category_id: product.category_id || null,
         total_quantity: product.total_quantity || 0,
         last_purchase_price: product.last_purchase_price || 0.0,
+        website_price: product.website_price || 0.0,
         min_stock: product.min_stock || 0.0,
         unit_id: product.unit_id || null, // ← ДОБАВЛЕНО
       });
@@ -72,6 +74,7 @@ function Product() {
     setForm(prev => ({
       ...prev,
       [name]: name === 'total_quantity' || name === 'last_purchase_price'
+        || name === 'website_price'
         ? parseFloat(value) || 0
         : name === 'unit_id'
         ? (value === '' ? null : Number(value))
@@ -104,7 +107,7 @@ function Product() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const { name, description, category_id, total_quantity, last_purchase_price, min_stock, unit_id } = form;
+    const { name, description, category_id, total_quantity, last_purchase_price, website_price, min_stock, unit_id } = form;
 
     try {
       // Сначала обновляем основные данные товара
@@ -115,6 +118,7 @@ function Product() {
         category_id: category_id !== null ? parseInt(category_id) : null,
         total_quantity: total_quantity,
         last_purchase_price: last_purchase_price,
+        website_price: website_price,
         min_stock: min_stock,
         unit_id: unit_id, // ← ДОБАВЛЕНО
       };
@@ -315,6 +319,19 @@ function Product() {
                 </div>
               </div>
             )}
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Цена для сайта (₽)</label>
+              <input
+                type="number"
+                name="website_price"
+                value={form.website_price}
+                onChange={handleChange}
+                min="0"
+                step="0.01"
+                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
 
             {/* Кнопки */}
             <div className="flex space-x-4 pt-4">
