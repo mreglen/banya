@@ -42,18 +42,6 @@ const getTodayDate = () => new Date().toISOString().split('T')[0];
 
 const INITIAL_FILTERS = { date: getTodayDate() };
 
-const getLocalDayStart = (dateString) => {
-  const [year, month, day] = dateString.split('-').map(Number);
-  return new Date(year, month - 1, day, 0, 0, 0, 0);
-};
-
-const getLocalDayBounds = (dateString) => {
-  const dayStart = getLocalDayStart(dateString);
-  const dayEnd = new Date(dayStart);
-  dayEnd.setDate(dayEnd.getDate() + 1);
-  return { dayStart, dayEnd };
-};
-
 // ============================================================
 // ОСНОВНОЙ КОМПОНЕНТ
 // ============================================================
@@ -86,11 +74,9 @@ function AdminReservationsNew() {
   const timeSlots = useMemo(() => {
     const slots = [];
     const interval = bookingInterval;
-    const dayStart = getLocalDayStart(filters.date);
-
     for (let hour = 0; hour < 24; hour++) {
       for (let minute = 0; minute < 60; minute += interval) {
-        const slotStart = new Date(dayStart);
+        const slotStart = new Date(filters.date);
         slotStart.setHours(hour, minute, 0, 0);
         
         const slotEnd = new Date(slotStart.getTime() + interval * 60000);
@@ -124,7 +110,9 @@ function AdminReservationsNew() {
         // Проверяем пересечение с выбранным днем
         const bookingStart = new Date(res.start_datetime);
         const bookingEnd = new Date(res.end_datetime);
-        const { dayStart: filterDateStart, dayEnd: filterDateEnd } = getLocalDayBounds(filters.date);
+        const filterDateStart = new Date(filters.date);
+        const filterDateEnd = new Date(filters.date);
+        filterDateEnd.setDate(filterDateEnd.getDate() + 1);
         
         // Бронь пересекается с выбранным днем
         return res.bath_id === bathId && 
@@ -304,7 +292,9 @@ function AdminReservationsNew() {
                               const end = new Date(item.end_datetime);
                               
                               // Ограничиваем бронирование пределами текущего дня
-                              const { dayStart, dayEnd } = getLocalDayBounds(filters.date);
+                              const dayStart = new Date(filters.date);
+                              const dayEnd = new Date(filters.date);
+                              dayEnd.setDate(dayEnd.getDate() + 1);
                               
                               const effectiveStart = start < dayStart ? dayStart : start;
                               const effectiveEnd = end > dayEnd ? dayEnd : end;
@@ -337,7 +327,9 @@ function AdminReservationsNew() {
                             const itemEnd = new Date(activeItem.end_datetime);
                             
                             // Ограничиваем бронирование пределами текущего дня
-                            const { dayStart, dayEnd } = getLocalDayBounds(filters.date);
+                            const dayStart = new Date(filters.date);
+                            const dayEnd = new Date(filters.date);
+                            dayEnd.setDate(dayEnd.getDate() + 1);
                             
                             const effectiveStart = itemStart < dayStart ? dayStart : itemStart;
                             const effectiveEnd = itemEnd > dayEnd ? dayEnd : itemEnd;

@@ -34,6 +34,7 @@ function Product() {
     total_quantity: 0,
     last_purchase_price: 0.0,
     website_price: 0.0,
+    is_countable: true,
     min_stock: 0.0,
     unit_id: null, // ← ДОБАВЛЕНО
   });
@@ -51,6 +52,7 @@ function Product() {
         total_quantity: product.total_quantity || 0,
         last_purchase_price: product.last_purchase_price || 0.0,
         website_price: product.website_price || 0.0,
+        is_countable: product.is_countable ?? true,
         min_stock: product.min_stock || 0.0,
         unit_id: product.unit_id || null, // ← ДОБАВЛЕНО
       });
@@ -107,7 +109,7 @@ function Product() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const { name, description, category_id, total_quantity, last_purchase_price, website_price, min_stock, unit_id } = form;
+    const { name, description, category_id, total_quantity, last_purchase_price, website_price, is_countable, min_stock, unit_id } = form;
 
     try {
       // Сначала обновляем основные данные товара
@@ -119,7 +121,8 @@ function Product() {
         total_quantity: total_quantity,
         last_purchase_price: last_purchase_price,
         website_price: website_price,
-        min_stock: min_stock,
+        is_countable: is_countable,
+        min_stock: is_countable ? min_stock : 0,
         unit_id: unit_id, // ← ДОБАВЛЕНО
       };
 
@@ -282,6 +285,19 @@ function Product() {
               </div>
             </div>
 
+            <div>
+              <label className="inline-flex items-center gap-2 cursor-pointer text-sm text-gray-700">
+                <input
+                  type="checkbox"
+                  checked={!form.is_countable}
+                  onChange={(e) =>
+                    setForm((prev) => ({ ...prev, is_countable: !e.target.checked }))
+                  }
+                />
+                <span>Не исчисляемый товар</span>
+              </label>
+            </div>
+
             {/* Минимальный остаток */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -294,12 +310,13 @@ function Product() {
                 onChange={handleChange}
                 min="0"
                 step="0.01"
+                disabled={!form.is_countable}
                 className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
 
             {/* Остаток — ТОЛЬКО ПРОСМОТР */}
-            {isEditing && (
+            {isEditing && form.is_countable && (
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Остаток ({selectedUnit?.name || 'шт.'})

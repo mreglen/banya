@@ -19,6 +19,7 @@ const AddStorageProduct = () => {
     categoryPath: null,
     unit_id: '',
     website_price: 0,
+    is_countable: true,
   });
 
   const [images, setImages] = useState([]);
@@ -93,6 +94,7 @@ const AddStorageProduct = () => {
       }
 
       productData.website_price = Number(formData.website_price) || 0;
+      productData.is_countable = Boolean(formData.is_countable);
 
       const createdProduct = await createProduct(productData).unwrap();
       const productId = createdProduct.id;
@@ -186,6 +188,19 @@ const AddStorageProduct = () => {
                 ))}
               </select>
             )}
+          </div>
+
+          <div className="mb-5">
+            <label className="inline-flex items-center gap-2 cursor-pointer text-sm text-gray-700">
+              <input
+                type="checkbox"
+                checked={!formData.is_countable}
+                onChange={(e) =>
+                  setFormData((prev) => ({ ...prev, is_countable: !e.target.checked }))
+                }
+              />
+              <span>Не исчисляемый товар</span>
+            </label>
           </div>
 
           <div className="mb-5">

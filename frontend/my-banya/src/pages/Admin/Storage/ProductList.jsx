@@ -99,7 +99,7 @@ const ProductList = ({
 
     // Применить фильтр
     const lowStockFilteredProducts = filterType === 'min_stock'
-        ? filteredProducts.filter(p => (p.total_quantity || 0) < (p.min_stock || 0))
+        ? filteredProducts.filter(p => p.is_countable && (p.total_quantity || 0) < (p.min_stock || 0))
         : filteredProducts;
 
     const normalizedSearch = searchQuery.trim().toLowerCase();
@@ -171,7 +171,7 @@ const ProductList = ({
                                                 actions={[
                                                     {
                                                         label: 'Редактировать',
-                                                        icon: '✏️',
+                                                        icon: '',
                                                         color: 'blue',
                                                         onClick: (e) => {
                                                             e.stopPropagation();
@@ -180,7 +180,7 @@ const ProductList = ({
                                                     },
                                                     {
                                                         label: product.is_visible_on_website ? 'Скрыть с сайта' : 'Отображать на сайте',
-                                                        icon: product.is_visible_on_website ? '🙈' : '🌐',
+                                                        icon: product.is_visible_on_website ? '' : '',
                                                         color: product.is_visible_on_website ? 'gray' : 'green',
                                                         onClick: async () => {
                                                             try {
@@ -195,8 +195,8 @@ const ProductList = ({
                                                         },
                                                     },
                                                     {
-                                                        label: markedForDeletion ? 'Снять пометку' : 'Пометить на удаление',
-                                                        icon: markedForDeletion ? '✓' : '🗑️',
+                                                        label: markedForDeletion ? 'Снять с удаления' : 'Пометить на удаление',
+                                                        icon: markedForDeletion ? '✓' : '',
                                                         color: markedForDeletion ? 'green' : 'red',
                                                         onClick: (e) => {
                                                             e.stopPropagation();
@@ -204,6 +204,7 @@ const ProductList = ({
                                                                 dispatch(unmarkForDeletion(product.id));
                                                             } else {
                                                                 dispatch(markForDeletion(product.id));
+                                                                navigate('/admin/deletion-requests');
                                                             }
                                                         },
                                                     },
@@ -248,13 +249,13 @@ const ProductList = ({
                                             actions={[
                                                 {
                                                     label: 'Редактировать',
-                                                    icon: '✏️',
+                                                    icon: '',
                                                     color: 'blue',
                                                     onClick: () => handleEdit(product.id),
                                                 },
                                                 {
                                                     label: product.is_visible_on_website ? 'Скрыть с сайта' : 'Отображать на сайте',
-                                                    icon: product.is_visible_on_website ? '🙈' : '🌐',
+                                                    icon: product.is_visible_on_website ? '' : '',
                                                     color: product.is_visible_on_website ? 'gray' : 'green',
                                                     onClick: async () => {
                                                         try {
@@ -269,14 +270,15 @@ const ProductList = ({
                                                     },
                                                 },
                                                 {
-                                                    label: markedForDeletion ? 'Снять пометку' : 'Пометить на удаление',
-                                                    icon: markedForDeletion ? '✓' : '🗑️',
+                                                    label: markedForDeletion ? 'Снять с удаления' : 'Пометить на удаление',
+                                                    icon: markedForDeletion ? '✓' : '',
                                                     color: markedForDeletion ? 'green' : 'red',
                                                     onClick: () => {
                                                         if (markedForDeletion) {
                                                             dispatch(unmarkForDeletion(product.id));
                                                         } else {
                                                             dispatch(markForDeletion(product.id));
+                                                            navigate('/admin/deletion-requests');
                                                         }
                                                     },
                                                 },

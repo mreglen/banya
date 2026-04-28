@@ -144,6 +144,7 @@ class Product(Base):
     name = Column(String, nullable=False)
     description = Column(String, nullable=True)
     is_visible_on_website = Column(Boolean, default=False)
+    is_countable = Column(Boolean, nullable=False, default=True)
     category_id = Column(Integer, ForeignKey("categories.id"), nullable=True)
     total_quantity = Column(Float, default=0)
     last_purchase_price = Column(Float, default=0.0)

@@ -35,8 +35,11 @@ def create_product_with_photos(db: Session, product_data: ProductCreate, photo_u
         name=product_data.name,
         description=product_data.description,
         is_visible_on_website=product_data.is_visible_on_website,
+        is_countable=product_data.is_countable,
         category_id=product_data.category_id,
-        unit_id=product_data.unit_id  
+        unit_id=product_data.unit_id,
+        website_price=product_data.website_price,
+        min_stock=0.0 if not product_data.is_countable else product_data.min_stock
     )
     db.add(db_product)
     db.commit()
@@ -92,6 +95,9 @@ def update_product(product_id: int, product: ProductCreate, db: Session = Depend
     
     for key, value in product.model_dump().items():
         setattr(db_product, key, value)
+
+    if not db_product.is_countable:
+        db_product.min_stock = 0.0
     
     db.commit()
     db.refresh(db_product)

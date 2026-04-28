@@ -312,6 +312,7 @@ class ProductBase(BaseModel):
     name: str
     description: Optional[str] = None
     is_visible_on_website: bool = False
+    is_countable: bool = True
     category_id: Optional[int] = None
     website_price: float = 0.0
     min_stock: float = 0.0
@@ -426,6 +427,7 @@ class StockProduct(BaseModel):
     name: str
     description: Optional[str] = None
     category_id: Optional[int] = None
+    is_countable: bool = True
     total_quantity: int = 0
     last_purchase_price: float = 0.0
     min_stock: float = 0.0
