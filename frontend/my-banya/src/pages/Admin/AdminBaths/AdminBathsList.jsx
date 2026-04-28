@@ -42,7 +42,7 @@ function AdminBathsList() {
             onClick={() => handleEditClick(bath.bath_id)}
           >
             <img
-              src={bath.photos?.[0] ? `${SERVER_BASE_URL}${bath.photos[0].image_url}` : '/img/placeholder.jpg'}
+              src={bath.photos?.[0] ? `${SERVER_BASE_URL}${bath.photos[0].image_url}` : '/img/placeholder.svg'}
               alt={bath.name}
               className="w-full h-48 object-cover"
             />

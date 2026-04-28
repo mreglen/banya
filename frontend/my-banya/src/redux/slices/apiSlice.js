@@ -28,7 +28,7 @@ export const apiSlice = createApi({
           return {
             ...bath,
             bath_id: bathId,
-            image: bath.photos?.[0]?.image_url || '/img/placeholder.jpg',
+            image: bath.photos?.[0]?.image_url || '/img/placeholder.svg',
             path: `/baths/${bathId}`,
             subtitle: bath.title,
           };
@@ -45,7 +45,7 @@ export const apiSlice = createApi({
         return {
           ...response,
           bath_id: response.bath_id,
-          image: response.photos?.[0]?.image_url || '/img/placeholder.jpg',
+          image: response.photos?.[0]?.image_url || '/img/placeholder.svg',
           images: response.photos?.map(p => p.image_url) || [],
           path: `/baths/${response.bath_id}`,
           subtitle: response.title,
