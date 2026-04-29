@@ -9,6 +9,7 @@ class Bath(Base):
     __tablename__ = "baths"
 
     bath_id = Column(Integer, primary_key=True, index=True)
+    slug = Column(String(200), nullable=False, unique=True, index=True)
     name = Column(String(100), nullable=False)
     title = Column(String(200), nullable=False)
     cost_weekday = Column(Integer, nullable=False)

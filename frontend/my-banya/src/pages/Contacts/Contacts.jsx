@@ -107,17 +107,44 @@ function Contacts() {
 
 
         <div className="rounded-3xl overflow-hidden shadow-xl border border-gray-200 flex">
-          <iframe
-            src="https://yandex.ru/map-widget/v1/?ll=60.837443%2C56.842733&mode=search&ol=geo&ouri=ymapsbm1%3A%2F%2Fgeo%3Fdata%3DCgg1ODQ2NjI2MjE3EiLQkNGA0LjQvtC80LjRgNC%2BD9GR0YLQvtC80LjQtNC10L3RjCjQn9Cw0L3RgtGALdCh0LDQv9Cw0YLRjNC80LDRgtCw0YbQuNCy0LrQuCDQodCw0L%2FRgdGC0LAg0JzQvtGB0L7QsdCw0LvQvtCz0YDRjCk%3D&z=17"
-            width="100%"
-            height="100%"
-            frameBorder="0"
-            title="Местоположение бани в Екатеринбурге, ул. Кизеловская, 18"
-            className="border-0 min-h-[400px] lg:min-h-[520px]"
-            allowFullScreen
-            loading="lazy"
-          ></iframe>
-          
+          <div style={{ position: 'relative', overflow: 'hidden' }}>
+            <a
+              href="https://yandex.ru/maps/54/yekaterinburg/?utm_medium=mapframe&utm_source=maps"
+              style={{
+                color: '#eee',
+                fontSize: '12px',
+                position: 'absolute',
+                top: '0px',
+                left: 0,
+                zIndex: 2,
+              }}
+            >
+              Екатеринбург
+            </a>
+            <a
+              href="https://yandex.ru/maps/54/yekaterinburg/house/kizelovskaya_ulitsa_18/YkkYcwRpSEYPQFtsfXRzcnVqZQ==/?ll=60.539138%2C56.823991&utm_medium=mapframe&utm_source=maps&z=16"
+              style={{
+                color: '#eee',
+                fontSize: '12px',
+                position: 'absolute',
+                top: '14px',
+                left: 0,
+                zIndex: 2,
+              }}
+            >
+              Кизеловская улица, 18 — Яндекс Карты
+            </a>
+            <iframe
+              src="https://yandex.ru/map-widget/v1/?ll=60.539138%2C56.823991&mode=search&ol=geo&ouri=ymapsbm1%3A%2F%2Fgeo%3Fdata%3DCgg1NjA3OTYyMjY0NBJ20KDQvtGB0YHQuNGPLCDQodCy0LXRgNC00LvQvtCy0YHQutCw0Y8g0L7QsdC70LDRgdGC0YwsINCV0LrQsNGC0LXRgNC40L3QsdGD0YDQsywg0JrQuNC30LXQu9C-0LLRgdC60LDRjyDRg9C70LjRhtCwLCAxOCIKDRQockIVxEtjQg%2C%2C&z=16"
+              width="560"
+              height="400"
+              frameBorder="1"
+              allowFullScreen={true}
+              style={{ position: 'relative', width: '100%', height: '400px', border: 0, zIndex: 1 }}
+              title="Местоположение по адресу: Кизеловская улица, 18 (Екатеринбург)"
+              loading="lazy"
+            />
+          </div>
         </div>
       </div>
     </section>

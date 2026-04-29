@@ -83,7 +83,7 @@ function AppWithLayout() {
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/categories/:categoryId/products" element={<WebsiteCategoryProductsPage />} />
-        <Route path="/baths/:id" element={<BathsCard />} />
+        <Route path="/baths/:slug" element={<BathsCard />} />
         {/* Оставляем как резерв, но убираем из меню */}
         <Route path="/booking" element={<Booking />} />
 

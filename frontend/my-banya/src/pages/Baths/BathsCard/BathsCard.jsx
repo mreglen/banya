@@ -5,11 +5,12 @@ import { useGetBathByIdQuery } from '../../../redux/slices/apiSlice';
 import { useState, useEffect } from 'react';
 
 function BathsCard() {
-  const { id } = useParams();
+  const { slug } = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
   const [images, setImages] = useState([]);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
 
-  const { data: bath, isLoading, error } = useGetBathByIdQuery(id);
+  const { data: bath, isLoading, error } = useGetBathByIdQuery(slug);
 
   const mainIndex = parseInt(searchParams.get('main')) || 0;
 
@@ -25,20 +26,26 @@ function BathsCard() {
           : `${baseUrl}/${url}`;
       });
 
-      const newImages = [...fullUrls];
-      if (mainIndex > 0 && mainIndex < newImages.length) {
-        [newImages[0], newImages[mainIndex]] = [newImages[mainIndex], newImages[0]];
-      }
-      setImages(newImages);
+      setImages(fullUrls);
+      setCurrentImageIndex(mainIndex < fullUrls.length ? mainIndex : 0);
     }
   }, [bath, mainIndex]);
 
   const handleThumbnailClick = (thumbIndex) => {
-    const actualIndex = thumbIndex + 1;
-    const newImages = [...images];
-    [newImages[0], newImages[actualIndex]] = [newImages[actualIndex], newImages[0]];
-    setImages(newImages);
-    setSearchParams({ main: actualIndex });
+    setCurrentImageIndex(thumbIndex + 1);
+    setSearchParams({ main: thumbIndex + 1 });
+  };
+
+  const handlePreviousImage = () => {
+    const newIndex = currentImageIndex === 0 ? images.length - 1 : currentImageIndex - 1;
+    setCurrentImageIndex(newIndex);
+    setSearchParams({ main: newIndex });
+  };
+
+  const handleNextImage = () => {
+    const newIndex = currentImageIndex === images.length - 1 ? 0 : currentImageIndex + 1;
+    setCurrentImageIndex(newIndex);
+    setSearchParams({ main: newIndex });
   };
 
   if (isLoading) {
@@ -71,10 +78,8 @@ function BathsCard() {
         </div>
       </div>
     );
-  }
-
-  const thumbnails = images.slice(1);
-
+  };
+  
   return (
     <section className="py-12 px-6 bg-white min-h-screen mt-28">
       <Helmet>
@@ -86,7 +91,7 @@ function BathsCard() {
         <meta property="og:title" content={`${bath.name} - Николаевские бани`} />
         <meta property="og:description" content={bath.description?.slice(0, 200) || bath.subtitle} />
         <meta property="og:type" content="website" />
-        <meta property="og:url" content={`https://nikolaevskie-bani.ru/baths/${bath.bath_id || id}`} />
+        <meta property="og:url" content={`https://nikolaevskie-bani.ru/baths/${bath.slug || slug}`} />
         {images[0] && <meta property="og:image" content={images[0]} />}
         <meta property="og:locale" content="ru_RU" />
         
@@ -103,7 +108,7 @@ function BathsCard() {
             "@type": "TouristAttraction",
             "name": bath.name,
             "description": bath.description,
-            "url": `https://nikolaevskie-bani.ru/baths/${bath.bath_id || id}`,
+            "url": `https://nikolaevskie-bani.ru/baths/${bath.slug || slug}`,
             "image": images[0] || '',
             "touristType": "Отдых и оздоровление"
           })}
@@ -117,19 +122,48 @@ function BathsCard() {
 
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-8 items-start">
           <div className="lg:col-span-2 space-y-4">
-            <div className="rounded-2xl overflow-hidden shadow-lg">
+            <div className="relative rounded-2xl overflow-hidden shadow-lg">
               <img
-                src={images[0]}
+                src={images[currentImageIndex]}
                 alt={bath.name}
                 className="w-full h-64 sm:h-80 object-cover"
               />
+              
+              {/* Навигационные стрелки поверх фото */}
+              {images.length > 1 && (
+                <>
+                  {/* Стрелка влево */}
+                  <button
+                    onClick={handlePreviousImage}
+                    className="absolute left-4 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white p-3 rounded-full transition-all duration-300 backdrop-blur-sm z-10"
+                    aria-label="Предыдущее фото"
+                  >
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                    </svg>
+                  </button>
+
+                  {/* Стрелка вправо */}
+                  <button
+                    onClick={handleNextImage}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white p-3 rounded-full transition-all duration-300 backdrop-blur-sm z-10"
+                    aria-label="Следующее фото"
+                  >
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                  </button>
+                </>
+              )}
             </div>
 
             <div className="grid grid-cols-3 gap-2">
-              {thumbnails.map((img, index) => (
+              {images.map((img, index) => (
                 <div
                   key={index}
-                  className="rounded-lg overflow-hidden shadow-md cursor-pointer"
+                  className={`rounded-lg overflow-hidden shadow-md cursor-pointer ${
+                    index === currentImageIndex ? 'ring-2 ring-green-500' : ''
+                  }`}
                   onClick={() => handleThumbnailClick(index)}
                 >
                   <img

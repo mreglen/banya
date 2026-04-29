@@ -18,6 +18,7 @@ from app.routers.staffs.permissions import router as permissions_router
 from app.routers.password_reset import router as password_reset_router
 from app.routers.settings import router as settings_router
 from app.routers.support import router as support_router
+from app.routers.dashboard import router as dashboard_router
 
 api_router = APIRouter(prefix="/api")
 
@@ -42,5 +43,6 @@ api_router.include_router(stock_router)
 api_router.include_router(documents_entrance_router)
 api_router.include_router(documents_realization_router)
 api_router.include_router(support_router)
+api_router.include_router(dashboard_router)
 
 

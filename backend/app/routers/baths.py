@@ -9,6 +9,7 @@ from app.database import get_db
 from app.models import Bath, Photo, BathPromotion, Promotion
 from app.schemas import BathOut, BathCreate, BathUpdate
 from app.image_utils import process_image_to_webp
+from app.slug_utils import generate_slug, make_unique_slug
 
 router = APIRouter(prefix="/baths", tags=["baths"])
 
@@ -26,11 +27,11 @@ def get_baths(db: Session = Depends(get_db)):
     return baths
 
 
-@router.get("/{bath_id}")
-def get_bath(bath_id: int, db: Session = Depends(get_db)):
+@router.get("/{slug}")
+def get_bath(slug: str, db: Session = Depends(get_db)):
     bath = db.query(Bath)\
         .options(joinedload(Bath.photos))\
-        .filter(Bath.bath_id == bath_id)\
+        .filter(Bath.slug == slug)\
         .first()
 
     if not bath:
@@ -38,12 +39,13 @@ def get_bath(bath_id: int, db: Session = Depends(get_db)):
     
     # Load active promotions for this bath
     bath.promotions = db.query(Promotion).join(BathPromotion).filter(
-        BathPromotion.bath_id == bath_id,
+        BathPromotion.bath_id == bath.bath_id,
         Promotion.is_active == True
     ).all()
 
     return {
         "bath_id": bath.bath_id,
+        "slug": bath.slug,
         "name": bath.name,
         "title": bath.title,
         "cost_weekday": bath.cost_weekday,
@@ -81,8 +83,16 @@ def create_bath(
     bath: BathCreate,
     db: Session = Depends(get_db)
 ):
+    # Генерируем slug из названия
+    base_slug = generate_slug(bath.name)
+    
+    # Проверяем уникальность slug
+    existing_slugs = [row[0] for row in db.query(Bath.slug).all()]
+    slug = make_unique_slug(base_slug, existing_slugs)
+    
     # Создаём баню
     db_bath = Bath(
+        slug=slug,
         name=bath.name,
         title=bath.title,
         cost_weekday=bath.cost_weekday,
@@ -125,6 +135,12 @@ def update_bath(
     # Обновляем основные поля
     update_data = bath_update.model_dump(exclude_unset=True)
     promotion_ids = update_data.pop('promotion_ids', None)
+    
+    # Если обновляется name, перегенерируем slug
+    if 'name' in update_data and update_data['name'] != db_bath.name:
+        base_slug = generate_slug(update_data['name'])
+        existing_slugs = [row[0] for row in db.query(Bath.slug).filter(Bath.bath_id != bath_id).all()]
+        update_data['slug'] = make_unique_slug(base_slug, existing_slugs)
     
     for key, value in update_data.items():
         if key not in ["photo_urls"]:

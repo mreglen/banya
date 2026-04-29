@@ -76,7 +76,7 @@ function SliderBaths() {
 
                   <div className="flex flex-col sm:flex-row gap-4 justify-center md:justify-start mt-8">
                     <CustomButton
-                      to={`/baths/${bath.id}`}
+                      to={`/baths/${bath.slug}`}
                       text="Подробнее"
                       className="px-6 py-3"
                     />

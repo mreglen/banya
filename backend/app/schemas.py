@@ -31,6 +31,7 @@ class PhotoOut(BaseModel):
 
 # === Бани ===
 class BathBase(BaseModel):
+    slug: str
     name: str
     title: str
     cost_weekday: int
@@ -44,6 +45,7 @@ class BathCreate(BathBase):
     promotion_ids: List[int] = []
 
 class BathUpdate(BaseModel):
+    slug: Optional[str] = None
     name: Optional[str] = None
     title: Optional[str] = None
     cost_weekday: Optional[int] = None

@@ -29,7 +29,7 @@ export const apiSlice = createApi({
             ...bath,
             bath_id: bathId,
             image: bath.photos?.[0]?.image_url || '/img/placeholder.svg',
-            path: `/baths/${bathId}`,
+            path: `/baths/${bath.slug}`,
             subtitle: bath.title,
           };
         }).filter(Boolean);
@@ -38,7 +38,7 @@ export const apiSlice = createApi({
     }),
 
     getBathById: builder.query({
-      query: (id) => `/baths/${id}`,
+      query: (slug) => `/baths/${slug}`,
       transformResponse: (response) => {
         if (!response) return null;
 
@@ -47,7 +47,7 @@ export const apiSlice = createApi({
           bath_id: response.bath_id,
           image: response.photos?.[0]?.image_url || '/img/placeholder.svg',
           images: response.photos?.map(p => p.image_url) || [],
-          path: `/baths/${response.bath_id}`,
+          path: `/baths/${response.slug}`,
           subtitle: response.title,
         };
       },
