@@ -49,7 +49,7 @@ function Baths() {
         ) : (
           baths.map((bath) => (
             <div
-              key={bath.id}
+              key={bath.bath_id}
               className="bg-white rounded-2xl shadow-lg overflow-hidden hover:shadow-2xl transition-shadow duration-300 flex flex-col"
             >
               <div className="h-56 md:h-64 w-full relative">
@@ -64,17 +64,25 @@ function Baths() {
               <div className="p-6 flex-1 flex flex-col">
                 <div>
                   <h3 className="text-2xl font-light text-gray-800 mb-1">{bath.name}</h3>
-                  <p className="text-green-600 text-sm font-medium mb-3">{bath.subtitle}</p>
+                  <p className="text-green-600 text-sm font-medium mb-3">{bath.title}</p>
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="text-sm text-gray-500">
+                      <span className="font-medium text-gray-700">{bath.cost_weekday}₽</span>/час (пн-чт)
+                    </div>
+                    <div className="text-sm text-gray-500">
+                      <span className="font-medium text-gray-700">{bath.cost_weekend}₽</span>/час (пт-вс)
+                    </div>
+                  </div>
                   <p className="text-gray-600 text-sm leading-relaxed mb-6">
-                    {bath.description.length > 150
+                    {bath.description && bath.description.length > 150
                       ? `${bath.description.slice(0, 150)}...`
-                      : bath.description}
+                      : bath.description || 'Русская баня на дровах'}
                   </p>
                 </div>
 
                 <div className="mt-auto">
                   <CustomButton
-                    to={bath.path}
+                    to={`/baths/${bath.slug}`}
                     text="Подробнее"
                     variant="green"
                     className="w-full py-3 text-sm hover:shadow-md transition"
