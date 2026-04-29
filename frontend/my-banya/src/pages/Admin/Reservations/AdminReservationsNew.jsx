@@ -42,6 +42,13 @@ const getTodayDate = () => new Date().toISOString().split('T')[0];
 
 const INITIAL_FILTERS = { date: getTodayDate() };
 
+// Важно: `new Date('YYYY-MM-DD')` парсится как UTC и может уехать от локальной полуночи.
+// Поэтому для визуальной сетки и сравнения с датами используем локальную полуночь.
+const parseLocalYmd = (ymd) => {
+  const [year, month, day] = String(ymd).split('-').map(Number);
+  return new Date(year, month - 1, day, 0, 0, 0, 0);
+};
+
 // ============================================================
 // ОСНОВНОЙ КОМПОНЕНТ
 // ============================================================
@@ -76,7 +83,7 @@ function AdminReservationsNew() {
     const interval = bookingInterval;
     for (let hour = 0; hour < 24; hour++) {
       for (let minute = 0; minute < 60; minute += interval) {
-        const slotStart = new Date(filters.date);
+        const slotStart = parseLocalYmd(filters.date);
         slotStart.setHours(hour, minute, 0, 0);
         
         const slotEnd = new Date(slotStart.getTime() + interval * 60000);
@@ -110,8 +117,8 @@ function AdminReservationsNew() {
         // Проверяем пересечение с выбранным днем
         const bookingStart = new Date(res.start_datetime);
         const bookingEnd = new Date(res.end_datetime);
-        const filterDateStart = new Date(filters.date);
-        const filterDateEnd = new Date(filters.date);
+        const filterDateStart = parseLocalYmd(filters.date);
+        const filterDateEnd = new Date(filterDateStart);
         filterDateEnd.setDate(filterDateEnd.getDate() + 1);
         
         // Бронь пересекается с выбранным днем
@@ -292,8 +299,8 @@ function AdminReservationsNew() {
                               const end = new Date(item.end_datetime);
                               
                               // Ограничиваем бронирование пределами текущего дня
-                              const dayStart = new Date(filters.date);
-                              const dayEnd = new Date(filters.date);
+                              const dayStart = parseLocalYmd(filters.date);
+                              const dayEnd = new Date(dayStart);
                               dayEnd.setDate(dayEnd.getDate() + 1);
                               
                               const effectiveStart = start < dayStart ? dayStart : start;
@@ -327,19 +334,23 @@ function AdminReservationsNew() {
                             const itemEnd = new Date(activeItem.end_datetime);
                             
                             // Ограничиваем бронирование пределами текущего дня
-                            const dayStart = new Date(filters.date);
-                            const dayEnd = new Date(filters.date);
+                            const dayStart = parseLocalYmd(filters.date);
+                            const dayEnd = new Date(dayStart);
                             dayEnd.setDate(dayEnd.getDate() + 1);
                             
                             const effectiveStart = itemStart < dayStart ? dayStart : itemStart;
                             const effectiveEnd = itemEnd > dayEnd ? dayEnd : itemEnd;
                             
-                            // Проверяем, начинается ли бронирование в этом слоте
-                            const bookingStartsInThisSlot = effectiveStart >= slot.start && effectiveStart < slot.end;
-                            
-                            if (!bookingStartsInThisSlot) {
-                              // Проверяем, продолжается ли эта бронь через этот слот
-                              const bookingContinuesThroughSlot = effectiveStart < slot.start && effectiveEnd > slot.start;
+                            // Проверяем, это первый слот, где начинается бронь
+                            const isFirstSlotOfBooking = 
+                              effectiveStart >= slot.start && 
+                              effectiveStart < slot.end;
+
+                            if (!isFirstSlotOfBooking) {
+                              // Проверяем, продолжается ли бронь через этот слот
+                              const bookingContinuesThroughSlot = 
+                                effectiveStart < slot.start && 
+                                effectiveEnd > slot.start;
                               
                               if (bookingContinuesThroughSlot) {
                                 // Бронь продолжается через этот слот - не показываем ничего
@@ -365,17 +376,18 @@ function AdminReservationsNew() {
                             
                             // Бронирование начинается в этом слоте - рассчитываем позицию и высоту
                             const minutesFromSlotStart = (effectiveStart - slot.start) / 60000;
+                              
                             const durationMinutes = (effectiveEnd - effectiveStart) / 60000;
                             const slotMinutes = (slot.end - slot.start) / 60000;
                             
-                            const topPercent = minutesFromSlotStart > 0 ? (minutesFromSlotStart / slotMinutes) * 100 : 0;
+                            const topPercent = (minutesFromSlotStart / slotMinutes) * 100;
                             // Высота может быть больше 100% - бронирование растягивается на множество слотов
                             const heightPercent = (durationMinutes / slotMinutes) * 100;
 
                             // Tooltip с полным временем
                             const tooltipText = activeItem.is_cleaning 
                               ? 'Уборка' 
-                              : `${activeItem.client_name} • ${formatTime(itemStart)} – ${formatTime(itemEnd)}`;
+                              : `${activeItem.client_name} • ${formatTime(itemStart < dayStart ? dayStart : itemStart)} – ${formatTime(itemEnd)}`;
 
                             return (
                               <tr key={idx} className="hover:bg-gray-25 transition-colors">
@@ -501,7 +513,10 @@ function AdminReservationsNew() {
                           <div>
                             <div className="font-semibold text-orange-800">Уборка</div>
                             <div className="text-sm text-orange-600">
-                              {new Date(booking.start_datetime).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}
+                              {new Date(booking.start_datetime) < parseLocalYmd(filters.date)
+                                ? parseLocalYmd(filters.date).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
+                                : new Date(booking.start_datetime).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
+                              }
                               &nbsp;–&nbsp;
                               {new Date(booking.end_datetime).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}
                             </div>
@@ -523,7 +538,10 @@ function AdminReservationsNew() {
                               </div>
                             )}
                             <div className="text-sm font-medium text-gray-800 mb-1">
-                              {new Date(booking.start_datetime).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}
+                              {new Date(booking.start_datetime) < parseLocalYmd(filters.date)
+                                ? parseLocalYmd(filters.date).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
+                                : new Date(booking.start_datetime).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
+                              }
                               &nbsp;–&nbsp;
                               {new Date(booking.end_datetime).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}
                             </div>

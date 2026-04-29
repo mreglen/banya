@@ -8,14 +8,14 @@ function Contacts() {
         <title>Контакты - Николаевские бани в Екатеринбурге</title>
         <meta name="description" content="Контакты Николаевских бань в Екатеринбурге. Адрес: ул. Кизеловская, 18. Телефон: +7 (343) 344-87-55. Бронирование бань онлайн." />
         <meta name="keywords" content="Николаевские бани контакты, адрес бани Екатеринбург, телефон бани, как добраться" />
-        
+
         {/* Open Graph */}
         <meta property="og:title" content="Контакты - Николаевские бани" />
         <meta property="og:description" content="Мы всегда рады гостям. Приезжайте к нам - баня ждёт вас в любое время года." />
         <meta property="og:type" content="website" />
         <meta property="og:url" content="https://nikolaevskie-bani.ru/contacts" />
         <meta property="og:locale" content="ru_RU" />
-        
+
         {/* Schema.org structured data */}
         <script type="application/ld+json">
           {JSON.stringify({
@@ -39,7 +39,7 @@ function Contacts() {
           })}
         </script>
       </Helmet>
-  
+
       <div className="py-16 px-6 text-center max-w-4xl mx-auto">
         <h1 className="text-4xl sm:text-5xl font-light text-gray-800 mb-4">Контакты</h1>
         <p className="text-lg text-gray-600 font-extralight">
@@ -47,15 +47,15 @@ function Contacts() {
         </p>
       </div>
 
-  
+
       <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-12 px-6 pb-20">
-       
+
         <div className="bg-white rounded-3xl shadow-xl border border-gray-100 flex flex-col">
           <div className="p-8 flex-1 flex flex-col">
             <h2 className="text-2xl font-medium text-gray-800 mb-6">Информация</h2>
 
             <div className="space-y-6 text-gray-700">
-              
+
               <div className="flex items-start gap-4">
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-green-600 mt-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
@@ -79,7 +79,7 @@ function Contacts() {
                 </div>
               </div>
 
-            
+
               <div className="flex items-start gap-4">
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-green-600 mt-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
@@ -93,7 +93,7 @@ function Contacts() {
               </div>
             </div>
 
-          
+
             <div className="mt-auto pt-8">
               <CustomButton
                 to="/booking"
@@ -105,7 +105,7 @@ function Contacts() {
           </div>
         </div>
 
-       
+
         <div className="rounded-3xl overflow-hidden shadow-xl border border-gray-200 flex">
           <iframe
             src="https://yandex.ru/map-widget/v1/?ll=60.837443%2C56.842733&mode=search&ol=geo&ouri=ymapsbm1%3A%2F%2Fgeo%3Fdata%3DCgg1ODQ2NjI2MjE3EiLQkNGA0LjQvtC80LjRgNC%2BD9GR0YLQvtC80LjQtNC10L3RjCjQn9Cw0L3RgtGALdCh0LDQv9Cw0YLRjNC80LDRgtCw0YbQuNCy0LrQuCDQodCw0L%2FRgdGC0LAg0JzQvtGB0L7QsdCw0LvQvtCz0YDRjCk%3D&z=17"
@@ -117,6 +117,7 @@ function Contacts() {
             allowFullScreen
             loading="lazy"
           ></iframe>
+          
         </div>
       </div>
     </section>

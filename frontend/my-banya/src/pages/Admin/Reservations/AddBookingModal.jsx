@@ -103,6 +103,7 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
             available: stockItem?.total_quantity || 0,
             unit_id: stockItem?.unit_id || null, // ← ДОБАВЛЕНО
             unit_name: unitName, // ← ДОБАВЛЕНО
+            is_countable: stockItem?.is_countable ?? true,
             quantity: product.quantity,
           };
         });
@@ -218,6 +219,7 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
     const stockItem = stockProducts.find(p => p.id === product.id);
     const available = stockItem?.total_quantity || 0;
     const unitName = findUnitName(stockItem?.unit_id); // ← ДОБАВЛЕНО
+    const isCountable = stockItem?.is_countable ?? true;
 
     setFormData(prev => ({
       ...prev,
@@ -230,6 +232,7 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
           available,
           unit_id: stockItem?.unit_id || null, // ← ДОБАВЛЕНО
           unit_name: unitName, // ← ДОБАВЛЕНО
+          is_countable: isCountable,
           quantity: 1,
         }
       ]
@@ -237,26 +240,12 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
   };
 
   const updateProductQuantity = (productId, newQty) => {
-    // Разрешаем пустое значение (когда пользователь стирает всё)
-    const qty = newQty === '' ? '' : Math.max(1, Math.min(formData.selectedProducts.find(p => p.id === productId)?.available || 1, parseInt(newQty) || 1));
-    
+    if (newQty !== '' && !/^\d+$/.test(newQty)) return;
     setFormData(prev => ({
       ...prev,
       selectedProducts: prev.selectedProducts.map(p =>
         p.id === productId
-          ? { ...p, quantity: qty }
-          : p
-      )
-    }));
-  };
-
-  const handleQuantityBlur = (productId) => {
-    // При потере фокуса, если поле пустое, устанавливаем 1
-    setFormData(prev => ({
-      ...prev,
-      selectedProducts: prev.selectedProducts.map(p =>
-        p.id === productId && (p.quantity === '' || p.quantity === null)
-          ? { ...p, quantity: 1 }
+          ? { ...p, quantity: newQty === '' ? '' : parseInt(newQty, 10) }
           : p
       )
     }));
@@ -320,9 +309,11 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
     
     // Проверка товаров (количество)
     formData.selectedProducts.forEach(product => {
-      if (!product.quantity || product.quantity < 1) {
+      const q = product.quantity;
+      const qNum = typeof q === 'number' ? q : parseInt(q, 10);
+      if (q === '' || q === null || Number.isNaN(qNum) || qNum < 1) {
         errors[`product_${product.id}`] = 'Минимум 1';
-      } else if (product.quantity > product.available) {
+      } else if (product.is_countable !== false && qNum > product.available) {
         errors[`product_${product.id}`] = `Превышает доступное количество (${product.available})`;
       }
     });
@@ -445,7 +436,7 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
   const isSubmitting = isCreating || isUpdating;
 
   const totalProductCost = formData.selectedProducts.reduce(
-    (sum, p) => sum + p.quantity * p.purchase_price,
+    (sum, p) => sum + (parseInt(p.quantity, 10) || 0) * p.purchase_price,
     0
   );
 
@@ -657,13 +648,24 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
               {formData.bath_id && (
                 <div className="text-xs sm:text-sm text-gray-600 bg-blue-50 px-3 py-2 rounded-lg">
                   {(() => {
-                    const selectedBath = baths.find((b) => b.bath_id === formData.bath_id);
+                    // `select` возвращает строку, а `bath_id` в данных обычно число — приводим типы
+                    const selectedBath = baths.find(
+                      (b) => String(b.bath_id) === String(formData.bath_id)
+                    );
                     if (!selectedBath) return null;
+                    const baseGuests = Number(selectedBath.base_guests) || 0;
+                    const guestsNum = Number(formData.guests) || 0;
+                    const extraGuestsCount = Math.max(0, guestsNum - baseGuests);
+                    const extraPrice = Number(selectedBath.extra_guest_price) || 0;
+                    const extraTotal = extraGuestsCount * extraPrice;
                     return (
                       <>
-                        Входит: <strong>{selectedBath.base_guests}</strong> чел.
-                        {selectedBath.extra_guest_price > 0 && (
-                          <> | Доп. гость: <strong>{selectedBath.extra_guest_price} ₽</strong></>
+                        Входит: <strong>{baseGuests}</strong> чел.
+                        {extraGuestsCount > 0 && (
+                          <>
+                            | Доп. гости ({extraGuestsCount} × {extraPrice} ₽):{' '}
+                            <strong>{extraTotal.toLocaleString()}</strong> ₽
+                          </>
                         )}
                       </>
                     );
@@ -748,20 +750,25 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
                 {formData.selectedProducts.map((item) => (
                   <div key={item.id} className="bg-gray-50 p-3 rounded-lg border border-gray-200">
                     <div className="font-medium text-gray-800">{item.name}</div>
-                    <div className="text-xs text-gray-600 mt-1">
-                      Доступно: {item.available} {item.unit_name}
-                    </div>
+                    {item.is_countable !== false ? (
+                      <div className="text-xs text-gray-600 mt-1">
+                        Доступно: {item.available} {item.unit_name}
+                      </div>
+                    ) : (
+                      <div className="text-xs text-gray-600 mt-1">
+                        Не исчисляемая позиция (например, услуга) — количество без ограничения по остатку
+                      </div>
+                    )}
                     <div className="flex items-center justify-between mt-2">
                       <div className="flex items-center space-x-2">
                         <span className="text-sm text-gray-700">Кол-во:</span>
                         <input
-                          type="number"
-                          min="1"
-                          max={item.available}
+                          type="text"
+                          inputMode="numeric"
+                          pattern="\d*"
                           value={item.quantity}
                           onChange={(e) => updateProductQuantity(item.id, e.target.value)}
-                          onBlur={() => handleQuantityBlur(item.id)}
-                          className={`w-14 px-2 py-1 border rounded text-sm ${
+                          className={`w-16 px-2 py-1 border rounded text-sm ${
                             validationErrors[`product_${item.id}`]
                               ? 'border-red-500 bg-red-50'
                               : 'border-gray-300'
@@ -770,7 +777,9 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
                         <span className="text-sm text-gray-600">{item.unit_name}</span>
                       </div>
                       <div className="text-right">
-                        <div className="text-sm font-medium">{(item.quantity * item.purchase_price).toFixed(2)} ₽</div>
+                        <div className="text-sm font-medium">
+                          {((parseInt(item.quantity, 10) || 0) * item.purchase_price).toFixed(2)} ₽
+                        </div>
                         {/* Показывать ошибку валидации */}
                         {validationErrors[`product_${item.id}`] && (
                           <p className="text-xs text-red-600 mt-1">{validationErrors[`product_${item.id}`]}</p>
