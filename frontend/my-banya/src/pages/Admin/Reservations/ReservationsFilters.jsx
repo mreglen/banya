@@ -2,8 +2,15 @@
 
 import { useState, useEffect } from 'react';
 
+const formatLocalYmd = (date) => {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+};
+
 function ReservationsFilters({ onApply, onAddBooking }) {
-  const today = new Date().toISOString().split('T')[0];
+  const today = formatLocalYmd(new Date());
 
   const [date, setDate] = useState(today);
 
@@ -29,8 +36,12 @@ function ReservationsFilters({ onApply, onAddBooking }) {
             type="date"
             id="date"
             value={date}
+            readOnly
+            onKeyDown={(e) => e.preventDefault()}
+            onClick={(e) => e.currentTarget.showPicker?.()}
+            onFocus={(e) => e.currentTarget.showPicker?.()}
             onChange={handleDateChange}
-            className="w-full py-2 sm:px-4 sm:py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent text-sm"
+            className="w-full py-2 sm:px-4 sm:py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent text-sm cursor-pointer"
           />
         </div>
 

@@ -1,5 +1,5 @@
 import { createPortal } from 'react-dom';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import {
   useGetBathsQuery,
 } from '../../../redux/slices/apiSlice';
@@ -24,18 +24,93 @@ const generateTimeOptions = () => {
   return options;
 };
 
+const formatLocalYmd = (date) => {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+};
+
+const formatLocalHm = (date) => {
+  const hh = String(date.getHours()).padStart(2, '0');
+  const mm = String(date.getMinutes()).padStart(2, '0');
+  return `${hh}:${mm}`;
+};
+
+/** Округление вверх до 30 минут (локальное время) */
+const roundUpTo30Min = (date) => {
+  const d = new Date(date.getTime());
+  d.setSeconds(0, 0);
+  const m = d.getMinutes();
+  const rem = m % 30;
+  if (rem === 0) return d;
+  d.setMinutes(m + (30 - rem), 0, 0);
+  return d;
+};
+
+/** Первый доступный слот времени начала для выбранной даты (локально) */
+const getFirstAllowedStartTime = (ymd) => {
+  const today = formatLocalYmd(new Date());
+  if (ymd !== today) return '00:00';
+  return formatLocalHm(roundUpTo30Min(new Date()));
+};
+
+/** Конец брони по дате/времени начала и длительности в часах (может перейти через полночь) */
+const computeEndDateTime = (ymd, hm, durationHours) => {
+  const start = new Date(`${ymd}T${hm}:00`);
+  const end = new Date(start.getTime() + Number(durationHours) * 60 * 60 * 1000);
+  return { endDate: formatLocalYmd(end), endHm: formatLocalHm(end) };
+};
+
+const addDaysYmd = (ymd, days) => {
+  const [y, mo, d] = String(ymd).split('-').map(Number);
+  const dt = new Date(y, mo - 1, d, 12, 0, 0, 0);
+  dt.setDate(dt.getDate() + days);
+  return formatLocalYmd(dt);
+};
+
+// Build ISO string with timezone offset (Python datetime.fromisoformat supports it)
+const toLocalIsoWithOffset = (ymd, hm) => {
+  const dt = new Date(`${ymd}T${hm}:00`);
+  const y = dt.getFullYear();
+  const m = String(dt.getMonth() + 1).padStart(2, '0');
+  const d = String(dt.getDate()).padStart(2, '0');
+  const hh = String(dt.getHours()).padStart(2, '0');
+  const mm = String(dt.getMinutes()).padStart(2, '0');
+  const ss = String(dt.getSeconds()).padStart(2, '0');
+
+  // JS offset: minutes behind UTC (e.g. Екатеринбург UTC+5 => -300)
+  const offsetMin = -dt.getTimezoneOffset();
+  const sign = offsetMin >= 0 ? '+' : '-';
+  const abs = Math.abs(offsetMin);
+  const offH = String(Math.floor(abs / 60)).padStart(2, '0');
+  const offM = String(abs % 60).padStart(2, '0');
+
+  return `${y}-${m}-${d}T${hh}:${mm}:${ss}${sign}${offH}:${offM}`;
+};
+
 function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess }) {
   const isEditing = !!booking;
-  const today = new Date().toISOString().split('T')[0];
+  const today = formatLocalYmd(new Date());
   const [updateReservation, { isLoading: isUpdating }] = useUpdateReservationMutation();
   const [createReservation, { isLoading: isCreating }] = useCreateReservationMutation();
 
+  let initialNewDate =
+    selectedDate && String(selectedDate).trim() !== '' ? String(selectedDate) : today;
+  let initialNewStartTime = getFirstAllowedStartTime(initialNewDate);
+  if (initialNewDate === today) {
+    const slots = generateTimeOptions().filter((t) => t >= initialNewStartTime);
+    if (slots.length === 0) {
+      initialNewDate = addDaysYmd(today, 1);
+      initialNewStartTime = '00:00';
+    }
+  }
+
   const [formData, setFormData] = useState({
     bath_id: '',
-    date: today,
-    end_date: today,
-    start_time: '00:00',
-    end_time: '01:00',
+    date: initialNewDate,
+    start_time: initialNewStartTime,
+    duration_hours: 1,
     client_name: '',
     client_phone: '',
     client_email: '',
@@ -48,6 +123,7 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
   const [validationErrors, setValidationErrors] = useState({});
   const [toast, setToast] = useState(null);
+  const prevIsOpenRef = useRef(false);
 
   const { data: baths = [], isLoading: isLoadingBaths } = useGetBathsQuery();
   const { data: stockProducts = [] } = useGetStockProductsQuery();
@@ -71,27 +147,49 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
     setTimeout(() => setToast(null), 5000);
   };
 
+  // При открытии модалки «новая бронь» — сброс к выбранной в фильтре дате и валидному времени
   useEffect(() => {
-    if (!isEditing) {
-      setFormData((prev) => ({
-        ...prev,
-        date: today,
-        end_date: today,
-        start_time: '00:00',
-        end_time: '01:00',
-      }));
+    const justOpened = isOpen && !prevIsOpenRef.current;
+    prevIsOpenRef.current = isOpen;
+
+    if (!justOpened || !isOpen || isEditing) return;
+
+    let date =
+      selectedDate && String(selectedDate).trim() !== '' ? String(selectedDate) : formatLocalYmd(new Date());
+    let start_time = getFirstAllowedStartTime(date);
+    const todayStr = formatLocalYmd(new Date());
+    if (date === todayStr) {
+      const slots = generateTimeOptions().filter((t) => t >= start_time);
+      if (slots.length === 0) {
+        date = addDaysYmd(todayStr, 1);
+        start_time = '00:00';
+      }
     }
-  }, [isEditing, today]);
+    setFormData((prev) => ({
+      ...prev,
+      date,
+      start_time,
+      duration_hours: 1,
+      bath_id: '',
+      client_name: '',
+      client_phone: '',
+      client_email: '',
+      notes: '',
+      guests: 1,
+      status_id: 1,
+      selectedProducts: [],
+    }));
+  }, [isOpen, isEditing, selectedDate]);
 
   useEffect(() => {
     if (booking && statusOptions.length > 0) {
       try {
         const start = new Date(booking.start_datetime);
         const end = new Date(booking.end_datetime);
-        const date = start.toISOString().split('T')[0];
-        const end_date = end.toISOString().split('T')[0];
+        const date = formatLocalYmd(start);
         const start_time = start.toTimeString().slice(0, 5);
-        const end_time = end.toTimeString().slice(0, 5);
+        const diffMs = end.getTime() - start.getTime();
+        const duration_hours = Math.max(0.5, Math.round((diffMs / (1000 * 60 * 60)) * 2) / 2);
 
         const selectedProducts = (booking.products || []).map(product => {
           const stockItem = stockProducts.find(p => p.id === product.product_id);
@@ -112,9 +210,8 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
         setFormData({
           bath_id: booking.bath?.bath_id || booking.bath_id || '',
           date,
-          end_date,
           start_time,
-          end_time,
+          duration_hours,
           client_name: booking.client_name || '',
           client_phone: booking.client_phone || '',
           client_email: booking.client_email || '',
@@ -130,26 +227,24 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
     }
   }, [booking, stockProducts, units, findUnitName, statusOptions.length]); // ← ДОБАВЛЕНО units
 
+  // Если выбрана сегодняшняя дата — не даём оставить время в прошлом
   useEffect(() => {
-    if (formData.end_time <= formData.start_time) {
-      const options = getEndTimeOptions(formData.start_time);
-      if (options.length > 0) {
-        setFormData(prev => ({ ...prev, end_time: options[0] }));
-      }
+    const todayStr = formatLocalYmd(new Date());
+    if (formData.date !== todayStr) return;
+    const minHm = getFirstAllowedStartTime(formData.date);
+    const slots = generateTimeOptions().filter((t) => t >= minHm);
+    if (slots.length === 0) {
+      setFormData((prev) => ({
+        ...prev,
+        date: addDaysYmd(todayStr, 1),
+        start_time: '00:00',
+      }));
+      return;
     }
-  }, [formData.start_time, formData.end_time]);
-
-  const getEndTimeOptions = (startTime, endDate, startDate) => {
-    const allOptions = generateTimeOptions();
-    
-    // Если дата окончания больше даты начала, показать все времена
-    if (endDate > startDate) {
-      return allOptions;
+    if (formData.start_time < minHm) {
+      setFormData((prev) => ({ ...prev, start_time: minHm }));
     }
-    
-    // Иначе только времена после времени начала
-    return allOptions.filter(time => time > startTime);
-  };
+  }, [formData.date, formData.start_time]);
 
   const handleOverlayClick = (e) => {
     if (e.target === e.currentTarget) {
@@ -164,6 +259,13 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
     if (name === 'client_phone') {
       const formatted = formatPhoneInput(value, formData.client_phone);
       setFormData((prev) => ({ ...prev, client_phone: formatted }));
+    } else if (name === 'duration_hours') {
+      if (value === '') {
+        setFormData((prev) => ({ ...prev, duration_hours: '' }));
+      } else {
+        const n = parseFloat(value);
+        setFormData((prev) => ({ ...prev, duration_hours: Number.isNaN(n) ? prev.duration_hours : n }));
+      }
     } else {
       setFormData((prev) => ({ ...prev, [name]: value }));
     }
@@ -288,18 +390,38 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
       }
     }
     
-    // Проверка даты и времени
-    const start_datetime = `${formData.date}T${formData.start_time}`;
-    const end_datetime = `${formData.end_date}T${formData.end_time}`;
-    
-    // Проверка что дата окончания не раньше даты начала
-    if (formData.end_date < formData.date) {
-      errors.end_date = 'Дата окончания не может быть раньше даты начала';
+    const minDateStr = formatLocalYmd(new Date());
+    if (formData.date < minDateStr) {
+      errors.date = 'Нельзя выбрать дату в прошлом';
     }
-    
-    // Проверка что конец позже начала
-    if (new Date(start_datetime) >= new Date(end_datetime)) {
-      errors.end_time = 'Дата/время окончания должны быть позже начала';
+
+    const dh =
+      formData.duration_hours === '' || formData.duration_hours == null
+        ? NaN
+        : Number(formData.duration_hours);
+    if (Number.isNaN(dh) || dh < 0.5) {
+      errors.duration_hours = 'Минимум 0.5 часа';
+    } else {
+      const stepped = Math.round(dh * 2) / 2;
+      if (Math.abs(dh - stepped) > 1e-6) {
+        errors.duration_hours = 'Шаг 0.5 часа (например 1, 1.5, 2)';
+      }
+    }
+
+    const start_iso = toLocalIsoWithOffset(formData.date, formData.start_time);
+    const { endDate, endHm } = computeEndDateTime(
+      formData.date,
+      formData.start_time,
+      Number.isNaN(dh) ? 0 : dh
+    );
+    const end_iso = toLocalIsoWithOffset(endDate, endHm);
+
+    if (new Date(start_iso) >= new Date(end_iso)) {
+      errors.duration_hours = 'Укажите положительную длительность';
+    }
+
+    if (new Date(start_iso) < new Date()) {
+      errors.start_time = 'Нельзя выбрать прошедшее время начала';
     }
     
     // Проверка количества гостей
@@ -322,29 +444,47 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
     return Object.keys(errors).length === 0;
   };
 
-  // Функция расчета длительности
-  const calculateDuration = () => {
-    const start = new Date(`${formData.date}T${formData.start_time}`);
-    const end = new Date(`${formData.end_date}T${formData.end_time}`);
-    
+  const calculateDurationHint = () => {
+    const dh =
+      formData.duration_hours === '' || formData.duration_hours == null
+        ? NaN
+        : Number(formData.duration_hours);
+    if (Number.isNaN(dh) || dh < 0.5) return 'Укажите длительность (от 0.5 ч, шаг 0.5)';
+
+    const start = new Date(`${formData.date}T${formData.start_time}:00`);
+    const { endDate, endHm } = computeEndDateTime(formData.date, formData.start_time, dh);
+    const end = new Date(`${endDate}T${endHm}:00`);
     const diffMs = end - start;
-    
-    if (diffMs <= 0) return '0 мин';
-    
+    if (diffMs <= 0) return 'Проверьте длительность';
+
     const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
     const diffHours = Math.floor((diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
     const diffMinutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
-    
+
+    const endLabel = end.toLocaleString('ru-RU', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+
+    let dur = '';
     if (diffDays > 0) {
-      if (diffHours === 0 && diffMinutes === 0) {
-        return `${diffDays} дн.`;
-      }
-      return `${diffDays} дн. ${diffHours} ч ${diffMinutes} мин`;
+      dur =
+        diffHours === 0 && diffMinutes === 0
+          ? `${diffDays} дн.`
+          : `${diffDays} дн. ${diffHours} ч ${diffMinutes} мин`;
+    } else if (diffHours === 0) {
+      dur = `${diffMinutes} мин`;
+    } else if (diffMinutes === 0) {
+      dur = `${diffHours} ч`;
+    } else {
+      dur = `${diffHours} ч ${diffMinutes} мин`;
     }
-    
-    if (diffHours === 0) return `${diffMinutes} мин`;
-    if (diffMinutes === 0) return `${diffHours} ч`;
-    return `${diffHours} ч ${diffMinutes} мин`;
+
+    const crosses = endDate !== formData.date;
+    return { dur, endLabel, crosses };
   };
 
   const handleSubmit = async (e) => {
@@ -360,8 +500,10 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
       return;
     }
 
-    const start_datetime = `${formData.date}T${formData.start_time}`;
-    const end_datetime = `${formData.end_date}T${formData.end_time}`;
+    const dh = Number(formData.duration_hours);
+    const { endDate, endHm } = computeEndDateTime(formData.date, formData.start_time, dh);
+    const start_datetime = toLocalIsoWithOffset(formData.date, formData.start_time);
+    const end_datetime = toLocalIsoWithOffset(endDate, endHm);
     console.log('🟡 Datetime:', { start_datetime, end_datetime });
 
     // Нормализуем телефон перед отправкой
@@ -440,7 +582,18 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
     0
   );
 
-  // ... (весь импорт и хуки остаются без изменений)
+  const minDateStr = formatLocalYmd(new Date());
+  const allTimeSlots = generateTimeOptions();
+  const minStartHmForToday = getFirstAllowedStartTime(formData.date);
+  let startTimeOptions =
+    formData.date === minDateStr
+      ? allTimeSlots.filter((t) => t >= minStartHmForToday)
+      : allTimeSlots;
+  if (startTimeOptions.length === 0) {
+    startTimeOptions = ['00:00'];
+  }
+
+  const durationHint = calculateDurationHint();
 
   return createPortal(
     <div
@@ -540,73 +693,107 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
               <input
                 type="date"
                 value={formData.date}
-                onChange={(e) => setFormData((prev) => ({ ...prev, date: e.target.value }))}
-                className="w-full px-3 py-2.5 sm:px-4 sm:py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 text-sm"
+                min={minDateStr}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setFormData((prev) => {
+                    const next = { ...prev, date: v };
+                    if (v === minDateStr) {
+                      const minHm = getFirstAllowedStartTime(v);
+                      if (next.start_time < minHm) next.start_time = minHm;
+                    }
+                    return next;
+                  });
+                }}
+                className={`w-full px-3 py-2.5 sm:px-4 sm:py-3 border rounded-xl focus:ring-2 focus:ring-blue-500 text-sm ${
+                  validationErrors.date ? 'border-red-500 bg-red-50' : 'border-gray-300'
+                }`}
                 required
               />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Дата окончания *</label>
-              <input
-                type="date"
-                value={formData.end_date}
-                onChange={(e) => setFormData((prev) => ({ ...prev, end_date: e.target.value }))}
-                className="w-full px-3 py-2.5 sm:px-4 sm:py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 text-sm"
-                min={formData.date}
-                required
-              />
+              {validationErrors.date && (
+                <p className="mt-1 text-xs text-red-600 flex items-center gap-1">
+                  <span>⚠</span> {validationErrors.date}
+                </p>
+              )}
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Время начала *</label>
               <select
                 value={formData.start_time}
                 onChange={(e) => setFormData((prev) => ({ ...prev, start_time: e.target.value }))}
-                className="w-full px-3 py-2.5 sm:px-4 sm:py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 text-sm sm:text-base"
-                required
-              >
-                {generateTimeOptions().map((time) => (
-                  <option key={time} value={time}>
-                    {time}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Время окончания *</label>
-              <select
-                value={formData.end_time}
-                onChange={(e) => setFormData((prev) => ({ ...prev, end_time: e.target.value }))}
                 className={`w-full px-3 py-2.5 sm:px-4 sm:py-3 border rounded-xl focus:ring-2 text-sm sm:text-base ${
-                  validationErrors.end_time 
-                    ? 'border-red-500 focus:ring-red-500 bg-red-50' 
+                  validationErrors.start_time
+                    ? 'border-red-500 focus:ring-red-500 bg-red-50'
                     : 'border-gray-300 focus:ring-blue-500'
                 }`}
                 required
               >
-                {getEndTimeOptions(formData.start_time, formData.end_date, formData.date).map((time) => (
+                {startTimeOptions.map((time) => (
                   <option key={time} value={time}>
                     {time}
                   </option>
                 ))}
               </select>
-              {validationErrors.end_time && (
+              {validationErrors.start_time && (
                 <p className="mt-1 text-xs text-red-600 flex items-center gap-1">
-                  <span>⚠</span> {validationErrors.end_time}
+                  <span>⚠</span> {validationErrors.start_time}
+                </p>
+              )}
+            </div>
+            <div className="sm:col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Количество часов * <span className="text-gray-500 font-normal">(шаг 0.5)</span>
+              </label>
+              <input
+                type="number"
+                name="duration_hours"
+                min="0.5"
+                step="0.5"
+                value={formData.duration_hours}
+                onChange={handleChange}
+                onBlur={() => {
+                  const n = Number(formData.duration_hours);
+                  if (Number.isNaN(n) || n < 0.5) return;
+                  const stepped = Math.round(n * 2) / 2;
+                  setFormData((prev) => ({ ...prev, duration_hours: stepped }));
+                }}
+                className={`w-full max-w-[200px] px-3 py-2.5 sm:px-4 sm:py-3 border rounded-xl focus:ring-2 text-sm ${
+                  validationErrors.duration_hours
+                    ? 'border-red-500 focus:ring-red-500 bg-red-50'
+                    : 'border-gray-300 focus:ring-blue-500'
+                }`}
+                required
+              />
+              {validationErrors.duration_hours && (
+                <p className="mt-1 text-xs text-red-600 flex items-center gap-1">
+                  <span>⚠</span> {validationErrors.duration_hours}
                 </p>
               )}
             </div>
           </div>
 
           {/* Подсказка о длительности */}
-          <div className={`text-xs px-3 py-2 rounded-lg ${
-            formData.end_date > formData.date
-              ? 'bg-purple-50 text-purple-700 border border-purple-200'
-              : 'bg-blue-50 text-gray-600'
-          }`}>
-            {formData.end_date > formData.date && (
-              <div className="font-medium mb-1">📅 Бронирование на несколько дней</div>
+          <div
+            className={`text-xs px-3 py-2 rounded-lg ${
+              typeof durationHint === 'object' && durationHint?.crosses
+                ? 'bg-purple-50 text-purple-700 border border-purple-200'
+                : 'bg-blue-50 text-gray-600'
+            }`}
+          >
+            {typeof durationHint === 'object' && durationHint?.crosses && (
+              <div className="font-medium mb-1">Бронирование переходит на следующий день</div>
             )}
-            <div>Длительность: {calculateDuration()}</div>
+            <div>
+              {typeof durationHint === 'string' ? (
+                durationHint
+              ) : (
+                <>
+                  Длительность: <strong>{durationHint.dur}</strong>
+                  <span className="mx-1">·</span>
+                  Окончание: <strong>{durationHint.endLabel}</strong>
+                </>
+              )}
+            </div>
           </div>
 
           {/* Имя клиента */}
