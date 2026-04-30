@@ -6,9 +6,21 @@ import {
   useUpdateProductMutation,
   useGetCategoriesQuery,
   useUploadProductPhotosMutation,
-  useGetUnitsOfMeasurementQuery, // ← ДОБАВЛЕНО
+  useGetUnitsOfMeasurementQuery,
 } from '../../../redux/slices/productsApiSlice';
 import CategorySelectModal from './CategorySelectModal';
+
+const findCategoryById = (categories, categoryId) => {
+  if (categoryId == null) return null;
+  for (const cat of categories) {
+    if (cat.id === categoryId) return cat;
+    if (cat.children?.length) {
+      const found = findCategoryById(cat.children, categoryId);
+      if (found) return found;
+    }
+  }
+  return null;
+};
 
 function Product() {
   const { id } = useParams();
@@ -19,10 +31,9 @@ function Product() {
 
   const fromPath = location.state?.from || '/admin/storage/nomenclature';
 
-  // Запросы
   const { data: product, isLoading: isLoadingProduct, isError: isErrorProduct } = useGetProductByIdQuery(productId, { skip: !isEditing });
   const { data: categories = [], isLoading: isLoadingCategories } = useGetCategoriesQuery();
-  const { data: units = [], isLoading: isLoadingUnits } = useGetUnitsOfMeasurementQuery(); // ← ДОБАВЛЕНО
+  const { data: units = [], isLoading: isLoadingUnits } = useGetUnitsOfMeasurementQuery();
   const [updateProduct, { isLoading: isUpdating }] = useUpdateProductMutation();
   const [uploadPhotos, { isLoading: isUploadingPhotos }] = useUploadProductPhotosMutation();
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
@@ -32,33 +43,34 @@ function Product() {
     description: '',
     category_id: null,
     total_quantity: 0,
-    last_purchase_price: 0.0,
-    website_price: 0.0,
+    price: '',
     is_countable: true,
     min_stock: 0.0,
-    unit_id: null, // ← ДОБАВЛЕНО
+    unit_id: null,
+    is_visible_on_website: true,
   });
 
   const [imageFiles, setImageFiles] = useState([]);
   const [tempImagePreviews, setTempImagePreviews] = useState([]);
 
-  // Загрузка данных при редактировании
   useEffect(() => {
     if (isEditing && product) {
+      const selectedCat = findCategoryById(categories, product.category_id);
+      const categoryVisible = Boolean(selectedCat?.is_visible_on_website);
       setForm({
         name: product.name || '',
         description: product.description || '',
         category_id: product.category_id || null,
         total_quantity: product.total_quantity || 0,
-        last_purchase_price: product.last_purchase_price || 0.0,
-        website_price: product.website_price || 0.0,
+        price: (product.price ?? 0).toString(),
         is_countable: product.is_countable ?? true,
         min_stock: product.min_stock || 0.0,
-        unit_id: product.unit_id || null, // ← ДОБАВЛЕНО
+        unit_id: product.unit_id || null,
+        is_visible_on_website: categoryVisible
+          ? (product.is_visible_on_website ?? true)
+          : false,
       });
-      // Устанавливаем превью существующих фото
       if (product.photos?.length) {
-        // Для фото используем базовый URL сервера (без /api)
         const baseUrl = process.env.REACT_APP_API_URL ? process.env.REACT_APP_API_URL.replace('/api', '') : (window.location.origin || 'http://127.0.0.1:8000');
         const fullUrls = product.photos.map(photo => {
           const url = photo.image_url;
@@ -69,15 +81,16 @@ function Product() {
         setTempImagePreviews(fullUrls);
       }
     }
-  }, [isEditing, product]);
+  }, [isEditing, product, categories]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
     setForm(prev => ({
       ...prev,
-      [name]: name === 'total_quantity' || name === 'last_purchase_price'
-        || name === 'website_price'
+      [name]: name === 'total_quantity'
         ? parseFloat(value) || 0
+        : name === 'price'
+        ? (value === '' || /^\d*$/.test(value) ? value : prev.price)
         : name === 'unit_id'
         ? (value === '' ? null : Number(value))
         : value
@@ -104,31 +117,38 @@ function Product() {
   };
 
   const handleCategorySelect = (categoryId) => {
-    setForm(prev => ({ ...prev, category_id: categoryId }));
+    setForm((prev) => {
+      const cat = categoryId != null ? findCategoryById(categories, categoryId) : null;
+      const visible = Boolean(cat?.is_visible_on_website);
+      return {
+        ...prev,
+        category_id: categoryId,
+        is_visible_on_website: visible ? true : false,
+      };
+    });
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const { name, description, category_id, total_quantity, last_purchase_price, website_price, is_countable, min_stock, unit_id } = form;
+    const { name, description, category_id, is_countable, min_stock, unit_id, price, is_visible_on_website } = form;
 
     try {
-      // Сначала обновляем основные данные товара
+      const selectedCat = findCategoryById(categories, category_id);
+      const visibleCategory = Boolean(selectedCat?.is_visible_on_website);
       const productData = {
         id: productId,
         name: name.trim(),
         description: description.trim(),
         category_id: category_id !== null ? parseInt(category_id) : null,
-        total_quantity: total_quantity,
-        last_purchase_price: last_purchase_price,
-        website_price: website_price,
+        is_visible_on_website: visibleCategory ? Boolean(is_visible_on_website) : false,
         is_countable: is_countable,
         min_stock: is_countable ? min_stock : 0,
-        unit_id: unit_id, // ← ДОБАВЛЕНО
+        unit_id: unit_id,
+        price: price === '' ? 0 : Number(price),
       };
 
       await updateProduct(productData).unwrap();
 
-      // Затем загружаем новые фото (если есть)
       if (imageFiles.length > 0) {
         const formData = new FormData();
         imageFiles.forEach(file => {
@@ -144,10 +164,11 @@ function Product() {
     }
   };
 
-  const selectedCategory = categories.find(c => c.id === form.category_id);
+  const selectedCategory = findCategoryById(categories, form.category_id);
+  const categoryVisibleOnWebsite = Boolean(selectedCategory?.is_visible_on_website);
   const selectedUnit = units.find(u => u.id === form.unit_id);
 
-  if (isLoadingProduct || isLoadingCategories || isLoadingUnits) { // ← ДОБАВЛЕНО isLoadingUnits
+  if (isLoadingProduct || isLoadingCategories || isLoadingUnits) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         Загрузка...
@@ -174,7 +195,6 @@ function Product() {
 
         <div className="bg-white rounded-2xl shadow-lg p-6">
           <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Название */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Название *</label>
               <input
@@ -187,7 +207,6 @@ function Product() {
               />
             </div>
 
-            {/* Описание */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Описание</label>
               <textarea
@@ -199,7 +218,6 @@ function Product() {
               />
             </div>
 
-            {/* Единица измерения */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Единица измерения</label>
               <select
@@ -217,13 +235,11 @@ function Product() {
               </select>
             </div>
 
-            {/* Фотографии */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Фотографии (макс. 5)
               </label>
 
-              {/* Сетка изображений */}
               {(tempImagePreviews.length > 0) && (
                 <div className="grid grid-cols-3 sm:grid-cols-5 gap-3 mb-4">
                   {tempImagePreviews.map((url, index) => (
@@ -246,7 +262,6 @@ function Product() {
                 </div>
               )}
 
-              {/* Кнопка загрузки (только если < 5) */}
               {tempImagePreviews.length < 5 && (
                 <label className="block w-full px-4 py-3 bg-white border-2 border-dashed border-gray-300 rounded-xl text-center text-gray-600 cursor-pointer hover:border-blue-500 hover:text-blue-500 transition">
                   <span>Выберите файлы или перетащите сюда</span>
@@ -266,7 +281,6 @@ function Product() {
               </p>
             </div>
 
-            {/* Категория */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Категория *</label>
               <div className="flex items-center">
@@ -285,6 +299,21 @@ function Product() {
               </div>
             </div>
 
+            {categoryVisibleOnWebsite && (
+              <div>
+                <label className="inline-flex items-center gap-2 cursor-pointer text-sm text-gray-700">
+                  <input
+                    type="checkbox"
+                    checked={form.is_visible_on_website}
+                    onChange={(e) =>
+                      setForm((prev) => ({ ...prev, is_visible_on_website: e.target.checked }))
+                    }
+                  />
+                  <span>Отображать на сайте</span>
+                </label>
+              </div>
+            )}
+
             <div>
               <label className="inline-flex items-center gap-2 cursor-pointer text-sm text-gray-700">
                 <input
@@ -298,7 +327,6 @@ function Product() {
               </label>
             </div>
 
-            {/* Минимальный остаток */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Минимальный остаток ({selectedUnit?.name || 'шт.'})
@@ -315,7 +343,6 @@ function Product() {
               />
             </div>
 
-            {/* Остаток — ТОЛЬКО ПРОСМОТР */}
             {isEditing && form.is_countable && (
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -327,7 +354,6 @@ function Product() {
               </div>
             )}
 
-            {/* Цена закупки — ТОЛЬКО ПРОСМОТР */}
             {isEditing && (
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Цена закупки (₽)</label>
@@ -338,35 +364,29 @@ function Product() {
             )}
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Цена для сайта (₽)</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Цена (₽)</label>
               <input
                 type="text"
-                name="website_price"
-                value={form.website_price}
-                onChange={(e) => {
-                  const value = e.target.value;
-                  // Allow only digits and decimal point
-                  if (/^\d*\.?\d*$/.test(value) || value === '') {
-                    setForm(prev => ({
-                      ...prev,
-                      website_price: value === '' ? 0 : value
-                    }));
-                  }
-                }}
-                onBlur={(e) => {
-                  // Convert to number on blur
-                  const value = parseFloat(e.target.value) || 0;
-                  setForm(prev => ({
-                    ...prev,
-                    website_price: value
-                  }));
+                name="price"
+                value={form.price}
+                inputMode="numeric"
+                onChange={handleChange}
+                onBlur={() => {
+                  setForm((prev) => {
+                    if (prev.price === '') return prev;
+                    return { ...prev, price: String(Number(prev.price)) };
+                  });
                 }}
                 className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="0"
               />
+              <p className="text-xs text-gray-500 mt-1">
+                Рассчитывается автоматически: закупочная × (1 + наценка %). При ручном изменении не пересчитывается автоматически, пока не придёт новое поступление или не измените наценку в настройках.
+              </p>
+              {isEditing && product?.is_price_manual && (
+                <p className="text-xs text-amber-700 mt-1 font-medium">Ручное значение</p>
+              )}
             </div>
 
-            {/* Кнопки */}
             <div className="flex space-x-4 pt-4">
               <button
                 type="submit"

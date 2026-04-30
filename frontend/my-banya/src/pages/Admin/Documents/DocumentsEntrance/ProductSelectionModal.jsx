@@ -254,7 +254,7 @@ const ProductSelectionModal = ({ isOpen, onClose, onSelect }) => {
                               Мин. остаток: {product.min_stock || 0} {findUnitName(product.unit_id)}
                             </div>
                             <div className="text-sm font-medium text-green-800 mt-1">
-                              {(product.last_purchase_price || 0).toFixed(2)} ₽
+                              {(product.price ?? 0).toFixed(2)} ₽
                             </div>
                             <button
                               onClick={(e) => {
@@ -296,7 +296,7 @@ const ProductSelectionModal = ({ isOpen, onClose, onSelect }) => {
                               <td className="px-2 py-2 text-xs text-gray-900">{product.min_stock || 0}</td>
                               <td className="px-2 py-2 text-xs text-gray-900">{findUnitName(product.unit_id)}</td>
                               <td className="px-2 py-2 text-xs text-gray-900">
-                                {(product.last_purchase_price || 0).toFixed(2)} ₽
+                                {(product.price ?? 0).toFixed(2)} ₽
                               </td>
                               <td className="px-2 py-2 text-right text-xs">
                                 <button

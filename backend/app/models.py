@@ -149,7 +149,8 @@ class Product(Base):
     category_id = Column(Integer, ForeignKey("categories.id"), nullable=True)
     total_quantity = Column(Float, default=0)
     last_purchase_price = Column(Float, default=0.0)
-    website_price = Column(Float, default=0.0)
+    price = Column(Float, default=0.0)
+    is_price_manual = Column(Boolean, nullable=False, default=False)
     min_stock = Column(Float, default=0.0)
     unit_id = Column(Integer, ForeignKey("units_of_measurement.id"), nullable=True)
 
@@ -287,7 +288,7 @@ class Settings(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     key = Column(String(100), nullable=False, unique=True)
-    value = Column(Integer, nullable=False)
+    value = Column(Float, nullable=False)
     description = Column(String(255), nullable=True)
 
 

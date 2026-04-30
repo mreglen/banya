@@ -45,6 +45,35 @@ Base.metadata.create_all(bind=engine)
 
 # Backward-compatible schema patch for existing databases.
 with engine.begin() as connection:
+    # Baths: ensure slug exists for website routes
+    connection.execute(
+        text(
+            """
+            ALTER TABLE baths
+            ADD COLUMN IF NOT EXISTS slug VARCHAR(200)
+            """
+        )
+    )
+    # Backfill slug for existing rows (keep it deterministic & unique)
+    connection.execute(
+        text(
+            """
+            UPDATE baths
+            SET slug = COALESCE(NULLIF(slug, ''), bath_id::text)
+            WHERE slug IS NULL OR slug = ''
+            """
+        )
+    )
+    # Ensure NOT NULL + unique index (idempotent)
+    connection.execute(text("ALTER TABLE baths ALTER COLUMN slug SET NOT NULL"))
+    connection.execute(
+        text(
+            """
+            CREATE UNIQUE INDEX IF NOT EXISTS ix_baths_slug ON baths (slug)
+            """
+        )
+    )
+
     connection.execute(
         text(
             """
@@ -57,7 +86,7 @@ with engine.begin() as connection:
         text(
             """
             ALTER TABLE products
-            ADD COLUMN IF NOT EXISTS website_price DOUBLE PRECISION NOT NULL DEFAULT 0
+            ADD COLUMN IF NOT EXISTS is_countable BOOLEAN NOT NULL DEFAULT TRUE
             """
         )
     )
@@ -65,7 +94,82 @@ with engine.begin() as connection:
         text(
             """
             ALTER TABLE products
-            ADD COLUMN IF NOT EXISTS is_countable BOOLEAN NOT NULL DEFAULT TRUE
+            ADD COLUMN IF NOT EXISTS price DOUBLE PRECISION NOT NULL DEFAULT 0
+            """
+        )
+    )
+    connection.execute(
+        text(
+            """
+            ALTER TABLE products
+            ADD COLUMN IF NOT EXISTS is_price_manual BOOLEAN NOT NULL DEFAULT FALSE
+            """
+        )
+    )
+    connection.execute(
+        text(
+            """
+            DO $mig$
+            BEGIN
+              IF EXISTS (
+                SELECT 1 FROM information_schema.columns
+                WHERE table_schema = 'public' AND table_name = 'products' AND column_name = 'website_price'
+              ) THEN
+                EXECUTE $q$
+                  UPDATE products SET price = website_price
+                  WHERE price = 0 AND website_price IS NOT NULL AND website_price > 0
+                $q$;
+              END IF;
+            END
+            $mig$;
+            """
+        )
+    )
+    connection.execute(
+        text(
+            """
+            ALTER TABLE products DROP COLUMN IF EXISTS website_price
+            """
+        )
+    )
+    connection.execute(
+        text(
+            """
+            DO $mig$
+            BEGIN
+              IF EXISTS (
+                SELECT 1 FROM information_schema.columns
+                WHERE table_schema = 'public' AND table_name = 'settings'
+                  AND column_name = 'value' AND udt_name = 'int4'
+              ) THEN
+                ALTER TABLE settings ALTER COLUMN value TYPE DOUBLE PRECISION USING value::DOUBLE PRECISION;
+              END IF;
+            END
+            $mig$;
+            """
+        )
+    )
+    connection.execute(
+        text(
+            """
+            INSERT INTO settings (key, value, description)
+            SELECT 'markup_percent', 0, 'Наценка на товары (%)'
+            WHERE NOT EXISTS (SELECT 1 FROM settings WHERE key = 'markup_percent')
+            """
+        )
+    )
+    connection.execute(
+        text(
+            """
+            UPDATE products p SET price = ROUND(
+                (p.last_purchase_price * (
+                    1 + COALESCE(
+                        (SELECT s.value FROM settings s WHERE s.key = 'markup_percent' LIMIT 1),
+                        0
+                    ) / 100.0
+                ))::numeric, 2
+            )
+            WHERE p.price = 0 AND p.last_purchase_price IS NOT NULL AND p.last_purchase_price > 0
             """
         )
     )

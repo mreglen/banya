@@ -1,11 +1,14 @@
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, status
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, status, Request, BackgroundTasks
 from sqlalchemy.orm import Session, joinedload
 from typing import List, Optional
 import os
 from pathlib import Path
 from app.database import get_db
-from app.models import Product as ProductModel, Category, Photo, UnitOfMeasurement
+from app.database import SessionLocal
+from app.models import Product as ProductModel, Category, Photo, UnitOfMeasurement, User
 from app.schemas import Product, ProductCreate, UnitOfMeasurementResponse, StockProduct, UnitOfMeasurementBase
+from app.auth import get_current_user
+from app.audit_logger import log_detailed_action, get_client_ip
 
 router = APIRouter(prefix="/admin/products", tags=["products"])
 
@@ -13,19 +16,13 @@ router = APIRouter(prefix="/admin/products", tags=["products"])
 UPLOAD_DIR = Path("public/img/products/")
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
+
 def create_product_with_photos(db: Session, product_data: ProductCreate, photo_urls: List[str] = None):
     if product_data.category_id is not None:
         category = db.query(Category).filter(Category.id == product_data.category_id).first()
         if not category:
             raise HTTPException(status_code=400, detail="Category does not exist")
 
-    db_product = ProductModel(
-        name=product_data.name,
-        description=product_data.description,
-        is_visible_on_website=product_data.is_visible_on_website,
-        category_id=product_data.category_id  
-    )
-    
     if product_data.unit_id is not None:
         unit = db.query(UnitOfMeasurement).filter(UnitOfMeasurement.id == product_data.unit_id).first()
         if not unit:
@@ -38,7 +35,8 @@ def create_product_with_photos(db: Session, product_data: ProductCreate, photo_u
         is_countable=product_data.is_countable,
         category_id=product_data.category_id,
         unit_id=product_data.unit_id,
-        website_price=product_data.website_price,
+        price=float(product_data.price or 0),
+        is_price_manual=False,
         min_stock=0.0 if not product_data.is_countable else product_data.min_stock
     )
     db.add(db_product)
@@ -69,7 +67,7 @@ def read_products(db: Session = Depends(get_db)):
     return db.query(ProductModel)\
              .options(
                  joinedload(ProductModel.photos),
-                 joinedload(ProductModel.unit) 
+                 joinedload(ProductModel.unit)
              ).all()
 
 @router.get("/{product_id}", response_model=Product)
@@ -83,22 +81,51 @@ def read_product(product_id: int, db: Session = Depends(get_db)):
     return product
 
 @router.put("/{product_id}", response_model=Product)
-def update_product(product_id: int, product: ProductCreate, db: Session = Depends(get_db)):
+def update_product(
+    product_id: int,
+    product: ProductCreate,
+    background_tasks: BackgroundTasks,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
     db_product = db.query(ProductModel).filter(ProductModel.id == product_id).first()
     if not db_product:
         raise HTTPException(status_code=404, detail="Product not found")
-    
+
     if product.unit_id is not None:
         unit = db.query(UnitOfMeasurement).filter(UnitOfMeasurement.id == product.unit_id).first()
         if not unit:
             raise HTTPException(status_code=400, detail="Unit of measurement does not exist")
-    
+
+    old_price = float(db_product.price or 0)
+
     for key, value in product.model_dump().items():
         setattr(db_product, key, value)
 
     if not db_product.is_countable:
         db_product.min_stock = 0.0
-    
+
+    new_price = float(db_product.price or 0)
+    if abs(new_price - old_price) > 1e-6:
+        db_product.is_price_manual = True
+        summary = (
+            f"Изменена цена товара '{db_product.name}' "
+            f"с {old_price:.2f} ₽ на {new_price:.2f} ₽"
+        )
+        background_tasks.add_task(
+            log_detailed_action,
+            db=SessionLocal(),
+            user_id=current_user.user_id,
+            action="UPDATE",
+            entity_type="product",
+            entity_id=product_id,
+            details={"old_price": old_price, "new_price": new_price, "name": db_product.name},
+            summary=summary,
+            ip_address=get_client_ip(request),
+            user_agent=request.headers.get("user-agent")
+        )
+
     db.commit()
     db.refresh(db_product)
     return db_product
@@ -113,7 +140,7 @@ async def upload_product_photos(
     product = db.query(ProductModel).filter(ProductModel.id == product_id).first()
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
-    
+
     db.query(Photo).filter(Photo.product_id == product_id).delete()
 
     urls = []
@@ -144,13 +171,13 @@ def delete_product(product_id: int, db: Session = Depends(get_db)):
     product = db.query(ProductModel).filter(ProductModel.id == product_id).first()
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
-    
+
     # Удаляем связанные фото (если нужно удалить и файлы с диска — добавьте логику)
     db.query(Photo).filter(Photo.product_id == product_id).delete()
-    
+
     db.delete(product)
     db.commit()
-    return  
+    return
 
 @router.get("/units/", response_model=List[UnitOfMeasurementResponse])
 def get_units_of_measurement(db: Session = Depends(get_db)):
@@ -166,7 +193,7 @@ def create_unit_of_measurement(
     existing = db.query(UnitOfMeasurement).filter(UnitOfMeasurement.name == unit.name).first()
     if existing:
         raise HTTPException(status_code=400, detail="Единица измерения с таким названием уже существует")
-    
+
     db_unit = UnitOfMeasurement(
         name=unit.name,
         description=unit.description
@@ -186,7 +213,7 @@ def update_unit_of_measurement(
     db_unit = db.query(UnitOfMeasurement).filter(UnitOfMeasurement.id == unit_id).first()
     if not db_unit:
         raise HTTPException(status_code=404, detail="Единица измерения не найдена")
-    
+
     # Check if new name conflicts with existing unit
     existing = db.query(UnitOfMeasurement).filter(
         UnitOfMeasurement.name == unit.name,
@@ -194,7 +221,7 @@ def update_unit_of_measurement(
     ).first()
     if existing:
         raise HTTPException(status_code=400, detail="Единица измерения с таким названием уже существует")
-    
+
     db_unit.name = unit.name
     db_unit.description = unit.description
     db.commit()
@@ -210,15 +237,15 @@ def delete_unit_of_measurement(
     db_unit = db.query(UnitOfMeasurement).filter(UnitOfMeasurement.id == unit_id).first()
     if not db_unit:
         raise HTTPException(status_code=404, detail="Единица измерения не найдена")
-    
+
     # Check if any products are using this unit
     products_using_unit = db.query(ProductModel).filter(ProductModel.unit_id == unit_id).count()
     if products_using_unit > 0:
         raise HTTPException(
-            status_code=400, 
+            status_code=400,
             detail=f"Невозможно удалить: эту единицу измерения используют {products_using_unit} товаров"
         )
-    
+
     db.delete(db_unit)
     db.commit()
     return

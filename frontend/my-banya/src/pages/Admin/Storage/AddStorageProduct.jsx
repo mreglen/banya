@@ -9,6 +9,17 @@ import {
 } from '../../../redux/slices/productsApiSlice';
 import CategorySelectModal from './CategorySelectModal';
 
+const findCategoryById = (cats, id) => {
+  for (const cat of cats) {
+    if (cat.id === id) return cat;
+    if (cat.children?.length) {
+      const found = findCategoryById(cat.children, id);
+      if (found) return found;
+    }
+  }
+  return null;
+};
+
 const AddStorageProduct = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -18,8 +29,8 @@ const AddStorageProduct = () => {
     description: '',
     categoryPath: null,
     unit_id: '',
-    website_price: 0,
     is_countable: true,
+    is_visible_on_website: true,
   });
 
   const [images, setImages] = useState([]);
@@ -32,7 +43,13 @@ const AddStorageProduct = () => {
 
   useEffect(() => {
     if (location.state?.category) {
-      setFormData(prev => ({ ...prev, categoryPath: location.state.category }));
+      const cat = location.state.category;
+      const visible = Boolean(cat.is_visible_on_website);
+      setFormData(prev => ({
+        ...prev,
+        categoryPath: cat,
+        is_visible_on_website: visible ? true : false,
+      }));
     }
   }, [location.state]);
 
@@ -52,21 +69,16 @@ const AddStorageProduct = () => {
 
   const handleCategorySelect = (categoryId) => {
     if (categoryId === null) {
-      setFormData(prev => ({ ...prev, categoryPath: null }));
+      setFormData(prev => ({ ...prev, categoryPath: null, is_visible_on_website: false }));
     } else {
-      const findCategory = (cats, id) => {
-        for (const cat of cats) {
-          if (cat.id === id) return cat;
-          if (cat.children?.length) {
-            const found = findCategory(cat.children, id);
-            if (found) return found;
-          }
-        }
-        return null;
-      };
-      const selectedCategory = findCategory(categoriesTree, categoryId);
+      const selectedCategory = findCategoryById(categoriesTree, categoryId);
       if (selectedCategory) {
-        setFormData(prev => ({ ...prev, categoryPath: selectedCategory }));
+        const visible = Boolean(selectedCategory.is_visible_on_website);
+        setFormData(prev => ({
+          ...prev,
+          categoryPath: selectedCategory,
+          is_visible_on_website: visible ? true : false,
+        }));
       }
     }
   };
@@ -93,8 +105,12 @@ const AddStorageProduct = () => {
         productData.unit_id = null;
       }
 
-      productData.website_price = Number(formData.website_price) || 0;
       productData.is_countable = Boolean(formData.is_countable);
+
+      const visibleCategory = Boolean(formData.categoryPath?.is_visible_on_website);
+      productData.is_visible_on_website = visibleCategory
+        ? Boolean(formData.is_visible_on_website)
+        : false;
 
       const createdProduct = await createProduct(productData).unwrap();
       const productId = createdProduct.id;
@@ -116,6 +132,7 @@ const AddStorageProduct = () => {
   };
 
   const categoryName = formData.categoryPath ? formData.categoryPath.name : 'не выбрана';
+  const categoryVisibleOnWebsite = Boolean(formData.categoryPath?.is_visible_on_website);
   const isLoading = isCreating || isUploading || isLoadingUnits;
 
   return (
@@ -137,6 +154,21 @@ const AddStorageProduct = () => {
               </button>
             </div>
           </div>
+
+          {categoryVisibleOnWebsite && (
+            <div className="mb-5">
+              <label className="inline-flex items-center gap-2 cursor-pointer text-sm text-gray-700">
+                <input
+                  type="checkbox"
+                  checked={formData.is_visible_on_website}
+                  onChange={(e) =>
+                    setFormData((prev) => ({ ...prev, is_visible_on_website: e.target.checked }))
+                  }
+                />
+                <span>Отображать на сайте</span>
+              </label>
+            </div>
+          )}
 
           {/* Наименование */}
           <div className="mb-5">
@@ -201,32 +233,6 @@ const AddStorageProduct = () => {
               />
               <span>Не исчисляемый товар</span>
             </label>
-          </div>
-
-          <div className="mb-5">
-            <label htmlFor="website_price" className="block text-sm font-medium text-gray-700 mb-1">
-              Цена для сайта (₽)
-            </label>
-            <input
-              type="text"
-              id="website_price"
-              name="website_price"
-              value={formData.website_price ?? 0}
-              onChange={(e) => {
-                const value = e.target.value;
-                // Allow only digits and decimal point
-                if (/^\d*\.?\d*$/.test(value) || value === '') {
-                  setFormData(prev => ({ ...prev, website_price: value === '' ? 0 : value }));
-                }
-              }}
-              onBlur={(e) => {
-                // Convert to number on blur
-                const value = parseFloat(e.target.value) || 0;
-                setFormData(prev => ({ ...prev, website_price: value }));
-              }}
-              className="w-full p-2 border border-gray-300 rounded"
-              placeholder="0"
-            />
           </div>
 
           {/* Фотографии */}

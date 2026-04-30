@@ -157,7 +157,7 @@ def send_booking_confirmation_email(
             for product in products:
                 product_name = product.get('name', 'Товар')
                 quantity = product.get('quantity', 1)
-                price = product.get('purchase_price', 0)
+                price = product.get('price', product.get('purchase_price', 0))
                 item_total = quantity * price
                 
                 products_html += f"""

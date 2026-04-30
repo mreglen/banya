@@ -64,6 +64,8 @@ def update_category(
     if not db_category:
         raise HTTPException(status_code=404, detail="Category not found")
 
+    was_visible_on_website = bool(db_category.is_visible_on_website)
+
     # Debug logging
     print(f"Updating category {category_id}")
     print(f"Received data: {category_update.model_dump()}")
@@ -76,6 +78,12 @@ def update_category(
     if "is_visible_on_website" in update_data:
         print(f"Setting is_visible_on_website to: {update_data['is_visible_on_website']}")
         db_category.is_visible_on_website = update_data["is_visible_on_website"]
+        new_visible = bool(update_data["is_visible_on_website"])
+        if new_visible and not was_visible_on_website:
+            db.query(Product).filter(Product.category_id == category_id).update(
+                {"is_visible_on_website": True},
+                synchronize_session=False,
+            )
     
     # Handle name
     if "name" in update_data:
@@ -185,7 +193,7 @@ def get_website_categories_preview(db: Session = Depends(get_db)):
                 id=product.id,
                 name=product.name,
                 description=product.description,
-                price=product.website_price if (product.website_price and product.website_price > 0) else product.last_purchase_price,
+                price=product.price,
                 photos=product.photos,
             )
             for product in category_products

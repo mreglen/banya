@@ -26,7 +26,7 @@ function ReservationPrintDocument() {
   const { data: reservation, isLoading, error } = useGetReservationByIdQuery(id, { skip: !id });
 
   const productTotal = useMemo(
-    () => (reservation?.products || []).reduce((sum, p) => sum + (p.purchase_price || 0) * (p.quantity || 0), 0),
+    () => (reservation?.products || []).reduce((sum, p) => sum + (p.price ?? p.purchase_price ?? 0) * (p.quantity || 0), 0),
     [reservation]
   );
   const massagesTotal = useMemo(
@@ -134,8 +134,8 @@ function ReservationPrintDocument() {
                   <tr key={`product-${idx}`}>
                     <td className="border border-gray-400 p-2">Товар: {p.name}</td>
                     <td className="border border-gray-400 p-2 text-right">{p.quantity}</td>
-                    <td className="border border-gray-400 p-2 text-right">{(p.purchase_price || 0).toLocaleString('ru-RU')} ₽</td>
-                    <td className="border border-gray-400 p-2 text-right">{((p.purchase_price || 0) * (p.quantity || 0)).toLocaleString('ru-RU')} ₽</td>
+                    <td className="border border-gray-400 p-2 text-right">{(p.price ?? p.purchase_price ?? 0).toLocaleString('ru-RU')} ₽</td>
+                    <td className="border border-gray-400 p-2 text-right">{((p.price ?? p.purchase_price ?? 0) * (p.quantity || 0)).toLocaleString('ru-RU')} ₽</td>
                   </tr>
                 ))}
               </tbody>

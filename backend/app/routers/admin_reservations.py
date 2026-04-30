@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks, Request
 from sqlalchemy.orm import Session, joinedload
 from typing import List
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 from app import models, schemas, database
 from app.auth import get_current_user
 from app.email_service import send_booking_confirmation_email
@@ -83,7 +83,7 @@ def get_reservations(
                 product_id=rp.product.id,
                 name=rp.product.name,
                 quantity=rp.quantity,
-                purchase_price=rp.product.last_purchase_price,
+                price=rp.product.price,
                 unit_id=rp.product.unit_id
             )
             for rp in res.reservation_products
@@ -155,7 +155,7 @@ def create_reservation(
             # Проверяем наличие, но НЕ списываем здесь!
             if product.total_quantity < item.quantity:
                 raise HTTPException(status_code=400, detail=f"Недостаточно товара {product.name} на складе")
-            total_cost += product.last_purchase_price * item.quantity
+            total_cost += product.price * item.quantity
 
     # 6. Создаём бронь
     db_reservation = models.Reservation(
@@ -203,7 +203,7 @@ def create_reservation(
                         product_id=product.id,
                         name=product.name,
                         quantity=item.quantity,
-                        purchase_price=product.last_purchase_price,
+                        price=product.price,
                         unit_id=product.unit_id
                     )
                 )
@@ -220,7 +220,7 @@ def create_reservation(
                         products_for_email.append({
                             'name': product.name,
                             'quantity': item.quantity,
-                            'purchase_price': product.last_purchase_price
+                            'price': product.price
                         })
             
             # Отправляем email
@@ -316,7 +316,7 @@ def get_reservation(
             product_id=rp.product.id,
             name=rp.product.name,
             quantity=rp.quantity,
-            purchase_price=rp.product.last_purchase_price
+            price=rp.product.price
         )
         for rp in reservation.reservation_products
     ]
@@ -413,7 +413,7 @@ def update_reservation(
                         document_id=realization_doc.id,
                         product_id=rp.product_id,
                         quantity=rp.quantity,
-                        price=product.last_purchase_price
+                        price=product.price
                     )
                     db.add(doc_item)
 
@@ -491,11 +491,11 @@ def update_reservation(
                         if not product:
                             print(f"❌ Product {item.product_id} not found")
                             raise HTTPException(status_code=400, detail=f"Товар с ID {item.product_id} не найден")
-                        print(f"Product: {product.name}, Qty: {item.quantity}, Stock: {product.total_quantity}, Price: {product.last_purchase_price}")
+                        print(f"Product: {product.name}, Qty: {item.quantity}, Stock: {product.total_quantity}, Price: {product.price}")
                         if product.total_quantity < item.quantity:
                             print(f"❌ Insufficient stock for {product.name}")
                             raise HTTPException(status_code=400, detail=f"Недостаточно товара {product.name} на складе")
-                        product_cost = product.last_purchase_price * item.quantity
+                        product_cost = product.price * item.quantity
                         total_cost += product_cost
                         print(f"Added product cost: {product_cost}")
 
@@ -542,7 +542,7 @@ def update_reservation(
                         product_id=rp.product.id,
                         name=rp.product.name,
                         quantity=rp.quantity,
-                        purchase_price=rp.product.last_purchase_price,
+                        price=rp.product.price,
                         unit_id=rp.product.unit_id
                     )
                 )
@@ -562,7 +562,7 @@ def update_reservation(
                         products_for_email.append({
                             'name': rp.product.name,
                             'quantity': rp.quantity,
-                            'purchase_price': rp.product.last_purchase_price
+                            'price': rp.product.price
                         })
                 
                 # Отправляем email об изменении

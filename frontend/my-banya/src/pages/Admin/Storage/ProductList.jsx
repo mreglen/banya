@@ -2,7 +2,7 @@
 import React from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
-import { useGetUnitsOfMeasurementQuery, useUpdateProductMutation } from '../../../redux/slices/productsApiSlice';
+import { useGetUnitsOfMeasurementQuery } from '../../../redux/slices/productsApiSlice';
 import { markForDeletion, unmarkForDeletion } from '../../../redux/slices/deletionRequestsSlice';
 import ActionDropdown from '../../../components/UI/ActionDropdown/ActionDropdown';
 
@@ -33,9 +33,6 @@ const findCategoryById = (categories, categoryId) => {
     }
     return null;
 };
-
-const isWebsiteToggleAction = (actionLabel) =>
-    actionLabel === 'Отображать на сайте' || actionLabel === 'Скрыть с сайта';
 
 const getProductsForSelectedCategory = (selectedCategoryPath, categoriesTree, storageData) => {
     if (selectedCategoryPath.length === 0) return storageData;
@@ -83,7 +80,6 @@ const ProductList = ({
     const navigate = useNavigate();
     const deletionArray = useSelector(state => state.deletionRequests);
     const { data: units = [] } = useGetUnitsOfMeasurementQuery();
-    const [updateProduct] = useUpdateProductMutation();
 
     const findUnitName = (unitId) => {
         if (!unitId) return 'шт.';
@@ -142,7 +138,8 @@ const ProductList = ({
                                 <th className="px-4 py-3 w-[20%]">Категория</th>
                                 <th className="px-4 py-3 w-[25%]">Описание</th>
                                 <th className="px-4 py-3 w-[10%] text-right">Остаток</th>
-                                <th className="px-4 py-3 w-[10%] text-right">Цена закупки</th>
+                                <th className="px-4 py-3 w-[8%] text-right">Цена</th>
+                                <th className="px-4 py-3 w-[8%] text-center">Сайт</th>
                                 <th className="px-4 py-3 w-[10%] text-center">Действия</th>
                             </tr>
                         </thead>
@@ -151,8 +148,6 @@ const ProductList = ({
                                 const categoryName = findCategoryName(categoriesTree, product.category_id);
                                 const markedForDeletion = deletionArray.includes(product.id);
                                 const unitName = findUnitName(product.unit_id);
-                                const category = findCategoryById(categoriesTree, product.category_id);
-                                const isWebsiteCategory = Boolean(category?.is_visible_on_website);
 
                                 return (
                                     <tr
@@ -164,7 +159,18 @@ const ProductList = ({
                                         <td className="px-4 py-3 text-gray-700 w-[20%]">{categoryName || '—'}</td>
                                         <td className="px-4 py-3 text-gray-700 w-[25%]">{truncateDescription(product.description, 50)}</td>
                                         <td className={`px-4 py-3 w-[10%] text-right ${(product.total_quantity || 0) < (product.min_stock || 0) ? 'text-red-600 font-semibold' : 'text-gray-900'}`}>{(product.total_quantity || 0)} {unitName}</td>
-                                        <td className="px-4 py-3 text-gray-900 w-[10%] text-right">{(product.last_purchase_price || 0).toFixed(2)} ₽</td>
+                                        <td className="px-4 py-3 text-gray-900 w-[8%] text-right">{(product.price ?? 0).toFixed(2)} ₽</td>
+                                        <td className="px-4 py-3 w-[8%] text-center">
+                                            <input
+                                                type="checkbox"
+                                                checked={Boolean(product.is_visible_on_website)}
+                                                readOnly
+                                                disabled
+                                                tabIndex={-1}
+                                                aria-label={product.is_visible_on_website ? 'На сайте' : 'Не на сайте'}
+                                                className="cursor-not-allowed opacity-80"
+                                            />
+                                        </td>
                                         <td className="px-4 py-3 w-[10%] text-center overflow-visible">
                                             <ActionDropdown
                                                 buttonText="⋮"
@@ -176,22 +182,6 @@ const ProductList = ({
                                                         onClick: (e) => {
                                                             e.stopPropagation();
                                                             handleEdit(product.id);
-                                                        },
-                                                    },
-                                                    {
-                                                        label: product.is_visible_on_website ? 'Скрыть с сайта' : 'Отображать на сайте',
-                                                        icon: product.is_visible_on_website ? '' : '',
-                                                        color: product.is_visible_on_website ? 'gray' : 'green',
-                                                        onClick: async () => {
-                                                            try {
-                                                                await updateProduct({
-                                                                    ...product,
-                                                                    is_visible_on_website: !product.is_visible_on_website,
-                                                                }).unwrap();
-                                                            } catch (err) {
-                                                                console.error('Ошибка обновления отображения товара на сайте:', err);
-                                                                alert('Не удалось обновить отображение товара на сайте');
-                                                            }
                                                         },
                                                     },
                                                     {
@@ -208,7 +198,7 @@ const ProductList = ({
                                                             }
                                                         },
                                                     },
-                                                ].filter((action) => isWebsiteCategory || !isWebsiteToggleAction(action.label))}
+                                                ]}
                                             />
                                         </td>
                                     </tr>
@@ -223,8 +213,6 @@ const ProductList = ({
                             const categoryName = findCategoryName(categoriesTree, product.category_id);
                             const markedForDeletion = deletionArray.includes(product.id);
                             const unitName = findUnitName(product.unit_id);
-                            const category = findCategoryById(categoriesTree, product.category_id);
-                            const isWebsiteCategory = Boolean(category?.is_visible_on_website);
 
                             return (
                                 <div
@@ -241,7 +229,18 @@ const ProductList = ({
                                     </div>
                                     <div className="flex justify-between items-center mt-2 text-sm">
                                         <span className={(product.total_quantity || 0) < (product.min_stock || 0) ? 'text-red-600 font-semibold' : ''}>Остаток: {(product.total_quantity || 0)} {unitName}</span>
-                                        <span>{(product.last_purchase_price || 0).toFixed(2)} ₽</span>
+                                        <span>{(product.price ?? 0).toFixed(2)} ₽</span>
+                                    </div>
+                                    <div className="text-sm text-gray-600 mt-1 flex items-center gap-2">
+                                        <span>Сайт:</span>
+                                        <input
+                                            type="checkbox"
+                                            checked={Boolean(product.is_visible_on_website)}
+                                            readOnly
+                                            disabled
+                                            tabIndex={-1}
+                                            className="cursor-not-allowed opacity-80"
+                                        />
                                     </div>
                                     <div className="flex justify-end items-center mt-2">
                                         <ActionDropdown
@@ -252,22 +251,6 @@ const ProductList = ({
                                                     icon: '',
                                                     color: 'blue',
                                                     onClick: () => handleEdit(product.id),
-                                                },
-                                                {
-                                                    label: product.is_visible_on_website ? 'Скрыть с сайта' : 'Отображать на сайте',
-                                                    icon: product.is_visible_on_website ? '' : '',
-                                                    color: product.is_visible_on_website ? 'gray' : 'green',
-                                                    onClick: async () => {
-                                                        try {
-                                                            await updateProduct({
-                                                                ...product,
-                                                                is_visible_on_website: !product.is_visible_on_website,
-                                                            }).unwrap();
-                                                        } catch (err) {
-                                                            console.error('Ошибка обновления отображения товара на сайте:', err);
-                                                            alert('Не удалось обновить отображение товара на сайте');
-                                                        }
-                                                    },
                                                 },
                                                 {
                                                     label: markedForDeletion ? 'Снять с удаления' : 'Пометить на удаление',
@@ -282,7 +265,7 @@ const ProductList = ({
                                                         }
                                                     },
                                                 },
-                                            ].filter((action) => isWebsiteCategory || !isWebsiteToggleAction(action.label))}
+                                            ]}
                                         />
                                     </div>
                                 </div>

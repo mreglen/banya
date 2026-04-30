@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useGetSettingsQuery, useUpdateSettingsMutation } from '../../../redux/slices/settingsApiSlice';
 import { 
   useGetUnitsOfMeasurementQuery,
@@ -20,8 +20,14 @@ function SettingsPage() {
 
   const [cleaningTime, setCleaningTime] = useState('30');
   const [bookingInterval, setBookingInterval] = useState('30');
+  const [markupPercent, setMarkupPercent] = useState('0');
   const [successMessage, setSuccessMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
+
+  const lastSavedMarkup = useRef(0);
+  const pendingSettingsPayload = useRef(null);
+  const [showMarkupConfirmModal, setShowMarkupConfirmModal] = useState(false);
+  const [updateManualPrices, setUpdateManualPrices] = useState(false);
 
   // Unit management state
   const [showAddUnit, setShowAddUnit] = useState(false);
@@ -34,6 +40,12 @@ function SettingsPage() {
     if (settings) {
       setCleaningTime(String(settings.cleaning_time_minutes || 30));
       setBookingInterval(String(settings.booking_interval_minutes || 30));
+      const m =
+        settings.markup_percent !== undefined && settings.markup_percent !== null
+          ? Number(settings.markup_percent)
+          : 0;
+      setMarkupPercent(String(m));
+      lastSavedMarkup.current = m;
     }
   }, [settings]);
 
@@ -42,35 +54,67 @@ function SettingsPage() {
     setSuccessMessage('');
     setErrorMessage('');
 
-    // Convert to integers
-    const cleaningTimeValue = parseInt(cleaningTime);
-    const bookingIntervalValue = parseInt(bookingInterval);
+    const cleaningTimeValue = parseInt(cleaningTime, 10);
+    const bookingIntervalValue = parseInt(bookingInterval, 10);
+    const markupStr = String(markupPercent).trim().replace(',', '.');
+    const markupNum = parseFloat(markupStr);
 
-    // Validation
-    if (cleaningTime === '' || bookingInterval === '') {
+    if (cleaningTime === '' || bookingInterval === '' || markupStr === '') {
       setErrorMessage('Пожалуйста, заполните все поля');
       return;
     }
 
-    if (isNaN(cleaningTimeValue) || isNaN(bookingIntervalValue)) {
+    if (isNaN(cleaningTimeValue) || isNaN(bookingIntervalValue) || Number.isNaN(markupNum)) {
       setErrorMessage('Значения должны быть числами');
       return;
     }
 
     if (cleaningTimeValue < 0 || bookingIntervalValue < 0) {
-      setErrorMessage('Значения должны быть положительными числами');
+      setErrorMessage('Время уборки и промежуток должны быть неотрицательными числами');
+      return;
+    }
+
+    if (markupNum < 0) {
+      setErrorMessage('Наценка не может быть отрицательной');
+      return;
+    }
+
+    const basePayload = {
+      cleaning_time_minutes: cleaningTimeValue,
+      booking_interval_minutes: bookingIntervalValue,
+    };
+
+    const markupChanged = Math.abs(markupNum - lastSavedMarkup.current) > 1e-9;
+
+    if (markupChanged) {
+      pendingSettingsPayload.current = { ...basePayload, markup_percent: markupNum };
+      setUpdateManualPrices(false);
+      setShowMarkupConfirmModal(true);
       return;
     }
 
     try {
-      await updateSettings({
-        cleaning_time_minutes: cleaningTimeValue,
-        booking_interval_minutes: bookingIntervalValue,
-      }).unwrap();
+      await updateSettings(basePayload).unwrap();
       setSuccessMessage('Настройки успешно сохранены');
       refetch();
-      
-      // Clear success message after 3 seconds
+      setTimeout(() => setSuccessMessage(''), 3000);
+    } catch (err) {
+      setErrorMessage(err.data?.detail || 'Ошибка при сохранении настроек');
+    }
+  };
+
+  const handleConfirmMarkupSave = async () => {
+    if (!pendingSettingsPayload.current) return;
+    setErrorMessage('');
+    try {
+      await updateSettings({
+        ...pendingSettingsPayload.current,
+        update_manual_prices: updateManualPrices,
+      }).unwrap();
+      setShowMarkupConfirmModal(false);
+      pendingSettingsPayload.current = null;
+      setSuccessMessage('Настройки успешно сохранены');
+      refetch();
       setTimeout(() => setSuccessMessage(''), 3000);
     } catch (err) {
       setErrorMessage(err.data?.detail || 'Ошибка при сохранении настроек');
@@ -232,6 +276,27 @@ function SettingsPage() {
               />
             </div>
 
+            <div>
+              <label htmlFor="markupPercent" className="block text-sm font-medium text-gray-700 mb-2">
+                Наценка на товары (%)
+              </label>
+              <p className="text-xs text-gray-500 mb-2">
+                Цена товара = цена закупки × (1 + наценка / 100). Дробные значения допускаются (например 27.5).
+              </p>
+              <input
+                type="text"
+                id="markupPercent"
+                inputMode="decimal"
+                value={markupPercent}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  if (v === '' || /^-?\d*[.,]?\d*$/.test(v)) setMarkupPercent(v.replace(',', '.'));
+                }}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                required
+              />
+            </div>
+
             {/* Submit Button */}
             <div className="flex justify-end">
               <button
@@ -368,6 +433,49 @@ function SettingsPage() {
             </div>
           )}
         </div>
+
+        {showMarkupConfirmModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6">
+              <h3 className="text-lg font-semibold text-gray-800 mb-2">
+                Изменение наценки
+              </h3>
+              <p className="text-gray-600 text-sm mb-4">
+                Для товаров без ручной цены пересчёт выполнится автоматически. Отметьте опцию ниже, если нужно
+                пересчитать и те товары, у которых цена была изменена вручную (признак «ручная цена» будет снят).
+              </p>
+              <label className="flex items-start gap-2 text-sm text-gray-800 mb-6 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={updateManualPrices}
+                  onChange={(e) => setUpdateManualPrices(e.target.checked)}
+                  className="mt-1"
+                />
+                <span>Также изменить цену для товаров, где цена была изменена вручную</span>
+              </label>
+              <div className="flex justify-end space-x-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowMarkupConfirmModal(false);
+                    pendingSettingsPayload.current = null;
+                  }}
+                  className="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 transition"
+                >
+                  Отмена
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmMarkupSave}
+                  disabled={isUpdating}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition disabled:opacity-50"
+                >
+                  {isUpdating ? 'Сохранение...' : 'Сохранить'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Delete Confirmation Modal */}
         {deleteConfirmId && (

@@ -6,6 +6,7 @@ from app.database import get_db
 from app.models import EntranceDocument, EntranceDocumentItem, Product
 from app.schemas import EntranceDocumentCreate, EntranceDocumentRead
 from sqlalchemy.orm import joinedload
+from app.pricing import get_markup_percent, price_from_purchase
 
 router = APIRouter(prefix="/admin/documents/entrance", tags=["Documents - Entrance"])
 
@@ -58,6 +59,8 @@ def create_document(doc: EntranceDocumentCreate, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(db_doc)
 
+    markup = get_markup_percent(db)
+
     # Создание строк и обновление склада
     for item in doc.items:
         # Добавляем строку
@@ -74,6 +77,8 @@ def create_document(doc: EntranceDocumentCreate, db: Session = Depends(get_db)):
         if product:
             product.total_quantity += item.quantity
             product.last_purchase_price = item.purchase_price
+            product.price = price_from_purchase(item.purchase_price, markup)
+            product.is_price_manual = False
 
     db.commit()
     db.refresh(db_doc)
@@ -92,7 +97,7 @@ def update_document(doc_id: int, doc: EntranceDocumentCreate, db: Session = Depe
     # Удаляем старые строки
     db.query(EntranceDocumentItem).filter(EntranceDocumentItem.document_id == doc_id).delete()
 
-    # Добавляем новые
+    # Добавляем новые (строки документа; склад/цены товара при редактировании не пересчитываются)
     for item in doc.items:
         db_item = EntranceDocumentItem(
             document_id=doc_id,

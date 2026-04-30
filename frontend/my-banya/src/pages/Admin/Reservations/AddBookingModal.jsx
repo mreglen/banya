@@ -99,7 +99,7 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
           return {
             id: product.product_id,
             name: product.name,
-            purchase_price: product.purchase_price || 0,
+            price: product.price ?? product.purchase_price ?? 0,
             available: stockItem?.total_quantity || 0,
             unit_id: stockItem?.unit_id || null, // ← ДОБАВЛЕНО
             unit_name: unitName, // ← ДОБАВЛЕНО
@@ -228,7 +228,7 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
         {
           id: product.id,
           name: product.name,
-          purchase_price: product.last_purchase_price || 0,
+          price: product.price ?? product.last_purchase_price ?? 0,
           available,
           unit_id: stockItem?.unit_id || null, // ← ДОБАВЛЕНО
           unit_name: unitName, // ← ДОБАВЛЕНО
@@ -436,7 +436,7 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
   const isSubmitting = isCreating || isUpdating;
 
   const totalProductCost = formData.selectedProducts.reduce(
-    (sum, p) => sum + (parseInt(p.quantity, 10) || 0) * p.purchase_price,
+    (sum, p) => sum + (parseInt(p.quantity, 10) || 0) * (p.price ?? p.purchase_price ?? 0),
     0
   );
 
@@ -778,7 +778,7 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
                       </div>
                       <div className="text-right">
                         <div className="text-sm font-medium">
-                          {((parseInt(item.quantity, 10) || 0) * item.purchase_price).toFixed(2)} ₽
+                          {((parseInt(item.quantity, 10) || 0) * (item.price ?? item.purchase_price ?? 0)).toFixed(2)} ₽
                         </div>
                         {/* Показывать ошибку валидации */}
                         {validationErrors[`product_${item.id}`] && (

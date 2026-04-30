@@ -325,18 +325,18 @@ function BookingDetailsModal({ booking, onClose, onDelete }) {
                       <div className="sm:hidden rounded-lg border border-gray-200 bg-white p-2 text-sm">
                         <div className="font-medium text-gray-800">{product.name}</div>
                         <div className="text-xs text-gray-600 mt-1">
-                          {product.quantity} {getUnitName(product.unit_id)} x {product.purchase_price?.toLocaleString()} ₽
+                          {product.quantity} {getUnitName(product.unit_id)} x {(product.price ?? product.purchase_price ?? 0).toLocaleString()} ₽
                         </div>
                         <div className="text-right font-semibold mt-1">
-                          {(product.purchase_price * product.quantity).toLocaleString()} ₽
+                          {((product.price ?? product.purchase_price ?? 0) * product.quantity).toLocaleString()} ₽
                         </div>
                       </div>
                       <div className="hidden sm:grid grid-cols-12 gap-2 text-sm">
                         <div className="col-span-4 text-gray-700">{product.name}</div>
                         <div className="col-span-2 text-gray-600">{getUnitName(product.unit_id)}</div>
-                        <div className="col-span-2 text-right text-gray-600">{product.purchase_price?.toLocaleString()} ₽</div>
+                        <div className="col-span-2 text-right text-gray-600">{(product.price ?? product.purchase_price ?? 0).toLocaleString()} ₽</div>
                         <div className="col-span-2 text-right text-gray-600">{product.quantity}</div>
-                        <div className="col-span-2 text-right font-medium">{(product.purchase_price * product.quantity).toLocaleString()} ₽</div>
+                        <div className="col-span-2 text-right font-medium">{((product.price ?? product.purchase_price ?? 0) * product.quantity).toLocaleString()} ₽</div>
                       </div>
                     </div>
                   ))}

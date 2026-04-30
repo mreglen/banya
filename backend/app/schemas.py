@@ -74,7 +74,7 @@ class ReservationProductResponse(BaseModel):
     product_id: int
     name: str
     quantity: int
-    purchase_price: float
+    price: float
     unit_id: Optional[int] = None
 
     class Config:
@@ -316,7 +316,7 @@ class ProductBase(BaseModel):
     is_visible_on_website: bool = False
     is_countable: bool = True
     category_id: Optional[int] = None
-    website_price: float = 0.0
+    price: float = 0.0
     min_stock: float = 0.0
 
 class ProductCreate(ProductBase):
@@ -333,6 +333,7 @@ class Product(ProductBase):
     id: int
     total_quantity: float
     last_purchase_price: float
+    is_price_manual: bool = False
     min_stock: float = 0.0
     unit_id: Optional[int] = None
     photos: List[ProductPhotoOut] = []
@@ -432,6 +433,8 @@ class StockProduct(BaseModel):
     is_countable: bool = True
     total_quantity: int = 0
     last_purchase_price: float = 0.0
+    price: float = 0.0
+    is_price_manual: bool = False
     min_stock: float = 0.0
     unit_id: Optional[int] = None 
 
@@ -477,7 +480,7 @@ class PasswordResetComplete(BaseModel):
 class SettingsResponse(BaseModel):
     id: int
     key: str
-    value: int
+    value: float
     description: Optional[str] = None
 
     class Config:
@@ -487,6 +490,8 @@ class SettingsResponse(BaseModel):
 class SettingsUpdate(BaseModel):
     cleaning_time_minutes: Optional[int] = None
     booking_interval_minutes: Optional[int] = None
+    markup_percent: Optional[float] = None
+    update_manual_prices: Optional[bool] = False
 
 
 # === Акции ===
