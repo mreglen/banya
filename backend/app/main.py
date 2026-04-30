@@ -197,7 +197,6 @@ app.add_middleware(
 # Use absolute path based on this file's location
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# Mount public images
 public_img_dir = BASE_DIR / "public" / "img"
 if public_img_dir.exists():
     app.mount("/img", StaticFiles(directory=str(public_img_dir)), name="static_images")
