@@ -1,10 +1,47 @@
-import { NavLink } from 'react-router-dom';
+import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
+import { useGetWebsiteCategoriesPreviewQuery } from '../../redux/slices/apiSlice';
 
 function Header() {
   const [activeSection, setActiveSection] = useState('');
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  const { data: websiteCategories = [] } = useGetWebsiteCategoriesPreviewQuery();
+
+  // Автоскролл по якорю после перехода на главную (важно для перехода со страниц категорий)
+  useEffect(() => {
+    if (location.pathname !== '/' || !location.hash) return;
+
+    const id = location.hash.replace('#', '');
+    if (!id) return;
+
+    let cancelled = false;
+    let tries = 0;
+    const maxTries = 20; // ~2s при 100ms
+
+    const tryScroll = () => {
+      if (cancelled) return;
+      const el = document.getElementById(id);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth' });
+        return;
+      }
+      tries += 1;
+      if (tries < maxTries) {
+        setTimeout(tryScroll, 100);
+      }
+    };
+
+    // Делаем скролл после отрисовки
+    setTimeout(tryScroll, 0);
+    return () => {
+      cancelled = true;
+    };
+  }, [location.pathname, location.hash]);
 
   // Отслеживаем скролл для изменения стиля шапки
   useEffect(() => {
@@ -28,14 +65,17 @@ function Header() {
       { threshold: 0.3 }
     );
 
-    const sections = ['baths', 'booking', 'contacts'];
+    const categorySectionIds = Array.isArray(websiteCategories)
+      ? websiteCategories.map((c) => `site-category-${c.id}`)
+      : [];
+    const sections = ['baths', ...categorySectionIds, 'booking', 'contacts'];
     sections.forEach(id => {
       const el = document.getElementById(id);
       if (el) observer.observe(el);
     });
 
     return () => observer.disconnect();
-  }, []);
+  }, [websiteCategories]);
 
   // Закрываем мобильное меню при клике на ссылку
   useEffect(() => {
@@ -51,6 +91,13 @@ function Header() {
 
   const navLinks = [
     { title: 'Бани', anchor: '#baths', sectionId: 'baths' },
+    ...(Array.isArray(websiteCategories)
+      ? websiteCategories.map((category) => ({
+          title: category.name,
+          anchor: `#site-category-${category.id}`,
+          sectionId: `site-category-${category.id}`,
+        }))
+      : []),
     { title: 'Контакты', anchor: '#contacts', sectionId: 'contacts' },
   ];
 
@@ -60,6 +107,13 @@ function Header() {
     const element = document.getElementById(id);
     if (element) {
       element.scrollIntoView({ behavior: 'smooth' });
+    } else {
+      // Если мы не на главной (или секции нет в DOM) — переходим на главную с нужным hash
+      if (location.pathname !== '/') {
+        navigate(`/${anchor}`);
+      } else if (typeof window !== 'undefined') {
+        window.location.hash = anchor;
+      }
     }
     setIsMobileMenuOpen(false);
   };
@@ -69,6 +123,12 @@ function Header() {
     const element = document.getElementById('booking');
     if (element) {
       element.scrollIntoView({ behavior: 'smooth' });
+    } else {
+      if (location.pathname !== '/') {
+        navigate('/#booking');
+      } else if (typeof window !== 'undefined') {
+        window.location.hash = '#booking';
+      }
     }
     setIsMobileMenuOpen(false);
   };

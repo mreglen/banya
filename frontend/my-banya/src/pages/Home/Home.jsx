@@ -47,14 +47,14 @@ function Home() {
                 </script>
             </Helmet>
             <div
-                className="relative w-full min-h-screen flex items-center bg-cover bg-center bg-no-repeat bg-fixed"
+                className="relative w-full min-h-[100svh] flex items-center bg-cover bg-no-repeat bg-[center_top] sm:bg-center bg-scroll md:bg-fixed"
                 style={{
                     backgroundImage: "url('/img/bg-home.png')",
                 }}
             >
                 <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/40 to-black/70"></div>
 
-                <div className="relative z-10 w-full px-6 py-32 md:py-0">
+                <div className="relative z-10 w-full px-6 py-24 sm:py-32 md:py-0">
                     <div className="max-w-5xl mx-auto text-center text-white">
                         <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-light mb-6 md:mb-8 leading-tight">
                             Николаевские бани
@@ -88,11 +88,16 @@ function Home() {
                 </div>
 
                 {/* Индикатор скролла */}
-                <div className="absolute bottom-8 left-1/2 -translate-x-1/2 animate-bounce">
+                <button
+                    type="button"
+                    onClick={() => document.getElementById('baths-slider')?.scrollIntoView({ behavior: 'smooth' })}
+                    className="absolute bottom-8 left-1/2 -translate-x-1/2 animate-bounce p-2 rounded-full hover:bg-white/10 transition"
+                    aria-label="Перейти к слайдеру бань"
+                >
                     <svg className="w-6 h-6 text-white/70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
                     </svg>
-                </div>
+                </button>
             </div>
 
             <ListBaths />

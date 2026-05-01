@@ -19,7 +19,9 @@ function ListBaths() {
                         Выберите идеальную баню для отдыха с друзьями и семьёй. Каждая баня уникальна и оборудована всем необходимым.
                     </p>
                 </div>
-                <SliderBaths />
+                <div id="baths-slider">
+                    <SliderBaths />
+                </div>
             </div>
         </div>
     );

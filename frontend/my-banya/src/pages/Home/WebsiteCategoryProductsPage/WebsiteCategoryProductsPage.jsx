@@ -9,7 +9,7 @@ function WebsiteCategoryProductsPage() {
 
   if (!category) {
     return (
-      <section className="py-20 px-6 bg-gray-50 min-h-screen">
+      <section className="pt-32 pb-20 px-6 bg-gray-50 min-h-screen">
         <div className="max-w-6xl mx-auto">
           <h1 className="text-3xl font-light text-gray-900 mb-4">Категория не найдена</h1>
           <Link to="/" className="text-amber-600 hover:text-amber-700">
@@ -21,7 +21,7 @@ function WebsiteCategoryProductsPage() {
   }
 
   return (
-    <section className="py-20 px-6 bg-gray-50 min-h-screen">
+    <section className="pt-32 pb-20 px-6 bg-gray-50 min-h-screen">
       <div className="max-w-6xl mx-auto">
         <div className="mb-10">
           <h1 className="text-3xl sm:text-4xl font-light text-gray-900 mb-3">{category.name}</h1>
