@@ -34,10 +34,11 @@ function ReservationsFilters({ onApply, onAddBooking }) {
             type="date"
             id="date"
             value={date}
-            readOnly
-            onKeyDown={(e) => e.preventDefault()}
-            onClick={(e) => e.currentTarget.showPicker?.()}
-            onFocus={(e) => e.currentTarget.showPicker?.()}
+            onClick={(e) => {
+              if (typeof e.currentTarget.showPicker === 'function') {
+                e.currentTarget.showPicker();
+              }
+            }}
             onChange={handleDateChange}
             className="w-full py-2 sm:px-4 sm:py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent text-sm cursor-pointer"
           />
