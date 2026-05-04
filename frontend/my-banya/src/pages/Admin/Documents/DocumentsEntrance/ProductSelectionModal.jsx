@@ -32,6 +32,16 @@ const ProductSelectionModal = ({ isOpen, onClose, onSelect }) => {
     return unit ? unit.name : 'шт.';
   };
 
+  const getProductStock = (product) => {
+    const stock = Number(product?.total_quantity);
+    return Number.isFinite(stock) ? stock : 0;
+  };
+
+  const getProductPrice = (product) => {
+    const price = Number(product?.price ?? product?.last_purchase_price);
+    return Number.isFinite(price) ? price : 0;
+  };
+
   const filteredProducts = React.useMemo(() => {
     const searchValue = productSearchTerm.trim().toLowerCase();
     const matchesSearch = (product) => {
@@ -285,13 +295,13 @@ const ProductSelectionModal = ({ isOpen, onClose, onSelect }) => {
                               {product.description || '—'}
                             </div>
                             <div className="text-xs text-gray-600 mt-1">
-                              Остаток: {product.total_quantity || 0} {findUnitName(product.unit_id)}
+                              Остаток: {getProductStock(product)} {findUnitName(product.unit_id)}
                             </div>
                             <div className="text-xs text-gray-600 mt-1">
                               Мин. остаток: {product.min_stock || 0} {findUnitName(product.unit_id)}
                             </div>
                             <div className="text-sm font-medium text-green-800 mt-1">
-                              {(product.price ?? 0).toFixed(2)} ₽
+                              {getProductPrice(product).toFixed(2)} ₽
                             </div>
                             <button
                               onClick={(e) => {
@@ -336,11 +346,11 @@ const ProductSelectionModal = ({ isOpen, onClose, onSelect }) => {
                               <td className="px-2 py-2 text-xs text-gray-700 max-w-[100px] truncate" title={product.description || ''}>
                                 {product.description || '—'}
                               </td>
-                              <td className="px-2 py-2 text-xs text-gray-900">{product.total_quantity || 0}</td>
+                              <td className="px-2 py-2 text-xs text-gray-900">{getProductStock(product)}</td>
                               <td className="px-2 py-2 text-xs text-gray-900">{product.min_stock || 0}</td>
                               <td className="px-2 py-2 text-xs text-gray-900">{findUnitName(product.unit_id)}</td>
                               <td className="px-2 py-2 text-xs text-gray-900">
-                                {(product.price ?? 0).toFixed(2)} ₽
+                                {getProductPrice(product).toFixed(2)} ₽
                               </td>
                               <td className="px-2 py-2 text-right text-xs">
                                 <button
