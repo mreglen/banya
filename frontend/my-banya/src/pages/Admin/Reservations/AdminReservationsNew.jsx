@@ -38,7 +38,14 @@ const getStatusStyle = (status) => {
   return STATUS_STYLES[status] || 'bg-gray-100 text-gray-800 border-gray-300';
 };
 
-const getTodayDate = () => new Date().toISOString().split('T')[0];
+const formatLocalYmd = (date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const getTodayDate = () => formatLocalYmd(new Date());
 
 const INITIAL_FILTERS = { date: getTodayDate() };
 
@@ -166,11 +173,14 @@ function AdminReservationsNew() {
 
   const filteredBaths = useMemo(() => {
     if (!activeBathId) return bathsToDisplay;
-    return bathsToDisplay.filter(bath => bath.bath_id === activeBathId);
+    return bathsToDisplay.filter(
+      (bath) => String(bath.bath_id) === String(activeBathId)
+    );
   }, [bathsToDisplay, activeBathId]);
 
   // 3. Обработчики с useCallback
   const handleDeleteBooking = useCallback(async (id) => {
+    if (id == null || String(id).startsWith('cleaning-')) return;
     try {
       await deleteReservation(id).unwrap();
     } catch (error) {
@@ -213,7 +223,7 @@ function AdminReservationsNew() {
   }
 
   // 5. Рендер
-  const formattedDate = new Date(filters.date).toLocaleDateString('ru-RU', {
+  const formattedDate = parseLocalYmd(filters.date).toLocaleDateString('ru-RU', {
     day: 'numeric',
     month: 'long',
     year: 'numeric',
@@ -253,7 +263,7 @@ function AdminReservationsNew() {
                 key={bath.bath_id}
                 onClick={() => handleSetActiveBath(bath.bath_id)}
                 className={`px-5 py-3 text-sm font-medium border-b-2 transition-all ${
-                  activeBathId === bath.bath_id 
+                  String(activeBathId) === String(bath.bath_id)
                     ? 'border-blue-600 text-blue-600' 
                     : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                 }`}
@@ -473,7 +483,7 @@ function AdminReservationsNew() {
                 key={bath.bath_id}
                 onClick={() => handleSetActiveBath(bath.bath_id)}
                 className={`px-3 py-2 text-sm font-medium border-b-2 whitespace-nowrap transition-all ${
-                  activeBathId === bath.bath_id 
+                  String(activeBathId) === String(bath.bath_id)
                     ? 'border-blue-600 text-blue-600' 
                     : 'border-transparent text-gray-500'
                 }`}

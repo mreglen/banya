@@ -18,6 +18,7 @@ const ProductSelectionModal = ({ isOpen, onClose, onSelect }) => {
   const [isCreatingCategory, setIsCreatingCategory] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
   const [expandedCategories, setExpandedCategories] = useState(new Set());
+  const [productSearchTerm, setProductSearchTerm] = useState('');
 
   const { data: categories = [], isLoading: isLoadingCategories } = useGetCategoriesQuery();
   const { data: products = [], isLoading: isLoadingProducts } = useGetStockProductsQuery();
@@ -32,7 +33,13 @@ const ProductSelectionModal = ({ isOpen, onClose, onSelect }) => {
   };
 
   const filteredProducts = React.useMemo(() => {
-    if (!selectedCategory) return products;
+    const searchValue = productSearchTerm.trim().toLowerCase();
+    const matchesSearch = (product) => {
+      if (!searchValue) return true;
+      return product.name.toLowerCase().includes(searchValue);
+    };
+
+    if (!selectedCategory) return products.filter(matchesSearch);
 
     const collectSubcategoryIds = (category) => {
       let ids = [category.id];
@@ -46,9 +53,9 @@ const ProductSelectionModal = ({ isOpen, onClose, onSelect }) => {
 
     const allCategoryIds = collectSubcategoryIds(selectedCategory);
     return products.filter(product =>
-      allCategoryIds.includes(product.category_id)
+      allCategoryIds.includes(product.category_id) && matchesSearch(product)
     );
-  }, [selectedCategory, products]);
+  }, [selectedCategory, products, productSearchTerm]);
 
   const handleContextMenu = useCallback((e, category) => {
     e.preventDefault();
@@ -227,6 +234,13 @@ const ProductSelectionModal = ({ isOpen, onClose, onSelect }) => {
                 <div className="text-sm font-medium mb-2">
                   Товары {selectedCategory ? `в "${selectedCategory.name}"` : 'во всей номенклатуре'}:
                 </div>
+                <input
+                  type="text"
+                  value={productSearchTerm}
+                  onChange={(e) => setProductSearchTerm(e.target.value)}
+                  className="w-full p-2 mb-2 border border-gray-300 rounded text-sm"
+                  placeholder="Введите название товара"
+                />
                 <div className="flex-grow overflow-y-auto min-h-0">
                   {isLoadingProducts ? (
                     <p className="text-sm">Загрузка товаров...</p>
@@ -267,6 +281,13 @@ const ProductSelectionModal = ({ isOpen, onClose, onSelect }) => {
                             </button>
                           </div>
                         ))}
+                        <button
+                          type="button"
+                          onClick={handleCreateProduct}
+                          className="w-full p-3 border border-dashed border-green-400 rounded bg-green-50 text-green-700 font-medium text-sm hover:bg-green-100"
+                        >
+                          + Добавить товар
+                        </button>
                       </div>
 
                       <table className="hidden sm:table w-full">
@@ -311,6 +332,17 @@ const ProductSelectionModal = ({ isOpen, onClose, onSelect }) => {
                               </td>
                             </tr>
                           ))}
+                          <tr className="bg-green-50">
+                            <td colSpan="7" className="px-2 py-2 text-right text-xs">
+                              <button
+                                type="button"
+                                onClick={handleCreateProduct}
+                                className="text-green-700 hover:text-green-900 font-medium"
+                              >
+                                + Добавить товар
+                              </button>
+                            </td>
+                          </tr>
                         </tbody>
                       </table>
                     </>

@@ -410,6 +410,7 @@ class EntranceDocumentBase(BaseModel):
     supplier_id: int
     responsible_name: str
     supplier_number: Optional[str] = None
+    comment: Optional[str] = None
     total_amount: float
 
 class EntranceDocumentCreate(EntranceDocumentBase):

@@ -53,6 +53,7 @@ def create_document(doc: EntranceDocumentCreate, db: Session = Depends(get_db)):
         supplier_id=doc.supplier_id,
         responsible_name=doc.responsible_name,
         supplier_number=doc.supplier_number,
+        comment=doc.comment,
         total_amount=doc.total_amount,
     )
     db.add(db_doc)

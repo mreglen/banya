@@ -7,6 +7,13 @@ import { useGetUnitsOfMeasurementQuery } from '../../../redux/slices/productsApi
 import { useGetReservationStatusesQuery, useUpdateReservationMutation, reservationApiSlice } from '../../../redux/slices/reservationSlice';
 import AddBookingModal from './AddBookingModal';
 
+const formatLocalYmd = (date) => {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+};
+
 function BookingDetailsModal({ booking, onClose, onDelete }) {
   const dispatch = useDispatch();
   const [isEditing, setIsEditing] = useState(false);
@@ -35,7 +42,7 @@ function BookingDetailsModal({ booking, onClose, onDelete }) {
 
   if (!booking) return null;
 
-  const bath = baths.find(b => b.bath_id === booking.bath_id);
+  const bath = baths.find((b) => String(b.bath_id) === String(booking.bath_id));
   const bathName = bath?.name || 'Баня не найдена';
 
   // Определяем цену бани на основе дня недели
@@ -60,7 +67,10 @@ function BookingDetailsModal({ booking, onClose, onDelete }) {
   const broomsTotal = (booking.brooms || []).reduce((sum, item) => sum + (item.price * item.quantity), 0);
   const menuItemsTotal = (booking.menu_items || []).reduce((sum, item) => sum + (item.price * item.quantity), 0);
   const massagesTotal = (booking.massages || []).reduce((sum, item) => sum + (item.cost * item.quantity), 0);
-  const bathOnlyCost = booking.total_cost - broomsTotal - menuItemsTotal - massagesTotal;
+  const totalCostNum = Number(booking.total_cost);
+  const bathOnlyCost = Number.isFinite(totalCostNum)
+    ? totalCostNum - broomsTotal - menuItemsTotal - massagesTotal
+    : 0;
 
   // 🔁 Переключиться обратно к просмотру
   const handleBackToView = () => {
@@ -107,6 +117,7 @@ function BookingDetailsModal({ booking, onClose, onDelete }) {
         // 🔁 Закрытие = возврат к просмотру, а не полное закрытие
         onClose={handleBackToView}
         booking={booking}
+        selectedDate={formatLocalYmd(new Date(booking.start_datetime))}
         // Опционально: передать колбэк на успех
         onEditSuccess={handleEditSuccess}
       />
@@ -372,7 +383,9 @@ function BookingDetailsModal({ booking, onClose, onDelete }) {
             
             <div className="flex justify-between font-bold text-lg">
               <span>Итого к оплате:</span>
-              <span className="text-green-600">{booking.total_cost.toLocaleString()} ₽</span>
+              <span className="text-green-600">
+                {(Number.isFinite(totalCostNum) ? totalCostNum : 0).toLocaleString()} ₽
+              </span>
             </div>
           </div>
           </div>

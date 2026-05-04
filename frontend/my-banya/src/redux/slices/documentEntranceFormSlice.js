@@ -7,6 +7,7 @@ const initialState = {
     supplierId: null,
     responsibleName: '', // Имя можно установить при инициализации или сохранении
     supplierNumber: '',
+    comment: '',
     // Позиции документа
     items: [],
     // Индикаторы загрузки и ошибок (опционально, но полезно)

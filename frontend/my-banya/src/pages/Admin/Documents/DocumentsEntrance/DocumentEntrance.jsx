@@ -46,7 +46,9 @@ function DocumentEntrance() {
             onClick={() => navigate('/admin/documents/entrance/add')}
             className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 sm:px-6 sm:py-3 rounded-lg sm:rounded-xl font-medium shadow transition flex items-center justify-center space-x-1 sm:space-x-2"
           >
-            <span>➕</span>
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
             <span className="text-sm sm:text-base">Новый документ</span>
           </button>
         </div>

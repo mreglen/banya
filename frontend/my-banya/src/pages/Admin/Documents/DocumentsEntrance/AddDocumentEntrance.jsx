@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import ContractorModal from './ContractorModal';
@@ -29,20 +29,23 @@ function AddDocumentEntrance() {
   const { id } = useParams();
   const isEditing = Boolean(id);
 
-  const { date, supplierId, responsibleName, supplierNumber, items } = useSelector(
+  const { date, supplierId, responsibleName, supplierNumber, comment, items } = useSelector(
     (state) => state.documentEntranceForm
   );
 
   const [isContractorModalOpen, setIsContractorModalOpen] = useState(false);
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState(null);
+  const [productSearch, setProductSearch] = useState('');
+  const [isProductDropdownOpen, setIsProductDropdownOpen] = useState(false);
+  const productSearchRef = useRef(null);
 
   // --- RTK Query ---
-  const { partnersData = [], isLoading: isLoadingPartners } = useGetPartnersQuery();
-  const { units = [], isLoading: isLoadingUnits } = useGetUnitsOfMeasurementQuery();
+  const { data: partnersData = [], isLoading: isLoadingPartners } = useGetPartnersQuery();
+  const { data: units = [], isLoading: isLoadingUnits } = useGetUnitsOfMeasurementQuery();
   const { data: products = [] } = useGetProductsQuery();
   const {
-    documentData,
+    data: documentData,
     isLoading: isLoadingDoc,
     isError: isDocError,
   } = useGetEntranceDocumentByIdQuery(id, { skip: !isEditing });
@@ -63,6 +66,30 @@ function AddDocumentEntrance() {
       };
     });
   }, [items, units, products]);
+
+  const filteredSearchProducts = useMemo(() => {
+    const searchValue = productSearch.trim().toLowerCase();
+    const availableProducts = (products || []).filter(
+      (product) => !items.some((item) => item.productId === product.id)
+    );
+
+    if (!searchValue) {
+      return availableProducts.slice(0, 50);
+    }
+
+    return availableProducts
+      .filter((product) => product.name.toLowerCase().includes(searchValue))
+      .slice(0, 50);
+  }, [productSearch, products, items]);
+
+  const selectedProductWithUnit = useMemo(() => {
+    if (!selectedProduct) return null;
+    const unit = units.find(u => u.id === selectedProduct.unit_id);
+    return {
+      ...selectedProduct,
+      unitName: unit ? unit.name : 'шт.'
+    };
+  }, [selectedProduct, units]);
 
   useEffect(() => {
     if (isEditing && documentData && !isLoadingUnits) {
@@ -85,16 +112,45 @@ function AddDocumentEntrance() {
           supplierId: documentData.supplier_id,
           responsibleName: documentData.responsible_name,
           supplierNumber: documentData.supplier_number || '',
+          comment: documentData.comment || '',
           items: parsedItems,
         })
       );
     } else if (!isEditing && !isLoadingUnits) {
-      const loggedUsername = localStorage.getItem('logged_in_username') || 'admin';
+      let loggedUsername = localStorage.getItem('logged_in_username') || 'admin';
+      const savedUserRaw = localStorage.getItem('user');
+      if (savedUserRaw) {
+        try {
+          const savedUser = JSON.parse(savedUserRaw);
+          if (savedUser?.full_name) {
+            loggedUsername = savedUser.full_name;
+          }
+        } catch {
+          // noop
+        }
+      }
       if (!responsibleName) {
         dispatch(setInitialState({ responsibleName: loggedUsername }));
       }
     }
   }, [isEditing, documentData, dispatch, responsibleName, units, isLoadingUnits]);
+
+  useEffect(() => {
+    if (selectedProductWithUnit) {
+      setProductSearch(`${selectedProductWithUnit.name} (${selectedProductWithUnit.unitName})`);
+    }
+  }, [selectedProductWithUnit]);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (productSearchRef.current && !productSearchRef.current.contains(event.target)) {
+        setIsProductDropdownOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   useEffect(() => {
     if (isDocError) {
@@ -122,16 +178,37 @@ function AddDocumentEntrance() {
     dispatch(addItem(newItem));
     setIsProductModalOpen(false);
     setSelectedProduct(product);
+    setProductSearch('');
+    setIsProductDropdownOpen(false);
+  };
+
+  const handleSelectProductFromSearch = (product) => {
+    handleSelectProductFromModal(product);
   };
 
   const updateItemInList = (index, field, value) => {
+    if (field === 'quantity') {
+      if (value === '') {
+        dispatch(updateItem({ index, field, value: '' }));
+        return;
+      }
+      const digitsOnly = value.replace(/\D/g, '');
+      dispatch(updateItem({ index, field, value: digitsOnly }));
+      return;
+    }
+
+    if (field === 'purchasePrice') {
+      if (value === '') {
+        dispatch(updateItem({ index, field, value: '' }));
+        return;
+      }
+      const digitsOnly = value.replace(/\D/g, '');
+      dispatch(updateItem({ index, field, value: digitsOnly }));
+      return;
+    }
+
     let numValue = parseFloat(value);
     if (isNaN(numValue)) numValue = 0;
-    if (field === 'quantity') {
-      numValue = Math.max(1, Math.floor(numValue));
-    } else if (field === 'purchasePrice') {
-      numValue = Math.max(0, parseFloat(numValue.toFixed(2)));
-    }
     dispatch(updateItem({ index, field, value: numValue }));
   };
 
@@ -149,17 +226,18 @@ function AddDocumentEntrance() {
   };
 
   const handleSaveDocument = async () => {
-    const total = items.reduce((sum, item) => sum + item.quantity * item.purchasePrice, 0);
+    const total = items.reduce((sum, item) => sum + item.quantity * (Number(item.purchasePrice) || 0), 0);
     const documentPayload = {
       date,
       supplier_id: supplierId,
       responsible_name: responsibleName,
       supplier_number: supplierNumber,
+      comment: comment || null,
       total_amount: total,
       items: items.map((item) => ({
         product_id: item.productId,
-        quantity: item.quantity,
-        purchase_price: item.purchasePrice,
+        quantity: Number(item.quantity) || 0,
+        purchase_price: Number(item.purchasePrice) || 0,
       })),
     };
 
@@ -185,15 +263,6 @@ function AddDocumentEntrance() {
   const currentUrl = window.location.pathname + window.location.search;
   const selectedPartner = partnersData.find((p) => p.partner_id === supplierId);
 
-  const selectedProductWithUnit = useMemo(() => {
-    if (!selectedProduct) return null;
-    const unit = units.find(u => u.id === selectedProduct.unit_id);
-    return {
-      ...selectedProduct,
-      unitName: unit ? unit.name : 'шт.'
-    };
-  }, [selectedProduct, units]);
-
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-50 p-4 sm:p-6 flex justify-center items-center">
@@ -212,18 +281,25 @@ function AddDocumentEntrance() {
           <button
             onClick={handleSaveDocument}
             disabled={isCreating || isUpdating}
-            className={`px-4 py-2 sm:px-6 sm:py-3 rounded-lg sm:rounded-xl font-medium shadow transition text-sm sm:text-base ${isCreating || isUpdating
+            className={`px-4 py-2 sm:px-6 sm:py-3 rounded-lg sm:rounded-xl font-medium shadow transition text-sm sm:text-base flex items-center justify-center space-x-1 sm:space-x-2 ${isCreating || isUpdating
               ? 'bg-gray-400 text-gray-200 cursor-not-allowed'
               : 'bg-green-600 hover:bg-green-700 text-white'
               }`}
           >
-            {isEditing
-              ? isUpdating
-                ? 'Сохранение...'
-                : 'Сохранить изменения'
-              : isCreating
-                ? 'Создание...'
-                : '➕ Создать документ'}
+            {!isEditing && !isCreating && (
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+            )}
+            <span>
+              {isEditing
+                ? isUpdating
+                  ? 'Сохранение...'
+                  : 'Сохранить изменения'
+                : isCreating
+                  ? 'Создание...'
+                  : 'Создать документ'}
+            </span>
           </button>
         </div>
 
@@ -297,29 +373,76 @@ function AddDocumentEntrance() {
                 />
               </div>
             </div>
+
+            <div>
+              <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">Комментарий</label>
+              <textarea
+                value={comment || ''}
+                onChange={(e) => updateDocumentData('comment', e.target.value)}
+                className="w-full px-3 py-2 sm:px-4 sm:py-3 border border-gray-300 rounded-lg sm:rounded-xl text-sm"
+                placeholder="Комментарий к документу"
+                rows={3}
+              />
+            </div>
           </div>
         </div>
 
         {/* Блок добавления товара */}
         <div className="bg-white rounded-xl sm:rounded-2xl shadow p-4 sm:p-6 mb-6 border border-gray-100">
           <h2 className="text-lg sm:text-xl font-semibold text-gray-800 mb-3 sm:mb-4">Добавить товар</h2>
-          <div className="mb-4">
-            <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">Номенклатура</label>
+          <div className="mb-4 relative" ref={productSearchRef}>
+            <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">Выберите товар</label>
             <div className="flex flex-col sm:flex-row gap-2">
               <input
                 type="text"
-                value={selectedProductWithUnit ? `${selectedProductWithUnit.name} (${selectedProductWithUnit.unitName})` : ''}
-                readOnly
-                className="flex-grow px-3 py-2 sm:px-4 sm:py-3 border border-gray-300 rounded-lg sm:rounded-xl bg-gray-100 text-sm"
-                placeholder="Выберите товар"
+                value={productSearch}
+                onChange={(e) => {
+                  setProductSearch(e.target.value);
+                  setIsProductDropdownOpen(true);
+                }}
+                onFocus={() => setIsProductDropdownOpen(true)}
+                className="flex-grow px-3 py-2 sm:px-4 sm:py-3 border border-gray-300 rounded-lg sm:rounded-xl text-sm"
+                placeholder="Начните вводить название товара"
               />
               <button
                 onClick={handleOpenProductModal}
                 className="px-3 py-2 sm:px-4 sm:py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg sm:rounded-xl font-medium shadow transition text-xs sm:text-sm"
               >
-                Выбрать
+                + Добавить товар
               </button>
             </div>
+
+            {isProductDropdownOpen && (
+              <div className="absolute z-30 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-72 overflow-y-auto">
+                {filteredSearchProducts.map((product) => {
+                  const unit = units.find((u) => u.id === product.unit_id);
+                  const unitName = unit ? unit.name : 'шт.';
+                  return (
+                    <button
+                      key={product.id}
+                      type="button"
+                      onClick={() => handleSelectProductFromSearch(product)}
+                      className="w-full text-left px-3 py-2 hover:bg-gray-50 border-b border-gray-100 last:border-b-0"
+                    >
+                      <div className="text-sm font-medium text-gray-900">{product.name}</div>
+                      <div className="text-xs text-gray-600">Ед. изм.: {unitName}</div>
+                    </button>
+                  );
+                })}
+
+                {filteredSearchProducts.length === 0 && (
+                  <div className="px-3 py-2 text-sm text-gray-500">Товары не найдены</div>
+                )}
+
+                <button
+                  type="button"
+                  onClick={handleOpenProductModal}
+                  className="w-full text-left px-3 py-2 font-medium text-green-700 hover:bg-green-50 border-t border-gray-200"
+                >
+                  + Добавить новый товар
+                </button>
+              </div>
+            )}
           </div>
         </div>
 
@@ -352,8 +475,9 @@ function AddDocumentEntrance() {
                       <td className="px-3 py-2 sm:px-6 sm:py-4 whitespace-nowrap text-xs sm:text-sm">
                         <div className="flex items-center gap-2">
                           <input
-                            type="number"
-                            min="1"
+                            type="text"
+                            inputMode="numeric"
+                            pattern="[0-9]*"
                             value={item.quantity}
                             onChange={(e) => updateItemInList(index, 'quantity', e.target.value)}
                             className="w-16 sm:w-20 px-2 py-1 border border-gray-300 rounded"
@@ -370,9 +494,9 @@ function AddDocumentEntrance() {
                       </td>
                       <td className="px-3 py-2 sm:px-6 sm:py-4 whitespace-nowrap text-xs sm:text-sm">
                         <input
-                          type="number"
-                          min="0"
-                          step="0.01"
+                          type="text"
+                          inputMode="numeric"
+                          pattern="[0-9]*"
                           value={item.purchasePrice}
                           onChange={(e) => updateItemInList(index, 'purchasePrice', e.target.value)}
                           className="w-20 sm:w-24 px-2 py-1 border border-gray-300 rounded"
@@ -447,8 +571,9 @@ function AddDocumentEntrance() {
                             <label className="block font-medium mb-1">Количество</label>
                             <div className="flex items-center gap-2">
                               <input
-                                type="number"
-                                min="1"
+                                type="text"
+                                inputMode="numeric"
+                                pattern="[0-9]*"
                                 value={item.quantity}
                                 onChange={(e) => updateItemInList(index, 'quantity', e.target.value)}
                                 className="flex-grow px-2 py-1.5 border border-gray-300 rounded bg-white"
@@ -470,9 +595,9 @@ function AddDocumentEntrance() {
                           <div>
                             <label className="block font-medium mb-1">Цена закупки</label>
                             <input
-                              type="number"
-                              min="0"
-                              step="0.01"
+                              type="text"
+                              inputMode="numeric"
+                              pattern="[0-9]*"
                               value={item.purchasePrice}
                               onChange={(e) => updateItemInList(index, 'purchasePrice', e.target.value)}
                               className="w-full px-2 py-1.5 border border-gray-300 rounded bg-white"

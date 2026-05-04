@@ -19,9 +19,7 @@ function ReservationsFilters({ onApply, onAddBooking }) {
   }, [date, onApply]);
 
   const handleDateChange = (e) => {
-    const newDate = e.target.value;
-    setDate(newDate);
-    onApply({ date: newDate });
+    setDate(e.target.value);
   };
 
   return (

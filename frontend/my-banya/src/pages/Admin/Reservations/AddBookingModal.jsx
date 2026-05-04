@@ -1,5 +1,5 @@
 import { createPortal } from 'react-dom';
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import {
   useGetBathsQuery,
 } from '../../../redux/slices/apiSlice';
@@ -89,6 +89,14 @@ const toLocalIsoWithOffset = (ymd, hm) => {
   return `${y}-${m}-${d}T${hh}:${mm}:${ss}${sign}${offH}:${offM}`;
 };
 
+/** Только цифры, без ведущих нулей; пустая строка если нечего показать */
+const normalizeGuestsDigits = (raw) => {
+  if (raw === '' || raw == null) return '';
+  const digits = String(raw).replace(/\D/g, '');
+  if (digits === '') return '';
+  return digits.replace(/^0+/, '') || '';
+};
+
 function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess }) {
   const isEditing = !!booking;
   const today = formatLocalYmd(new Date());
@@ -115,7 +123,7 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
     client_phone: '',
     client_email: '',
     notes: '',
-    guests: 1,
+    guests: '1',
     status_id: 1,
     selectedProducts: [],
   });
@@ -124,6 +132,8 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
   const [validationErrors, setValidationErrors] = useState({});
   const [toast, setToast] = useState(null);
   const prevIsOpenRef = useRef(false);
+  /** Чтобы при редактировании не сбрасывать форму при догрузке stock/units */
+  const editFormHydratedForRef = useRef(null);
 
   const { data: baths = [], isLoading: isLoadingBaths } = useGetBathsQuery();
   const { data: stockProducts = [] } = useGetStockProductsQuery();
@@ -134,12 +144,11 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
     error: statusesError
   } = useGetReservationStatusesQuery();
 
-  // ← ДОБАВЛЕНО: функция поиска единицы измерения
-  const findUnitName = (unitId) => {
+  const findUnitName = useCallback((unitId) => {
     if (!unitId) return 'шт.';
-    const unit = units.find(u => u.id === unitId);
+    const unit = units.find((u) => u.id === unitId);
     return unit ? unit.name : 'шт.';
-  };
+  }, [units]);
 
   // Функция показа toast-уведомлений
   const showToast = (message, type = 'error') => {
@@ -175,57 +184,72 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
       client_phone: '',
       client_email: '',
       notes: '',
-      guests: 1,
+      guests: '1',
       status_id: 1,
       selectedProducts: [],
     }));
   }, [isOpen, isEditing, selectedDate]);
 
   useEffect(() => {
-    if (booking && statusOptions.length > 0) {
-      try {
-        const start = new Date(booking.start_datetime);
-        const end = new Date(booking.end_datetime);
-        const date = formatLocalYmd(start);
-        const start_time = start.toTimeString().slice(0, 5);
-        const diffMs = end.getTime() - start.getTime();
-        const duration_hours = Math.max(0.5, Math.round((diffMs / (1000 * 60 * 60)) * 2) / 2);
-
-        const selectedProducts = (booking.products || []).map(product => {
-          const stockItem = stockProducts.find(p => p.id === product.product_id);
-          const unitName = findUnitName(stockItem?.unit_id); // ← ДОБАВЛЕНО
-          return {
-            id: product.product_id,
-            name: product.name,
-            price: product.price ?? product.purchase_price ?? 0,
-            available: stockItem?.total_quantity || 0,
-            unit_id: stockItem?.unit_id || null, // ← ДОБАВЛЕНО
-            unit_name: unitName, // ← ДОБАВЛЕНО
-            is_countable: stockItem?.is_countable ?? true,
-            quantity: product.quantity,
-          };
-        });
-
-        const statusIdFromBooking = booking.status?.id ?? booking.status_id;
-        setFormData({
-          bath_id: booking.bath?.bath_id || booking.bath_id || '',
-          date,
-          start_time,
-          duration_hours,
-          client_name: booking.client_name || '',
-          client_phone: booking.client_phone || '',
-          client_email: booking.client_email || '',
-          notes: booking.notes || '',
-          guests: booking.guests || 1,
-          status_id: parseInt(statusIdFromBooking, 10) || 1,
-          selectedProducts,
-        });
-      } catch (error) {
-        console.error('Ошибка загрузки данных брони:', error);
-        showToast('Ошибка загрузки данных для редактирования', 'error');
-      }
+    if (!isOpen) {
+      editFormHydratedForRef.current = null;
+      return;
     }
-  }, [booking, stockProducts, units, findUnitName, statusOptions.length]); // ← ДОБАВЛЕНО units
+    if (!booking || statusOptions.length === 0) return;
+
+    const rid = booking.reservation_id;
+    const needsStock = (booking.products?.length ?? 0) > 0;
+    if (needsStock && stockProducts.length === 0) return;
+
+    if (editFormHydratedForRef.current === rid) return;
+    editFormHydratedForRef.current = rid;
+
+    try {
+      const start = new Date(booking.start_datetime);
+      const end = new Date(booking.end_datetime);
+      const date = formatLocalYmd(start);
+      const start_time = start.toTimeString().slice(0, 5);
+      const diffMs = end.getTime() - start.getTime();
+      const duration_hours = Math.max(0.5, Math.round((diffMs / (1000 * 60 * 60)) * 2) / 2);
+
+      const selectedProducts = (booking.products || []).map((product) => {
+        const pid = Number(product.product_id);
+        const stockItem = stockProducts.find((p) => Number(p.id) === pid);
+        const unitName = findUnitName(stockItem?.unit_id);
+        return {
+          id: pid,
+          name: product.name,
+          price: product.price ?? product.purchase_price ?? 0,
+          available: stockItem?.total_quantity || 0,
+          unit_id: stockItem?.unit_id || null,
+          unit_name: unitName,
+          is_countable: stockItem?.is_countable ?? true,
+          quantity: product.quantity,
+        };
+      });
+
+      const statusIdFromBooking = booking.status?.id ?? booking.status_id;
+      const guestsNorm =
+        normalizeGuestsDigits(booking.guests ?? 1) || '1';
+
+      setFormData({
+        bath_id: booking.bath?.bath_id || booking.bath_id || '',
+        date,
+        start_time,
+        duration_hours,
+        client_name: booking.client_name || '',
+        client_phone: booking.client_phone || '',
+        client_email: booking.client_email || '',
+        notes: booking.notes || '',
+        guests: guestsNorm,
+        status_id: parseInt(statusIdFromBooking, 10) || 1,
+        selectedProducts,
+      });
+    } catch (error) {
+      console.error('Ошибка загрузки данных брони:', error);
+      showToast('Ошибка загрузки данных для редактирования', 'error');
+    }
+  }, [isOpen, booking, statusOptions.length, stockProducts, findUnitName]);
 
   // Если выбрана сегодняшняя дата — не даём оставить время в прошлом
   useEffect(() => {
@@ -312,41 +336,45 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
   };
 
   const handleSelectProduct = (product) => {
-    const existing = formData.selectedProducts.find(p => p.id === product.id);
-    if (existing) {
-      console.warn('Товар уже добавлен');
-      return;
-    }
+    const pid = Number(product.id);
+    setFormData((prev) => {
+      const existing = prev.selectedProducts.find((p) => Number(p.id) === pid);
+      if (existing) {
+        console.warn('Товар уже добавлен');
+        return prev;
+      }
 
-    const stockItem = stockProducts.find(p => p.id === product.id);
-    const available = stockItem?.total_quantity || 0;
-    const unitName = findUnitName(stockItem?.unit_id); // ← ДОБАВЛЕНО
-    const isCountable = stockItem?.is_countable ?? true;
+      const stockItem = stockProducts.find((p) => Number(p.id) === pid);
+      const available = stockItem?.total_quantity || 0;
+      const unitName = findUnitName(stockItem?.unit_id);
+      const isCountable = stockItem?.is_countable ?? true;
 
-    setFormData(prev => ({
-      ...prev,
-      selectedProducts: [
-        ...prev.selectedProducts,
-        {
-          id: product.id,
-          name: product.name,
-          price: product.price ?? product.last_purchase_price ?? 0,
-          available,
-          unit_id: stockItem?.unit_id || null, // ← ДОБАВЛЕНО
-          unit_name: unitName, // ← ДОБАВЛЕНО
-          is_countable: isCountable,
-          quantity: 1,
-        }
-      ]
-    }));
+      return {
+        ...prev,
+        selectedProducts: [
+          ...prev.selectedProducts,
+          {
+            id: pid,
+            name: product.name,
+            price: product.price ?? product.last_purchase_price ?? 0,
+            available,
+            unit_id: stockItem?.unit_id || null,
+            unit_name: unitName,
+            is_countable: isCountable,
+            quantity: 1,
+          },
+        ],
+      };
+    });
   };
 
   const updateProductQuantity = (productId, newQty) => {
     if (newQty !== '' && !/^\d+$/.test(newQty)) return;
+    const pid = Number(productId);
     setFormData(prev => ({
       ...prev,
       selectedProducts: prev.selectedProducts.map(p =>
-        p.id === productId
+        Number(p.id) === pid
           ? { ...p, quantity: newQty === '' ? '' : parseInt(newQty, 10) }
           : p
       )
@@ -354,10 +382,26 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
   };
 
   const removeProduct = (productId) => {
+    const pid = Number(productId);
     setFormData(prev => ({
       ...prev,
-      selectedProducts: prev.selectedProducts.filter(p => p.id !== productId)
+      selectedProducts: prev.selectedProducts.filter(p => Number(p.id) !== pid)
     }));
+  };
+
+  const handleGuestsChange = (e) => {
+    const v = e.target.value;
+    if (v === '') {
+      setFormData((prev) => ({ ...prev, guests: '' }));
+      return;
+    }
+    const digitsOnly = v.replace(/\D/g, '');
+    if (digitsOnly === '') {
+      setFormData((prev) => ({ ...prev, guests: '' }));
+      return;
+    }
+    const noLeading = digitsOnly.replace(/^0+/, '') || '';
+    setFormData((prev) => ({ ...prev, guests: noLeading }));
   };
 
   // Функция валидации формы
@@ -391,7 +435,7 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
     }
     
     const minDateStr = formatLocalYmd(new Date());
-    if (formData.date < minDateStr) {
+    if (!isEditing && formData.date < minDateStr) {
       errors.date = 'Нельзя выбрать дату в прошлом';
     }
 
@@ -420,12 +464,12 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
       errors.duration_hours = 'Укажите положительную длительность';
     }
 
-    if (new Date(start_iso) < new Date()) {
+    if (!isEditing && new Date(start_iso) < new Date()) {
       errors.start_time = 'Нельзя выбрать прошедшее время начала';
     }
     
-    // Проверка количества гостей
-    if (!formData.guests || formData.guests < 1) {
+    const guestsNum = parseInt(formData.guests, 10);
+    if (formData.guests === '' || Number.isNaN(guestsNum) || guestsNum < 1) {
       errors.guests = 'Минимум 1 гость';
     }
     
@@ -527,11 +571,11 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
       client_phone: normalizedPhone,
       client_email: formData.client_email && formData.client_email.trim() !== '' ? formData.client_email.trim() : null,
       notes: formData.notes && formData.notes.trim() !== '' ? formData.notes.trim() : null,
-      guests: parseInt(formData.guests) || 1,
+      guests: parseInt(formData.guests, 10) || 1,
       status_id: parseInt(formData.status_id) || 1,
       products: formData.selectedProducts.map(p => ({
-        product_id: p.id,
-        quantity: parseInt(p.quantity) || 1
+        product_id: Number(p.id),
+        quantity: parseInt(p.quantity, 10) || 1
       })),
     };
 
@@ -824,13 +868,18 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
             <label className="block text-sm font-medium text-gray-700 mb-2">Количество гостей *</label>
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
               <input
-                type="number"
+                type="text"
                 name="guests"
-                min="1"
+                inputMode="numeric"
+                autoComplete="off"
+                pattern="[0-9]*"
                 value={formData.guests}
-                onChange={handleChange}
-                className="w-full max-w-[120px] px-3 py-2.5 sm:px-4 sm:py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 text-sm"
-                required
+                onChange={handleGuestsChange}
+                className={`w-full max-w-[120px] px-3 py-2.5 sm:px-4 sm:py-3 border rounded-xl focus:ring-2 text-sm ${
+                  validationErrors.guests
+                    ? 'border-red-500 focus:ring-red-500 bg-red-50'
+                    : 'border-gray-300 focus:ring-blue-500'
+                }`}
               />
               {formData.bath_id && (
                 <div className="text-xs sm:text-sm text-gray-600 bg-blue-50 px-3 py-2 rounded-lg">
@@ -841,7 +890,7 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
                     );
                     if (!selectedBath) return null;
                     const baseGuests = Number(selectedBath.base_guests) || 0;
-                    const guestsNum = Number(formData.guests) || 0;
+                    const guestsNum = parseInt(formData.guests, 10) || 0;
                     const extraGuestsCount = Math.max(0, guestsNum - baseGuests);
                     const extraPrice = Number(selectedBath.extra_guest_price) || 0;
                     const extraTotal = extraGuestsCount * extraPrice;
@@ -860,6 +909,11 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
                 </div>
               )}
             </div>
+            {validationErrors.guests && (
+              <p className="mt-1 text-xs text-red-600 flex items-center gap-1">
+                <span>⚠</span> {validationErrors.guests}
+              </p>
+            )}
           </div>
 
           {/* Телефон и Email */}

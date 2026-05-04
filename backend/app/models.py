@@ -176,6 +176,7 @@ class EntranceDocument(Base):
     supplier_id = Column(Integer, ForeignKey("partners.partner_id"), nullable=False)
     responsible_name = Column(String, nullable=False)
     supplier_number = Column(String, nullable=True)
+    comment = Column(Text, nullable=True)
     total_amount = Column(Float, nullable=False, default=0.0)
 
     supplier = relationship("Partner", backref="entrance_documents")
