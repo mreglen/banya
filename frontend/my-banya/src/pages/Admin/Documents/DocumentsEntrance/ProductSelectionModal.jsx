@@ -122,7 +122,7 @@ const ProductSelectionModal = ({ isOpen, onClose, onSelect }) => {
     }
 
     try {
-      const parentId = contextMenu?.category?.id || null;
+      const parentId = contextMenu?.category?.id || selectedCategory?.id || null;
       await createCategory({
         name: newCategoryName,
         parent_id: parentId
@@ -190,9 +190,32 @@ const ProductSelectionModal = ({ isOpen, onClose, onSelect }) => {
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-start justify-center z-50 p-2 overflow-y-auto">
       <div className="bg-white p-4 sm:p-6 rounded-lg shadow-lg w-full max-w-full sm:w-3/5 max-h-[90vh] flex flex-col my-8">
-        <h3 className="text-base sm:text-lg font-semibold mb-4">
-          {step === 1 ? 'Выберите категорию и товар' : 'Создайте товар'}
-        </h3>
+        <div className="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+          <h3 className="text-base sm:text-lg font-semibold">
+            {step === 1 ? 'Выберите категорию и товар' : 'Создайте товар'}
+          </h3>
+          {step === 1 && (
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setContextMenu(null);
+                  setIsCreatingCategory(true);
+                }}
+                className="px-3 py-1.5 bg-blue-100 text-blue-800 rounded text-sm hover:bg-blue-200"
+              >
+                Добавить категорию
+              </button>
+              <button
+                type="button"
+                onClick={handleCreateProduct}
+                className="px-3 py-1.5 bg-green-100 text-green-800 rounded text-sm hover:bg-green-200"
+              >
+                Добавить товар
+              </button>
+            </div>
+          )}
+        </div>
 
         {step === 1 ? (
           <>
