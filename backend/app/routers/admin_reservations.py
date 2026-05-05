@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks, Request
 from sqlalchemy.orm import Session, joinedload
-from typing import List
+from typing import List, Optional
 from datetime import datetime, timedelta, date
 from app import models, schemas, database
 from app.auth import get_current_user
@@ -13,6 +13,33 @@ router = APIRouter(
     prefix="/admin/reservations",
     tags=["reservations"]
 )
+
+
+def _send_booking_confirmation_email_task(
+    email: str,
+    client_name: str,
+    bath_name: str,
+    start_datetime: datetime,
+    end_datetime: datetime,
+    guests: int,
+    total_cost: float,
+    products: Optional[List[dict]] = None,
+    notes: Optional[str] = None,
+) -> None:
+    try:
+        send_booking_confirmation_email(
+            email=email,
+            client_name=client_name,
+            bath_name=bath_name,
+            start_datetime=start_datetime,
+            end_datetime=end_datetime,
+            guests=guests,
+            total_cost=total_cost,
+            products=products,
+            notes=notes,
+        )
+    except Exception as e:
+        print(f"Ошибка фоновой отправки email подтверждения брони: {e}")
 
 
 def check_overlap(db: Session, bath_id: int, start: datetime, end: datetime, exclude_id: int = None):
@@ -152,8 +179,7 @@ def create_reservation(
             product = product_map.get(item.product_id)
             if not product:
                 raise HTTPException(status_code=400, detail=f"Товар с ID {item.product_id} не найден")
-            # Проверяем наличие, но НЕ списываем здесь!
-            if product.total_quantity < item.quantity:
+            if product.is_countable and product.total_quantity < item.quantity:
                 raise HTTPException(status_code=400, detail=f"Недостаточно товара {product.name} на складе")
             total_cost += product.price * item.quantity
 
@@ -179,10 +205,10 @@ def create_reservation(
             product = db.query(models.Product).filter(models.Product.id == item.product_id).first()
             if not product:
                 raise HTTPException(status_code=400, detail=f"Товар с ID {item.product_id} не найден")
-            if product.total_quantity < item.quantity:
-                raise HTTPException(status_code=400, detail=f"Недостаточно товара {product.name} на складе")
-            # Списываем товар при создании брони (резервирование)
-            product.total_quantity -= item.quantity
+            if product.is_countable:
+                if product.total_quantity < item.quantity:
+                    raise HTTPException(status_code=400, detail=f"Недостаточно товара {product.name} на складе")
+                product.total_quantity -= item.quantity
             db.add(models.ReservationProduct(
                 reservation_id=db_reservation.reservation_id,
                 product_id=item.product_id,
@@ -208,36 +234,30 @@ def create_reservation(
                     )
                 )
 
-    # === ОТПРАВЛЯЕМ EMAIL ПОДТВЕРЖДЕНИЯ ===
+    # === EMAIL ПОДТВЕРЖДЕНИЯ (фон, не блокирует HTTP-ответ) ===
     if reservation.client_email:
-        try:
-            # Подготавливаем данные о товарах для email
-            products_for_email = []
-            if reservation.products:
-                for item in reservation.products:
-                    product = db.query(models.Product).filter(models.Product.id == item.product_id).first()
-                    if product:
-                        products_for_email.append({
-                            'name': product.name,
-                            'quantity': item.quantity,
-                            'price': product.price
-                        })
-            
-            # Отправляем email
-            send_booking_confirmation_email(
-                email=reservation.client_email,
-                client_name=reservation.client_name,
-                bath_name=bath.name,
-                start_datetime=start_dt,
-                end_datetime=end_dt,
-                guests=reservation.guests,
-                total_cost=total_cost,
-                products=products_for_email,
-                notes=reservation.notes
-            )
-        except Exception as e:
-            print(f"Ошибка при отправке email: {e}")
-            # Не прерываем создание брони, если email не отправился
+        products_for_email = []
+        if reservation.products:
+            for item in reservation.products:
+                product = db.query(models.Product).filter(models.Product.id == item.product_id).first()
+                if product:
+                    products_for_email.append({
+                        'name': product.name,
+                        'quantity': item.quantity,
+                        'price': product.price
+                    })
+        background_tasks.add_task(
+            _send_booking_confirmation_email_task,
+            reservation.client_email,
+            reservation.client_name,
+            bath.name,
+            start_dt,
+            end_dt,
+            reservation.guests,
+            total_cost,
+            products_for_email or None,
+            reservation.notes,
+        )
 
     # Асинхронное логирование создания бронирования с детальной информацией
     # Получить название бани
@@ -492,7 +512,7 @@ def update_reservation(
                             print(f"❌ Product {item.product_id} not found")
                             raise HTTPException(status_code=400, detail=f"Товар с ID {item.product_id} не найден")
                         print(f"Product: {product.name}, Qty: {item.quantity}, Stock: {product.total_quantity}, Price: {product.price}")
-                        if product.total_quantity < item.quantity:
+                        if product.is_countable and product.total_quantity < item.quantity:
                             print(f"❌ Insufficient stock for {product.name}")
                             raise HTTPException(status_code=400, detail=f"Недостаточно товара {product.name} на складе")
                         product_cost = product.price * item.quantity
@@ -515,8 +535,7 @@ def update_reservation(
                 if not product:
                     print(f"❌ Product {item.product_id} not found")
                     raise HTTPException(status_code=400, detail=f"Товар с ID {item.product_id} не найден")
-                # Только проверка наличия, без списания!
-                if product.total_quantity < item.quantity:
+                if product.is_countable and product.total_quantity < item.quantity:
                     print(f"❌ Insufficient stock for {product.name}: {product.total_quantity} < {item.quantity}")
                     raise HTTPException(status_code=400, detail=f"Недостаточно товара {product.name} на складе")
                 db.add(models.ReservationProduct(
@@ -547,38 +566,30 @@ def update_reservation(
                     )
                 )
 
-        # === ОТПРАВЛЯЕМ EMAIL ОБ ИЗМЕНЕНИИ БРОНИ ===
-        # Отправляем только если изменились важные поля и есть email
-        if db_reservation.client_email and (reservation.start_datetime or reservation.end_datetime or 
+        # === EMAIL ОБ ИЗМЕНЕНИИ (фон, не блокирует HTTP-ответ) ===
+        if db_reservation.client_email and (reservation.start_datetime or reservation.end_datetime or
                                              reservation.guests or reservation.products or reservation.bath_id):
-            try:
-                # Получаем название бани
-                bath = db.query(models.Bath).filter(models.Bath.bath_id == db_reservation.bath_id).first()
-                
-                # Подготавливаем данные о товарах для email из базы
-                products_for_email = []
-                for rp in db_reservation.reservation_products:
-                    if rp.product:
-                        products_for_email.append({
-                            'name': rp.product.name,
-                            'quantity': rp.quantity,
-                            'price': rp.product.price
-                        })
-                
-                # Отправляем email об изменении
-                send_booking_confirmation_email(
-                    email=db_reservation.client_email,
-                    client_name=db_reservation.client_name,
-                    bath_name=bath.name if bath else "Не указано",
-                    start_datetime=db_reservation.start_datetime,
-                    end_datetime=db_reservation.end_datetime,
-                    guests=db_reservation.guests,
-                    total_cost=db_reservation.total_cost,
-                    products=products_for_email,
-                    notes=db_reservation.notes
-                )
-            except Exception as e:
-                print(f"Ошибка при отправке email об изменении: {e}")
+            bath_for_email = db.query(models.Bath).filter(models.Bath.bath_id == db_reservation.bath_id).first()
+            products_for_email = []
+            for rp in db_reservation.reservation_products:
+                if rp.product:
+                    products_for_email.append({
+                        'name': rp.product.name,
+                        'quantity': rp.quantity,
+                        'price': rp.product.price
+                    })
+            background_tasks.add_task(
+                _send_booking_confirmation_email_task,
+                db_reservation.client_email,
+                db_reservation.client_name,
+                bath_for_email.name if bath_for_email else "Не указано",
+                db_reservation.start_datetime,
+                db_reservation.end_datetime,
+                db_reservation.guests,
+                db_reservation.total_cost,
+                products_for_email or None,
+                db_reservation.notes,
+            )
 
         status_name = (status_obj or db.query(models.ReservationStatus)
                        .filter(models.ReservationStatus.id == db_reservation.status_id)
@@ -660,10 +671,10 @@ def delete_reservation(
     if not reservation:
         raise HTTPException(status_code=404, detail="Бронь не найдена")
 
-    # === ВОЗВРАТ ТОВАРОВ НА СКЛАД ДО УДАЛЕНИЯ ===
+    # === ВОЗВРАТ ТОВАРОВ НА СКЛАД ДО УДАЛЕНИЯ (только исчисляемые) ===
     for rp in reservation.reservation_products:
         product = db.query(models.Product).filter(models.Product.id == rp.product_id).first()
-        if product:
+        if product and product.is_countable:
             product.total_quantity += rp.quantity
 
     # Теперь можно безопасно удалить

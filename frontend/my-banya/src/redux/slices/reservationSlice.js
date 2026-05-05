@@ -24,7 +24,7 @@ export const reservationApiSlice = createApi({
                 method: 'POST',
                 body,
             }),
-            invalidatesTags: [{ type: 'Reservations', id: 'LIST' }],
+            invalidatesTags: ['Reservations'],
         }),
         updateReservation: builder.mutation({
             query: ({ id, ...body }) => ({
@@ -32,14 +32,14 @@ export const reservationApiSlice = createApi({
                 method: 'PUT',
                 body,
             }),
-            invalidatesTags: [{ type: 'Reservations', id: 'LIST' }],
+            invalidatesTags: ['Reservations'],
         }),
         deleteReservation: builder.mutation({
             query: (id) => ({
                 url: `/admin/reservations/${id}`,
                 method: 'DELETE',
             }),
-            invalidatesTags: [{ type: 'Reservations', id: 'LIST' }],
+            invalidatesTags: ['Reservations'],
         }),
         getReservationStatuses: builder.query({
             query: () => '/admin/reservation-status/',
