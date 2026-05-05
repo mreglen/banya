@@ -238,44 +238,6 @@ function SettingsPage() {
           )}
 
           <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Cleaning Time */}
-            <div>
-              <label htmlFor="cleaningTime" className="block text-sm font-medium text-gray-700 mb-2">
-                Время для уборки (минуты)
-              </label>
-              <p className="text-xs text-gray-500 mb-2">
-                Это время будет отображаться в бронированиях как промежуток между записями для уборки
-              </p>
-              <input
-                type="number"
-                id="cleaningTime"
-                value={cleaningTime}
-                onChange={(e) => setCleaningTime(e.target.value)}
-                min="0"
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                required
-              />
-            </div>
-
-            {/* Booking Interval */}
-            <div>
-              <label htmlFor="bookingInterval" className="block text-sm font-medium text-gray-700 mb-2">
-                Размер промежутка (минуты)
-              </label>
-              <p className="text-xs text-gray-500 mb-2">
-                Промежуток времени для бронирования (сейчас: 30 минут)
-              </p>
-              <input
-                type="number"
-                id="bookingInterval"
-                value={bookingInterval}
-                onChange={(e) => setBookingInterval(e.target.value)}
-                min="0"
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                required
-              />
-            </div>
-
             <div>
               <label htmlFor="markupPercent" className="block text-sm font-medium text-gray-700 mb-2">
                 Наценка на товары (%)

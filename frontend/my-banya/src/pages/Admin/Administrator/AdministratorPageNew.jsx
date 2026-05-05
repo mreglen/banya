@@ -29,6 +29,15 @@ const getActionColor = (action) => {
   }
 };
 
+const getActionLabel = (action) => {
+  switch (action) {
+    case 'CREATE': return 'Создание';
+    case 'UPDATE': return 'Изменение';
+    case 'DELETE': return 'Удаление';
+    default: return action || '-';
+  }
+};
+
 const getEntityTypeName = (entityType) => {
   const names = {
     reservation: 'Бронирование',
@@ -93,9 +102,22 @@ function AdministratorPageNew() {
     }));
   }, []);
 
+  const handleLimitChange = useCallback((value) => {
+    const parsed = Number(value);
+    setFilters(prev => ({
+      ...prev,
+      limit: Number.isFinite(parsed) && parsed > 0 ? parsed : prev.limit,
+      skip: 0,
+    }));
+  }, []);
+
   const handleCloseModal = useCallback(() => {
     setSelectedLog(null);
   }, []);
+
+  const currentPage = Math.floor(filters.skip / filters.limit) + 1;
+  const startRow = filters.skip + 1;
+  const endRow = filters.skip + auditLogs.length;
 
   // 3. Проверка прав ПОСЛЕ всех хуков
   if (!user?.is_admin) {
@@ -169,7 +191,7 @@ function AdministratorPageNew() {
               >
                 <option value="">Все</option>
                 <option value="CREATE">Создание</option>
-                <option value="UPDATE">Обновление</option>
+                <option value="UPDATE">Изменение</option>
                 <option value="DELETE">Удаление</option>
               </select>
             </div>
@@ -211,7 +233,7 @@ function AdministratorPageNew() {
                   <div className="flex items-start justify-between gap-2 mb-2">
                     <span className="text-xs text-gray-500">{formatDate(log.created_at)}</span>
                     <span className={`px-2 py-1 text-xs font-semibold rounded-full ${getActionColor(log.action)}`}>
-                      {log.action}
+                      {getActionLabel(log.action)}
                     </span>
                   </div>
                   <div className="text-sm font-medium text-gray-900 mb-1">
@@ -266,7 +288,7 @@ function AdministratorPageNew() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getActionColor(log.action)}`}>
-                          {log.action}
+                          {getActionLabel(log.action)}
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
@@ -297,6 +319,21 @@ function AdministratorPageNew() {
           {/* Пагинация */}
           {auditLogs.length > 0 && (
             <div className="mt-6 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <label htmlFor="pageLimit" className="text-sm text-gray-700 whitespace-nowrap">
+                  На странице:
+                </label>
+                <select
+                  id="pageLimit"
+                  value={filters.limit}
+                  onChange={(e) => handleLimitChange(e.target.value)}
+                  className="px-2 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                >
+                  <option value={20}>20</option>
+                  <option value={50}>50</option>
+                  <option value={100}>100</option>
+                </select>
+              </div>
               <button
                 onClick={handlePreviousPage}
                 disabled={filters.skip === 0}
@@ -305,7 +342,7 @@ function AdministratorPageNew() {
                 Предыдущая
               </button>
               <span className="text-center text-sm text-gray-700">
-                Показано {auditLogs.length} записей
+                Страница {currentPage}. Записи {startRow}-{endRow}
               </span>
               <button
                 onClick={handleNextPage}

@@ -4,8 +4,8 @@ import { useGetReservationByIdQuery } from '../../../redux/slices/reservationSli
 
 const ORG_INFO = {
   name: 'Николаевские бани',
-  address: 'г. Николаевск, ул. Примерная, д. 1',
-  phone: '+7 (999) 000-00-00',
+  address: 'г. Екатеринбург, ул. Кизеловская 18',
+  phone: '+7 (343) 344-87-55',
   email: 'info@banya.local',
 };
 
@@ -19,6 +19,10 @@ function formatDateTime(value) {
     hour: '2-digit',
     minute: '2-digit',
   });
+}
+
+function formatMoney(value) {
+  return `${(value || 0).toLocaleString('ru-RU')} ₽`;
 }
 
 function ReservationPrintDocument() {
@@ -36,6 +40,8 @@ function ReservationPrintDocument() {
   const extraTotal = productTotal + massagesTotal;
   const totalCost = reservation?.total_cost || 0;
   const bathServiceCost = Math.max(0, totalCost - extraTotal);
+  const hasBonusMinutes = Boolean(reservation?.promotion_snapshot?.bonus_minutes);
+  const hasGiftProducts = (reservation?.promotion_snapshot?.gift_products || []).length > 0;
 
   if (isLoading) return <div className="p-6">Загрузка документа...</div>;
   if (error || !reservation) return <div className="p-6 text-red-600">Не удалось загрузить данные брони.</div>;
@@ -46,21 +52,19 @@ function ReservationPrintDocument() {
         @media print {
           body { background: white !important; }
           .no-print { display: none !important; }
-          .print-sheet {
+          .receipt-sheet {
             box-shadow: none !important;
             border: none !important;
-            margin: 0 !important;
-            width: 100% !important;
-            max-width: 100% !important;
+            margin: 0 auto !important;
           }
           @page {
-            size: A4;
-            margin: 12mm;
+            size: 80mm auto;
+            margin: 4mm;
           }
         }
       `}</style>
 
-      <div className="max-w-4xl mx-auto">
+      <div className="max-w-xl mx-auto">
         <div className="no-print mb-4 flex items-center gap-3">
           <button
             onClick={() => window.print()}
@@ -76,92 +80,119 @@ function ReservationPrintDocument() {
           </button>
         </div>
 
-        <article className="print-sheet bg-white border border-gray-300 rounded-lg shadow-sm p-6 md:p-10 text-sm text-gray-900">
-          <header className="border-b pb-4 mb-6">
-            <h1 className="text-2xl font-bold text-center">АКТ ОКАЗАНИЯ УСЛУГ</h1>
-            <p className="text-center mt-1">по бронированию № {reservation.reservation_id}</p>
+        <article className="receipt-sheet w-full max-w-[320px] mx-auto bg-white border border-gray-300 rounded-lg shadow-sm p-4 text-xs text-gray-900">
+          <header className="text-center border-b border-dashed border-gray-400 pb-3 mb-3">
+            <h1 className="text-base font-bold uppercase">{ORG_INFO.name}</h1>
+            <p className="mt-1">{ORG_INFO.address}</p>
+            <p>{ORG_INFO.phone}</p>
+            <p className="mt-2 font-semibold">КАССОВЫЙ ЧЕК</p>
           </header>
 
-          <section className="mb-5">
-            <h2 className="font-semibold mb-2">1. Исполнитель</h2>
-            <p>{ORG_INFO.name}</p>
-            <p>Адрес: {ORG_INFO.address}</p>
-            <p>Телефон: {ORG_INFO.phone} | Email: {ORG_INFO.email}</p>
+          <section className="space-y-1 mb-3">
+            <div className="flex justify-between gap-3">
+              <span className="text-gray-600">Чек</span>
+              <span>№ {reservation.reservation_id}</span>
+            </div>
+            <div className="flex justify-between gap-3">
+              <span className="text-gray-600">Дата</span>
+              <span>{formatDateTime(new Date().toISOString())}</span>
+            </div>
+            <div className="flex justify-between gap-3">
+              <span className="text-gray-600">Клиент</span>
+              <span className="text-right">{reservation.client_name || '-'}</span>
+            </div>
+            <div className="flex justify-between gap-3">
+              <span className="text-gray-600">Телефон</span>
+              <span>{reservation.client_phone || '-'}</span>
+            </div>
+            <div className="flex justify-between gap-3">
+              <span className="text-gray-600">Баня</span>
+              <span className="text-right">{reservation.bath?.name || '-'}</span>
+            </div>
+            <div className="flex justify-between gap-3">
+              <span className="text-gray-600">Период</span>
+              <span className="text-right">{formatDateTime(reservation.start_datetime)}</span>
+            </div>
+            <div className="flex justify-between gap-3">
+              <span className="text-gray-600"></span>
+              <span className="text-right">{formatDateTime(reservation.end_datetime)}</span>
+            </div>
           </section>
 
-          <section className="mb-5">
-            <h2 className="font-semibold mb-2">2. Заказчик</h2>
-            <p>ФИО: {reservation.client_name || '-'}</p>
-            <p>Телефон: {reservation.client_phone || '-'}</p>
-            <p>Email: {reservation.client_email || '-'}</p>
-          </section>
+          <section className="mb-3">
+            <h2 className="font-semibold border-y border-dashed border-gray-400 py-1 mb-2">Позиции</h2>
 
-          <section className="mb-5">
-            <h2 className="font-semibold mb-2">3. Данные бронирования</h2>
-            <p>Баня: {reservation.bath?.name || '-'}</p>
-            <p>Дата и время: {formatDateTime(reservation.start_datetime)} - {formatDateTime(reservation.end_datetime)}</p>
-            <p>Количество гостей: {reservation.guests || 0}</p>
-            <p>Статус: {reservation.status || '-'}</p>
-          </section>
-
-          <section className="mb-5">
-            <h2 className="font-semibold mb-2">4. Перечень услуг и товаров</h2>
-            <table className="w-full border border-gray-400 border-collapse">
-              <thead>
-                <tr className="bg-gray-100">
-                  <th className="border border-gray-400 p-2 text-left">Наименование</th>
-                  <th className="border border-gray-400 p-2 text-right">Кол-во</th>
-                  <th className="border border-gray-400 p-2 text-right">Цена</th>
-                  <th className="border border-gray-400 p-2 text-right">Сумма</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td className="border border-gray-400 p-2">Услуга бани ({reservation.bath?.name || '-'})</td>
-                  <td className="border border-gray-400 p-2 text-right">1</td>
-                  <td className="border border-gray-400 p-2 text-right">{bathServiceCost.toLocaleString('ru-RU')} ₽</td>
-                  <td className="border border-gray-400 p-2 text-right">{bathServiceCost.toLocaleString('ru-RU')} ₽</td>
-                </tr>
-                {(reservation.massages || []).map((m, idx) => (
-                  <tr key={`massage-${idx}`}>
-                    <td className="border border-gray-400 p-2">Массаж: {m.name}</td>
-                    <td className="border border-gray-400 p-2 text-right">{m.quantity}</td>
-                    <td className="border border-gray-400 p-2 text-right">{(m.cost || 0).toLocaleString('ru-RU')} ₽</td>
-                    <td className="border border-gray-400 p-2 text-right">{((m.cost || 0) * (m.quantity || 0)).toLocaleString('ru-RU')} ₽</td>
-                  </tr>
-                ))}
-                {(reservation.products || []).map((p, idx) => (
-                  <tr key={`product-${idx}`}>
-                    <td className="border border-gray-400 p-2">Товар: {p.name}</td>
-                    <td className="border border-gray-400 p-2 text-right">{p.quantity}</td>
-                    <td className="border border-gray-400 p-2 text-right">{(p.price ?? p.purchase_price ?? 0).toLocaleString('ru-RU')} ₽</td>
-                    <td className="border border-gray-400 p-2 text-right">{((p.price ?? p.purchase_price ?? 0) * (p.quantity || 0)).toLocaleString('ru-RU')} ₽</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </section>
-
-          <section className="mb-8">
-            <h2 className="font-semibold mb-2">5. Итог</h2>
-            <p>Сумма услуг и товаров: {totalCost.toLocaleString('ru-RU')} ₽</p>
-            <p>Скидка/акция: {reservation.promotion_snapshot?.name ? reservation.promotion_snapshot.name : 'Не применялась'}</p>
-            <p className="font-bold mt-1">Итого к оплате: {totalCost.toLocaleString('ru-RU')} ₽</p>
-          </section>
-
-          <section className="pt-6 border-t">
-            <div className="grid grid-cols-2 gap-10">
-              <div>
-                <p className="mb-12">Исполнитель: _____________________</p>
-                <p className="text-xs text-gray-500">{ORG_INFO.name}</p>
-              </div>
-              <div>
-                <p className="mb-12">Заказчик: _____________________</p>
-                <p className="text-xs text-gray-500">{reservation.client_name || 'Клиент'}</p>
+            <div className="py-1 border-b border-dashed border-gray-300">
+              <div className="font-medium">Услуга бани ({reservation.bath?.name || '-'})</div>
+              <div className="flex justify-between text-gray-700">
+                <span>1 x {formatMoney(bathServiceCost)}</span>
+                <span>{formatMoney(bathServiceCost)}</span>
               </div>
             </div>
-            <p className="mt-6 text-xs text-gray-500">
-              Дата формирования документа: {formatDateTime(new Date().toISOString())}
+
+            {(reservation.massages || []).map((m, idx) => (
+              <div key={`massage-${idx}`} className="py-1 border-b border-dashed border-gray-300">
+                <div className="font-medium">Массаж: {m.name}</div>
+                <div className="flex justify-between text-gray-700">
+                  <span>{m.quantity || 0} x {formatMoney(m.cost || 0)}</span>
+                  <span>{formatMoney((m.cost || 0) * (m.quantity || 0))}</span>
+                </div>
+              </div>
+            ))}
+
+            {(reservation.products || []).map((p, idx) => (
+              <div key={`product-${idx}`} className="py-1 border-b border-dashed border-gray-300">
+                <div className="font-medium">Товар: {p.name}</div>
+                <div className="flex justify-between text-gray-700">
+                  <span>{p.quantity || 0} x {formatMoney(p.price ?? p.purchase_price ?? 0)}</span>
+                  <span>{formatMoney((p.price ?? p.purchase_price ?? 0) * (p.quantity || 0))}</span>
+                </div>
+              </div>
+            ))}
+          </section>
+
+          <section className="mb-3 space-y-1">
+            <div className="flex justify-between">
+              <span className="text-gray-700">Гостей</span>
+              <span>{reservation.guests || 0}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-700">Статус</span>
+              <span>{reservation.status || '-'}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-700">Акция</span>
+              <span className="text-right">{reservation.promotion_snapshot?.name || 'Нет'}</span>
+            </div>
+            {hasBonusMinutes && (
+              <div className="flex justify-between text-green-700">
+                <span>Бонусное время</span>
+                <span>+{reservation.promotion_snapshot.bonus_minutes} мин</span>
+              </div>
+            )}
+            {hasGiftProducts && (
+              <div className="pt-1">
+                <div className="text-green-700 font-medium">Подарки:</div>
+                {reservation.promotion_snapshot.gift_products.map((gp, idx) => (
+                  <div key={`gift-${idx}`} className="flex justify-between text-green-700">
+                    <span>{gp.product_name} x {gp.quantity}</span>
+                    <span>0 ₽</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+
+          <section className="border-t border-dashed border-gray-400 pt-2">
+            <div className="flex justify-between font-bold text-sm">
+              <span>ИТОГО К ОПЛАТЕ</span>
+              <span>{formatMoney(totalCost)}</span>
+            </div>
+            <p className="text-center text-[11px] text-gray-600 mt-3">
+              Спасибо за визит!
+            </p>
+            <p className="text-center text-[11px] text-gray-600">
+              {ORG_INFO.email}
             </p>
           </section>
         </article>
