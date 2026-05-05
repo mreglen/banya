@@ -473,14 +473,13 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
       errors.guests = 'Минимум 1 гость';
     }
     
-    // Проверка товаров (количество); неисчисляемые — без проверки поля количества (шлём ≥1 с бэкенда)
+    // Проверка товаров: для неисчисляемых (услуги/массаж) — любое количество ≥1, остаток на складе не смотрим
     formData.selectedProducts.forEach((product) => {
-      if (product.is_countable === false) return;
       const q = product.quantity;
       const qNum = typeof q === 'number' ? q : parseInt(q, 10);
       if (q === '' || q === null || Number.isNaN(qNum) || qNum < 1) {
         errors[`product_${product.id}`] = 'Минимум 1';
-      } else if (qNum > product.available) {
+      } else if (product.is_countable !== false && qNum > product.available) {
         errors[`product_${product.id}`] = `Превышает доступное количество (${product.available})`;
       }
     });
@@ -574,13 +573,10 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
       notes: formData.notes && formData.notes.trim() !== '' ? formData.notes.trim() : null,
       guests: parseInt(formData.guests, 10) || 1,
       status_id: parseInt(formData.status_id) || 1,
-      products: formData.selectedProducts.map((p) => {
-        const raw = parseInt(p.quantity, 10);
-        const q = p.is_countable === false
-          ? Math.max(1, Number.isNaN(raw) ? 1 : raw)
-          : parseInt(p.quantity, 10) || 1;
-        return { product_id: Number(p.id), quantity: q };
-      }),
+      products: formData.selectedProducts.map((p) => ({
+        product_id: Number(p.id),
+        quantity: parseInt(p.quantity, 10) || 1,
+      })),
     };
 
     console.log('🟢 Payload:', payload);
@@ -625,14 +621,10 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
   if (!isOpen) return null;
   const isSubmitting = isCreating || isUpdating;
 
-  const totalProductCost = formData.selectedProducts.reduce((sum, p) => {
-    const raw = parseInt(p.quantity, 10);
-    const q =
-      p.is_countable === false
-        ? Math.max(1, Number.isNaN(raw) ? 1 : raw)
-        : (parseInt(p.quantity, 10) || 0);
-    return sum + q * (p.price ?? p.purchase_price ?? 0);
-  }, 0);
+  const totalProductCost = formData.selectedProducts.reduce(
+    (sum, p) => sum + (parseInt(p.quantity, 10) || 0) * (p.price ?? p.purchase_price ?? 0),
+    0
+  );
 
   const minDateStr = formatLocalYmd(new Date());
   const allTimeSlots = generateTimeOptions();
@@ -1005,41 +997,29 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
                       </div>
                     ) : (
                       <div className="text-xs text-gray-600 mt-1">
-                        Не исчисляемая позиция (например, услуга) — количество без ограничения по остатку
+                        Услуга / неисчисляемая позиция — можно указать несколько штук; остаток на складе не ограничивает
                       </div>
                     )}
                     <div className="flex items-center justify-between mt-2">
-                      {item.is_countable !== false ? (
-                        <div className="flex items-center space-x-2">
-                          <span className="text-sm text-gray-700">Кол-во:</span>
-                          <input
-                            type="text"
-                            inputMode="numeric"
-                            pattern="\d*"
-                            value={item.quantity}
-                            onChange={(e) => updateProductQuantity(item.id, e.target.value)}
-                            className={`w-16 px-2 py-1 border rounded text-sm ${
-                              validationErrors[`product_${item.id}`]
-                                ? 'border-red-500 bg-red-50'
-                                : 'border-gray-300'
-                            }`}
-                          />
-                          <span className="text-sm text-gray-600">{item.unit_name}</span>
-                        </div>
-                      ) : (
-                        <div className="text-sm text-gray-600" />
-                      )}
+                      <div className="flex items-center space-x-2">
+                        <span className="text-sm text-gray-700">Кол-во:</span>
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          pattern="\d*"
+                          value={item.quantity}
+                          onChange={(e) => updateProductQuantity(item.id, e.target.value)}
+                          className={`w-16 px-2 py-1 border rounded text-sm ${
+                            validationErrors[`product_${item.id}`]
+                              ? 'border-red-500 bg-red-50'
+                              : 'border-gray-300'
+                          }`}
+                        />
+                        <span className="text-sm text-gray-600">{item.unit_name}</span>
+                      </div>
                       <div className="text-right">
                         <div className="text-sm font-medium">
-                          {(() => {
-                            const raw = parseInt(item.quantity, 10);
-                            const q =
-                              item.is_countable === false
-                                ? Math.max(1, Number.isNaN(raw) ? 1 : raw)
-                                : (parseInt(item.quantity, 10) || 0);
-                            return (q * (item.price ?? item.purchase_price ?? 0)).toFixed(2);
-                          })()}{' '}
-                          ₽
+                          {((parseInt(item.quantity, 10) || 0) * (item.price ?? item.purchase_price ?? 0)).toFixed(2)} ₽
                         </div>
                         {/* Показывать ошибку валидации */}
                         {validationErrors[`product_${item.id}`] && (
