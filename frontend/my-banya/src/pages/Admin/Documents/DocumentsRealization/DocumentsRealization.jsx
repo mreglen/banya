@@ -69,6 +69,7 @@ function DocumentsRealization() {
                             <tr>
                                 <th className="px-6 py-4 text-left text-sm font-medium text-gray-700 uppercase">№</th>
                                 <th className="px-6 py-4 text-left text-sm font-medium text-gray-700 uppercase">ФИО клиента</th>
+                                <th className="px-6 py-4 text-left text-sm font-medium text-gray-700 uppercase">Баня</th>
                                 <th className="px-6 py-4 text-left text-sm font-medium text-gray-700 uppercase">Дата</th>
                                 <th className="px-6 py-4 text-left text-sm font-medium text-gray-700 uppercase">Цена</th>
                                 <th className="px-6 py-4 text-left text-sm font-medium text-gray-700 uppercase">Статус</th>
@@ -85,6 +86,7 @@ function DocumentsRealization() {
                                     >
                                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{doc.id}</td>
                                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{doc.client_name}</td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{doc.bath_name || '—'}</td>
                                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                                             {formatDate(doc.date)}
                                         </td>
@@ -118,7 +120,7 @@ function DocumentsRealization() {
                                 ))
                             ) : (
                                 <tr>
-                                    <td colSpan="6" className="px-6 py-12 text-center text-gray-500 text-lg">
+                                    <td colSpan="7" className="px-6 py-12 text-center text-gray-500 text-lg">
                                         Нет документов реализации
                                     </td>
                                 </tr>
@@ -139,6 +141,7 @@ function DocumentsRealization() {
                                 <div className="font-bold text-gray-900 text-lg mb-1">#{doc.id}</div>
                                 <div className="text-sm text-gray-600 mb-2">
                                     <div>👤 {doc.client_name || '—'}</div>
+                                    <div>🛁 {doc.bath_name || '—'}</div>
                                     <div>📅 {formatDate(doc.date)}</div>
                                     <div>💰 {formatPrice(doc.total_amount)}</div>
                                 </div>

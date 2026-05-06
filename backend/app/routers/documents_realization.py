@@ -10,12 +10,16 @@ router = APIRouter(prefix="/admin/documents/realization", tags=["Documents - Rea
 
 @router.get("/", response_model=List[RealizationDocumentRead])
 def get_realization_documents(db: Session = Depends(get_db)):
-    return db.query(RealizationDocument)\
+    docs = db.query(RealizationDocument)\
              .options(
                  joinedload(RealizationDocument.items)
-                 .joinedload(RealizationDocumentItem.product)
+                 .joinedload(RealizationDocumentItem.product),
+                 joinedload(RealizationDocument.bath)
              )\
              .all()
+    for doc in docs:
+        doc.bath_name = doc.bath.name if doc.bath else None
+    return docs
 
 
 @router.get("/{doc_id}", response_model=RealizationDocumentRead)
@@ -23,12 +27,14 @@ def get_realization_document(doc_id: int, db: Session = Depends(get_db)):
     doc = db.query(RealizationDocument)\
              .options(
                  joinedload(RealizationDocument.items)
-                 .joinedload(RealizationDocumentItem.product)
+                 .joinedload(RealizationDocumentItem.product),
+                 joinedload(RealizationDocument.bath)
              )\
              .filter(RealizationDocument.id == doc_id)\
              .first()
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
+    doc.bath_name = doc.bath.name if doc.bath else None
     return doc
 
 

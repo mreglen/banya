@@ -213,6 +213,28 @@ function AdminReservationsNew() {
     refetchReservations();
   }, [refetchReservations]);
 
+  const handleCreateBookingSuccess = useCallback((createdReservation) => {
+    setSelectedBooking(null);
+    setEditingBooking(null);
+    setIsAddModalOpen(false);
+
+    const createdDate =
+      createdReservation?.selected_date ||
+      (createdReservation?.start_datetime
+        ? formatLocalYmd(new Date(createdReservation.start_datetime))
+        : null);
+    if (createdDate) {
+      setFilters((prev) => ({ ...prev, date: createdDate }));
+    }
+
+    const createdBathId = createdReservation?.selected_bath_id ?? createdReservation?.bath_id;
+    if (createdBathId != null) {
+      setActiveBathId(createdBathId);
+    }
+
+    refetchReservations();
+  }, [refetchReservations]);
+
   const handleSetActiveBath = useCallback((bathId) => {
     setActiveBathId(bathId);
   }, []);
@@ -613,6 +635,7 @@ function AdminReservationsNew() {
         onClose={handleCloseAllModals}
         booking={editingBooking}
         selectedDate={filters.date}
+        onCreateSuccess={handleCreateBookingSuccess}
       />
     </div>
   );  

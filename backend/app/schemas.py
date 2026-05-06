@@ -627,6 +627,8 @@ class RealizationDocumentBase(BaseModel):
 
 class RealizationDocumentRead(RealizationDocumentBase):
     id: int
+    bath_id: Optional[int] = None
+    bath_name: Optional[str] = None
     items: List[RealizationDocumentItemRead] = []
     
     class Config:

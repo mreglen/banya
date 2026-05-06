@@ -1,7 +1,7 @@
 // src/pages/Admin/Reservations/BookingDetailsModal.jsx
 
 import { useState, useEffect } from 'react';
-import { useDispatch } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import { useGetBathsQuery } from '../../../redux/slices/apiSlice';
 import { useGetUnitsOfMeasurementQuery } from '../../../redux/slices/productsApiSlice';
 import { useGetReservationStatusesQuery, useUpdateReservationMutation, reservationApiSlice } from '../../../redux/slices/reservationSlice';
@@ -16,10 +16,12 @@ const formatLocalYmd = (date) => {
 
 function BookingDetailsModal({ booking, onClose, onDelete }) {
   const dispatch = useDispatch();
+  const currentUser = useSelector((state) => state.auth?.user);
   const [isEditing, setIsEditing] = useState(false);
   const [isNotesExpanded, setIsNotesExpanded] = useState(false);
   const [selectedStatusId, setSelectedStatusId] = useState(null);
   const [isSavingStatus, setIsSavingStatus] = useState(false);
+  const [statusError, setStatusError] = useState(null);
   
   const { data: baths = [] } = useGetBathsQuery();
   const { data: units = [] } = useGetUnitsOfMeasurementQuery();
@@ -30,6 +32,7 @@ function BookingDetailsModal({ booking, onClose, onDelete }) {
   useEffect(() => {
     setIsEditing(false);
     setIsNotesExpanded(false);
+    setStatusError(null);
   }, [booking]);
 
   // Устанавливаем текущий статус при загрузке статусов
@@ -82,10 +85,16 @@ function BookingDetailsModal({ booking, onClose, onDelete }) {
     onClose(); // или можно обновить данные и остаться в просмотре
   };
 
+  // Бронь закрыта и пользователь не имеет прав для отката статуса
+  const isClosed = booking.status === 'закрыт';
+  const canRevertClosed = !!(currentUser?.is_admin || currentUser?.is_director);
+  const lockStatus = isClosed && !canRevertClosed;
+
   // 💾 Обработка изменения статуса с cache invalidation
   const handleStatusChange = async (e) => {
     const newStatusId = parseInt(e.target.value, 10);
     setSelectedStatusId(newStatusId);
+    setStatusError(null);
     
     try {
       setIsSavingStatus(true);
@@ -101,6 +110,20 @@ function BookingDetailsModal({ booking, onClose, onDelete }) {
       // Возвращаем предыдущий статус при ошибке
       const currentStatus = statusOptions.find(s => s.status_name === booking.status);
       setSelectedStatusId(currentStatus ? currentStatus.id : null);
+
+      const httpStatus = error?.status ?? error?.originalStatus;
+      const detail = error?.data?.detail;
+      if (httpStatus === 403) {
+        setStatusError(
+          typeof detail === 'string' && detail
+            ? detail
+            : 'Только администратор или директор может вернуть закрытую бронь в работу'
+        );
+      } else if (typeof detail === 'string' && detail) {
+        setStatusError(detail);
+      } else {
+        setStatusError('Не удалось обновить статус. Попробуйте ещё раз.');
+      }
     } finally {
       setIsSavingStatus(false);
     }
@@ -203,26 +226,39 @@ function BookingDetailsModal({ booking, onClose, onDelete }) {
               </div>
             )}
             
-            <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-              <strong>Статус:</strong>
-              <select
-                value={selectedStatusId || ''}
-                onChange={handleStatusChange}
-                disabled={isSavingStatus}
-                className={`w-full sm:w-auto sm:min-w-[220px] px-3 py-2 rounded-lg border text-sm font-medium transition-colors ${
-                  isSavingStatus
-                    ? 'bg-gray-100 text-gray-500 cursor-not-allowed'
-                    : 'bg-white border-gray-300 hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 cursor-pointer'
-                }`}
-              >
-                {statusOptions.map((status) => (
-                  <option key={status.id} value={status.id}>
-                    {status.status_name}
-                  </option>
-                ))}
-              </select>
-              {isSavingStatus && (
-                <span className="ml-2 text-xs text-gray-500">Сохранение...</span>
+            <div className="flex flex-col gap-2">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                <strong>Статус:</strong>
+                <select
+                  value={selectedStatusId || ''}
+                  onChange={handleStatusChange}
+                  disabled={isSavingStatus || lockStatus}
+                  title={lockStatus ? 'Изменить статус закрытой брони может только администратор или директор' : undefined}
+                  className={`w-full sm:w-auto sm:min-w-[220px] px-3 py-2 rounded-lg border text-sm font-medium transition-colors ${
+                    isSavingStatus || lockStatus
+                      ? 'bg-gray-100 text-gray-500 cursor-not-allowed'
+                      : 'bg-white border-gray-300 hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 cursor-pointer'
+                  }`}
+                >
+                  {statusOptions.map((status) => (
+                    <option key={status.id} value={status.id}>
+                      {status.status_name}
+                    </option>
+                  ))}
+                </select>
+                {isSavingStatus && (
+                  <span className="ml-2 text-xs text-gray-500">Сохранение...</span>
+                )}
+              </div>
+              {lockStatus && (
+                <p className="text-xs text-gray-500">
+                  Бронь закрыта. Изменить статус может только администратор или директор.
+                </p>
+              )}
+              {statusError && (
+                <p className="text-xs text-red-600 flex items-center gap-1">
+                  <span>⚠</span> {statusError}
+                </p>
               )}
             </div>
             

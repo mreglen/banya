@@ -1,5 +1,6 @@
 import { createPortal } from 'react-dom';
 import { useEffect, useState, useRef, useCallback } from 'react';
+import { useSelector } from 'react-redux';
 import {
   useGetBathsQuery,
 } from '../../../redux/slices/apiSlice';
@@ -11,6 +12,7 @@ import {
   useCreateReservationMutation,
   useUpdateReservationMutation,
   useGetReservationStatusesQuery,
+  useGetReservationsByDateQuery,
 } from '../../../redux/slices/reservationSlice';
 
 import ProductSelectionModal from '../../Admin/Documents/DocumentsEntrance/ProductSelectionModal';
@@ -97,9 +99,13 @@ const normalizeGuestsDigits = (raw) => {
   return digits.replace(/^0+/, '') || '';
 };
 
-function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess }) {
+function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess, onCreateSuccess }) {
   const isEditing = !!booking;
   const today = formatLocalYmd(new Date());
+  const currentUser = useSelector((state) => state.auth?.user);
+  const isClosedBooking = isEditing && booking?.status === 'закрыт';
+  const canRevertClosed = !!(currentUser?.is_admin || currentUser?.is_director);
+  const lockStatus = isClosedBooking && !canRevertClosed;
   const [updateReservation, { isLoading: isUpdating }] = useUpdateReservationMutation();
   const [createReservation, { isLoading: isCreating }] = useCreateReservationMutation();
 
@@ -123,7 +129,7 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
     client_phone: '',
     client_email: '',
     notes: '',
-    guests: '1',
+    guests: '',
     status_id: 1,
     selectedProducts: [],
   });
@@ -132,6 +138,7 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
   const [validationErrors, setValidationErrors] = useState({});
   const [toast, setToast] = useState(null);
   const prevIsOpenRef = useRef(false);
+  const dateInputRef = useRef(null);
   /** Чтобы при редактировании не сбрасывать форму при догрузке stock/units */
   const editFormHydratedForRef = useRef(null);
 
@@ -143,6 +150,11 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
     isLoading: isLoadingStatuses,
     error: statusesError
   } = useGetReservationStatusesQuery();
+  const selectedBathIdNum = formData.bath_id ? Number(formData.bath_id) : null;
+  const { data: reservationsForDate = [] } = useGetReservationsByDateQuery(
+    { date: formData.date, bathId: selectedBathIdNum },
+    { skip: !isOpen || !formData.date || !selectedBathIdNum }
+  );
 
   const findUnitName = useCallback((unitId) => {
     if (!unitId) return 'шт.';
@@ -184,11 +196,21 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
       client_phone: '',
       client_email: '',
       notes: '',
-      guests: '1',
+      guests: '',
       status_id: 1,
       selectedProducts: [],
     }));
   }, [isOpen, isEditing, selectedDate]);
+
+  // Закрытие модалки по клавише Escape
+  useEffect(() => {
+    if (!isOpen) return undefined;
+    const handleEsc = (e) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', handleEsc);
+    return () => document.removeEventListener('keydown', handleEsc);
+  }, [isOpen, onClose]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -270,9 +292,41 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
     }
   }, [formData.date, formData.start_time]);
 
+  // Если после выбора бани/даты текущее время стало недоступным — ставим ближайшее доступное
+  useEffect(() => {
+    if (!formData.bath_id) return;
+    const allSlots = generateTimeOptions();
+    const minHm = formData.date === formatLocalYmd(new Date()) ? getFirstAllowedStartTime(formData.date) : '00:00';
+    const validSlots = allSlots.filter((time) => {
+      if (time < minHm) return false;
+      const slotStart = new Date(`${formData.date}T${time}:00`);
+      const isBusy = reservationsForDate.some((res) => {
+        if (!res?.start_datetime || !res?.end_datetime) return false;
+        if (isEditing && Number(res.reservation_id) === Number(booking?.reservation_id)) return false;
+        const start = new Date(res.start_datetime);
+        const end = new Date(res.end_datetime);
+        return slotStart >= start && slotStart < end;
+      });
+      return !isBusy;
+    });
+
+    if (validSlots.length === 0) return;
+    if (!validSlots.includes(formData.start_time)) {
+      setFormData((prev) => ({ ...prev, start_time: validSlots[0] }));
+    }
+  }, [formData.bath_id, formData.date, formData.start_time, reservationsForDate, isEditing, booking]);
+
   const handleOverlayClick = (e) => {
     if (e.target === e.currentTarget) {
       onClose();
+    }
+  };
+
+  const openDatePicker = () => {
+    if (!dateInputRef.current) return;
+    dateInputRef.current.focus();
+    if (typeof dateInputRef.current.showPicker === 'function') {
+      dateInputRef.current.showPicker();
     }
   };
 
@@ -563,6 +617,14 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
       }
     }
 
+    // Если бронь закрыта и у пользователя нет прав на откат — оставляем исходный status_id,
+    // чтобы исключить случайную попытку смены статуса (бэкенд всё равно вернёт 403)
+    const originalStatusId =
+      booking?.status?.id ?? booking?.status_id ?? formData.status_id;
+    const submitStatusId = lockStatus
+      ? parseInt(originalStatusId, 10) || 1
+      : parseInt(formData.status_id, 10) || 1;
+
     const payload = {
       bath_id: parseInt(formData.bath_id),
       start_datetime,
@@ -572,7 +634,7 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
       client_email: formData.client_email && formData.client_email.trim() !== '' ? formData.client_email.trim() : null,
       notes: formData.notes && formData.notes.trim() !== '' ? formData.notes.trim() : null,
       guests: parseInt(formData.guests, 10) || 1,
-      status_id: parseInt(formData.status_id) || 1,
+      status_id: submitStatusId,
       products: formData.selectedProducts.map((p) => ({
         product_id: Number(p.id),
         quantity: parseInt(p.quantity, 10) || 1,
@@ -597,10 +659,20 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
           onClose();
         }
       } else {
-        await createReservation(payload).unwrap();
+        const createdReservation = await createReservation(payload).unwrap();
         console.log('✅ Reservation created successfully');
         showToast('Бронь успешно создана', 'success');
-        setTimeout(() => onClose(), 1000); // Закрыть через 1 секунду
+        setTimeout(() => {
+          if (onCreateSuccess) {
+            onCreateSuccess({
+              ...createdReservation,
+              selected_date: formData.date,
+              selected_bath_id: Number(formData.bath_id),
+            });
+          } else {
+            onClose();
+          }
+        }, 400);
       }
     } catch (error) {
       console.error('❌ Error:', error);
@@ -629,12 +701,28 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
   const minDateStr = formatLocalYmd(new Date());
   const allTimeSlots = generateTimeOptions();
   const minStartHmForToday = getFirstAllowedStartTime(formData.date);
+  const busyStartTimes = new Set(
+    (reservationsForDate || [])
+      .filter((res) => {
+        if (!res?.start_datetime || !res?.end_datetime) return false;
+        if (isEditing && Number(res.reservation_id) === Number(booking?.reservation_id)) return false;
+        return true;
+      })
+      .flatMap((res) => {
+        const start = new Date(res.start_datetime);
+        const end = new Date(res.end_datetime);
+        return allTimeSlots.filter((time) => {
+          const slotStart = new Date(`${formData.date}T${time}:00`);
+          return slotStart >= start && slotStart < end;
+        });
+      })
+  );
   let startTimeOptions =
     formData.date === minDateStr
       ? allTimeSlots.filter((t) => t >= minStartHmForToday)
       : allTimeSlots;
-  if (startTimeOptions.length === 0) {
-    startTimeOptions = ['00:00'];
+  if (formData.bath_id) {
+    startTimeOptions = startTimeOptions.filter((t) => !busyStartTimes.has(t));
   }
 
   const durationHint = calculateDurationHint();
@@ -654,7 +742,8 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
           </h2>
           <button
             onClick={onClose}
-            className="absolute top-4 right-4 sm:top-6 sm:right-6 text-gray-500 hover:text-gray-700 text-2xl"
+            className="absolute top-3 right-3 sm:top-5 sm:right-5 w-11 h-11 sm:w-12 sm:h-12 rounded-full text-gray-500 hover:text-gray-700 hover:bg-gray-200 text-3xl sm:text-4xl leading-none flex items-center justify-center transition-colors"
+            aria-label="Закрыть модалку"
           >
             ×
           </button>
@@ -675,22 +764,32 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
                 Ошибка загрузки статусов
               </div>
             ) : (
-              <select
-                value={formData.status_id}
-                onChange={handleStatusChange}
-                className="w-full px-3 py-2.5 sm:px-4 sm:py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 text-sm sm:text-base"
-                disabled={isLoadingStatuses}
-              >
-                {statusOptions.length === 0 ? (
-                  <option>Нет статусов</option>
-                ) : (
-                  statusOptions.map((status) => (
-                    <option key={status.id} value={status.id}>
-                      {status.status_name}
-                    </option>
-                  ))
+              <>
+                <select
+                  value={formData.status_id}
+                  onChange={handleStatusChange}
+                  className={`w-full px-3 py-2.5 sm:px-4 sm:py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 text-sm sm:text-base ${
+                    lockStatus ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : ''
+                  }`}
+                  disabled={isLoadingStatuses || lockStatus}
+                  title={lockStatus ? 'Изменить статус закрытой брони может только администратор или директор' : undefined}
+                >
+                  {statusOptions.length === 0 ? (
+                    <option>Нет статусов</option>
+                  ) : (
+                    statusOptions.map((status) => (
+                      <option key={status.id} value={status.id}>
+                        {status.status_name}
+                      </option>
+                    ))
+                  )}
+                </select>
+                {lockStatus && (
+                  <p className="mt-1 text-xs text-gray-500">
+                    Бронь закрыта. Изменить статус может только администратор или директор.
+                  </p>
                 )}
-              </select>
+              </>
             )}
           </div>
 
@@ -732,9 +831,21 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
 
           {/* Дата и время */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-            <div>
+            <div
+              className="cursor-pointer"
+              onClick={openDatePicker}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  openDatePicker();
+                }
+              }}
+              role="button"
+              tabIndex={0}
+            >
               <label className="block text-sm font-medium text-gray-700 mb-2">Дата начала *</label>
               <input
+                ref={dateInputRef}
                 type="date"
                 value={formData.date}
                 min={minDateStr}
@@ -770,13 +881,18 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
                     ? 'border-red-500 focus:ring-red-500 bg-red-50'
                     : 'border-gray-300 focus:ring-blue-500'
                 }`}
+                disabled={formData.bath_id && startTimeOptions.length === 0}
                 required
               >
-                {startTimeOptions.map((time) => (
-                  <option key={time} value={time}>
-                    {time}
-                  </option>
-                ))}
+                {startTimeOptions.length > 0 ? (
+                  startTimeOptions.map((time) => (
+                    <option key={time} value={time}>
+                      {time}
+                    </option>
+                  ))
+                ) : (
+                  <option value="">Нет свободного времени</option>
+                )}
               </select>
               {validationErrors.start_time && (
                 <p className="mt-1 text-xs text-red-600 flex items-center gap-1">
@@ -873,6 +989,7 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
                 inputMode="numeric"
                 autoComplete="off"
                 pattern="[0-9]*"
+                placeholder="Например, 4"
                 value={formData.guests}
                 onChange={handleGuestsChange}
                 className={`w-full max-w-[120px] px-3 py-2.5 sm:px-4 sm:py-3 border rounded-xl focus:ring-2 text-sm ${

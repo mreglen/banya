@@ -386,11 +386,13 @@ class RealizationDocument(Base):
     id = Column(Integer, primary_key=True, index=True)
     date = Column(Date, nullable=False, default=date.today)
     reservation_id = Column(Integer, ForeignKey("reservations.reservation_id"), nullable=False)
+    bath_id = Column(Integer, ForeignKey("baths.bath_id"), nullable=True)
     client_name = Column(String(100), nullable=False)
     client_phone = Column(String(20), nullable=False)
     total_amount = Column(Float, nullable=False, default=0.0)
 
     reservation = relationship("Reservation")
+    bath = relationship("Bath")
     items = relationship("RealizationDocumentItem", back_populates="document", cascade="all, delete-orphan")
 
 

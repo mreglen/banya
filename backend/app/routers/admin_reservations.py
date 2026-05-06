@@ -398,6 +398,29 @@ def update_reservation(
             if not status_obj:
                 print(f"❌ Status {reservation.status_id} not found")
                 raise HTTPException(status_code=400, detail=f"Статус с ID {reservation.status_id} не найден")
+
+            # Проверяем откат из статуса "закрыт": разрешено только админам и директорам
+            if reservation.status_id != old_status_id:
+                old_status_obj = db.query(models.ReservationStatus).filter(
+                    models.ReservationStatus.id == old_status_id
+                ).first()
+                old_status_name = old_status_obj.status_name if old_status_obj else None
+                if old_status_name == "закрыт":
+                    if not (current_user.is_admin or current_user.is_director):
+                        print(f"❌ User {current_user.user_id} cannot revert closed reservation {id}")
+                        raise HTTPException(
+                            status_code=403,
+                            detail="Только администратор или директор может вернуть закрытую бронь в работу"
+                        )
+                    # Удаляем связанные документы реализации (склад не трогаем —
+                    # товары уже были списаны при создании брони и должны остаться списанными)
+                    docs = db.query(models.RealizationDocument).filter(
+                        models.RealizationDocument.reservation_id == id
+                    ).all()
+                    for d in docs:
+                        db.delete(d)
+                    print(f"✅ Deleted {len(docs)} realization document(s) on revert from 'закрыт'")
+
             db_reservation.status_id = reservation.status_id
             print(f"Updated status_id = {reservation.status_id}")
 
@@ -416,6 +439,7 @@ def update_reservation(
             realization_doc = models.RealizationDocument(
                 date=date.today(),
                 reservation_id=id,
+                bath_id=db_reservation.bath_id,
                 client_name=db_reservation.client_name,
                 client_phone=db_reservation.client_phone,
                 total_amount=db_reservation.total_cost

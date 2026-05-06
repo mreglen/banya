@@ -173,6 +173,25 @@ with engine.begin() as connection:
             """
         )
     )
+    connection.execute(
+        text(
+            """
+            ALTER TABLE realization_documents
+            ADD COLUMN IF NOT EXISTS bath_id INTEGER
+            """
+        )
+    )
+    connection.execute(
+        text(
+            """
+            UPDATE realization_documents rd
+            SET bath_id = r.bath_id
+            FROM reservations r
+            WHERE rd.reservation_id = r.reservation_id
+              AND rd.bath_id IS NULL
+            """
+        )
+    )
 
 app = FastAPI(title='Бани')
 

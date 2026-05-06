@@ -43,6 +43,11 @@ function RealizationDetailsModal({ isOpen, onClose, reservation }) {
             <strong className="text-gray-600">Бронь №:</strong>
             <p className="mt-1 text-gray-900">{reservation.reservation_id}</p>
           </div>
+
+          <div>
+            <strong className="text-gray-600">Баня:</strong>
+            <p className="mt-1 text-gray-900">{reservation.bath_name || '—'}</p>
+          </div>
           
           <div className="pt-4 border-t border-gray-200">
             <strong className="text-gray-600">Итого:</strong>
