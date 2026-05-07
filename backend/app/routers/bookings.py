@@ -2,12 +2,56 @@
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import List
 
 from app import models, schemas, database
 
 router = APIRouter(prefix="/bookings", tags=["bookings"])
+
+
+@router.get("/availability")
+def get_booking_availability(
+    date: str,
+    bath_id: int,
+    days: int = 2,
+    db: Session = Depends(database.get_db)
+):
+    try:
+        start_date = datetime.strptime(date, "%Y-%m-%d")
+    except ValueError:
+        raise HTTPException(
+            status_code=400,
+            detail="Неверный формат даты. Используйте YYYY-MM-DD"
+        )
+
+    if days < 1 or days > 3:
+        raise HTTPException(status_code=400, detail="Параметр days должен быть от 1 до 3")
+
+    end_date = start_date + timedelta(days=days)
+
+    reservations = (
+        db.query(models.Reservation)
+        .filter(
+            models.Reservation.bath_id == bath_id,
+            models.Reservation.start_datetime < end_date,
+            models.Reservation.end_datetime > start_date,
+        )
+        .all()
+    )
+
+    return {
+        "bath_id": bath_id,
+        "date": date,
+        "days": days,
+        "occupied": [
+            {
+                "start_datetime": r.start_datetime.isoformat(),
+                "end_datetime": r.end_datetime.isoformat(),
+            }
+            for r in reservations
+        ],
+    }
 
 @router.post("/", response_model=schemas.BookingOut)
 def create_booking(booking: schemas.BookingCreate, db: Session = Depends(database.get_db)):

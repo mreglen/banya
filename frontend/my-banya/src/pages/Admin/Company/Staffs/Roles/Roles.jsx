@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   useGetRolesQuery,
   useCreateRoleMutation,
@@ -9,6 +10,7 @@ import {
 import ActionDropdown from '../../../../../components/UI/ActionDropdown/ActionDropdown';
 
 function Roles() {
+  const navigate = useNavigate();
   const { data: roles = [], isLoading } = useGetRolesQuery();
   const { data: permissions = [] } = useGetNewPermissionsQuery();
   const [createRole] = useCreateRoleMutation();
@@ -142,6 +144,13 @@ function Roles() {
   return (
     <div className="min-h-screen bg-gray-50 p-4 md:p-8">
       <div className="max-w-7xl mx-auto">
+        <button
+          type="button"
+          onClick={() => navigate('/admin/administrator')}
+          className="mb-4 px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition"
+        >
+          Вернуться
+        </button>
         <div className="mb-6 flex items-center justify-between">
           <div>
             <h1 className="text-2xl md:text-3xl font-bold text-gray-800">Роли</h1>
@@ -155,7 +164,7 @@ function Roles() {
           </button>
         </div>
 
-        <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
+        <div className="bg-white rounded-2xl shadow-lg overflow-visible">
           {isLoading ? (
             <div className="p-6 text-gray-500">Загрузка...</div>
           ) : roles.length === 0 ? (
@@ -178,7 +187,7 @@ function Roles() {
                   >
                     <td className="px-6 py-4 text-sm font-medium text-gray-800">{role.name}</td>
                     <td className="px-6 py-4 text-sm text-gray-600">{(role.permissions || []).length}</td>
-                    <td className="px-6 py-4 text-right">
+                    <td className="px-6 py-4 text-right relative overflow-visible">
                       <ActionDropdown
                         actions={[
                           {

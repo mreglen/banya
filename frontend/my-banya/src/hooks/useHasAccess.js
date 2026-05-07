@@ -10,8 +10,10 @@ export function useHasAccess() {
   
   return (permission) => {
     if (!user) return false;
-    // Admin has access to everything
-    if (user.is_admin) return true;
+    // administrator:* permissions are admin-only
+    if (permission?.startsWith('administrator:')) return !!user.is_admin;
+    // Admin and director have access to all other permissions
+    if (user.is_admin || user.is_director) return true;
     // Check if user has the specific permission
     if (!user.permissions) return false;
     return user.permissions.some((p) => (typeof p === 'string' ? p === permission : p.code === permission));

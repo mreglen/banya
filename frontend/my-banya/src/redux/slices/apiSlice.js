@@ -150,6 +150,10 @@ export const apiSlice = createApi({
       }),
       invalidatesTags: [{ type: 'Bookings', id: 'LIST' }],
     }),
+    getBookingAvailability: builder.query({
+      query: ({ date, bath_id, days = 2 }) =>
+        `/bookings/availability?date=${encodeURIComponent(date)}&bath_id=${bath_id}&days=${days}`,
+    }),
 
     // ========================
     // 👥 ПАРТНЁРЫ
@@ -359,6 +363,7 @@ export const {
   useGetBookingsQuery,
   useMarkBookingAsReadMutation,
   useCreateBookingMutation,
+  useGetBookingAvailabilityQuery,
 
   useGetPartnersQuery,
   useGetPartnerByIdQuery,

@@ -16,7 +16,10 @@ def check_permission(user, required_permission_code: str):
     """Проверяет, есть ли у пользователя нужное право"""
     if not user:
         return False
-    if getattr(user, "is_admin", False):
+    if required_permission_code and required_permission_code.startswith("administrator:"):
+        return bool(getattr(user, "is_admin", False))
+
+    if getattr(user, "is_admin", False) or getattr(user, "is_director", False):
         return True
 
     permissions = getattr(user, "permissions", None)

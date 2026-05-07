@@ -1,7 +1,11 @@
 // src/pages/Booking/Booking.jsx
 
-import { useState } from 'react';
-import { useCreateBookingMutation, useGetBathsQuery } from '../../redux/slices/apiSlice';
+import { useMemo, useState } from 'react';
+import {
+  useCreateBookingMutation,
+  useGetBathsQuery,
+  useGetBookingAvailabilityQuery,
+} from '../../redux/slices/apiSlice';
 
 function Booking() {
   const [createBooking, { isLoading, isError, error }] = useCreateBookingMutation();
@@ -9,7 +13,6 @@ function Booking() {
 
   const [formData, setFormData] = useState({
     date: '',
-    duration_hours: 1,
     bath_id: '',
     guests: 1,
     name: '',
@@ -17,11 +20,52 @@ function Booking() {
     email: '',
     notes: '',
   });
+  const [selectedStartSlot, setSelectedStartSlot] = useState(null);
+  const [selectedEndSlot, setSelectedEndSlot] = useState(null);
 
   const [errors, setErrors] = useState({});
   const [showSuccess, setShowSuccess] = useState(false);
 
   const MAX_NOTES_LENGTH = 300;
+
+  const { data: availabilityData } = useGetBookingAvailabilityQuery(
+    {
+      date: formData.date,
+      bath_id: Number(formData.bath_id),
+      days: 2,
+    },
+    {
+      skip: !formData.date || !formData.bath_id,
+    }
+  );
+
+  const occupiedIntervals = useMemo(
+    () =>
+      (availabilityData?.occupied || []).map((item) => ({
+        start: new Date(item.start_datetime),
+        end: new Date(item.end_datetime),
+      })),
+    [availabilityData]
+  );
+
+  const timeSlots = useMemo(() => {
+    if (!formData.date) return [];
+    const slots = [];
+    const start = new Date(`${formData.date}T00:00:00`);
+    for (let i = 0; i < 48; i += 1) {
+      const slotStart = new Date(start.getTime() + i * 60 * 60 * 1000);
+      const slotEnd = new Date(slotStart.getTime() + 60 * 60 * 1000);
+      const occupied = occupiedIntervals.some((interval) => slotStart < interval.end && slotEnd > interval.start);
+      slots.push({ slotStart, slotEnd, occupied });
+    }
+    return slots;
+  }, [formData.date, occupiedIntervals]);
+
+  const selectedDurationHours = useMemo(() => {
+    if (!selectedStartSlot || !selectedEndSlot) return 0;
+    const diff = (selectedEndSlot.slotStart - selectedStartSlot.slotStart) / (1000 * 60 * 60);
+    return diff > 0 ? diff : 0;
+  }, [selectedStartSlot, selectedEndSlot]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -37,6 +81,10 @@ function Booking() {
       }
       
       setFormData((prev) => ({ ...prev, [name]: value }));
+      if (name === 'bath_id' || name === 'date') {
+        setSelectedStartSlot(null);
+        setSelectedEndSlot(null);
+      }
     }
     if (errors[name]) {
       setErrors((prev) => {
@@ -83,10 +131,47 @@ function Booking() {
     return formatted;
   };
 
+  const formatSlotLabel = (date) => {
+    const day = date.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' });
+    const time = date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+    return `${day} ${time}`;
+  };
+
+  const handleSlotClick = (slot) => {
+    if (slot.occupied) return;
+    if (!selectedStartSlot || (selectedStartSlot && selectedEndSlot)) {
+      setSelectedStartSlot(slot);
+      setSelectedEndSlot(null);
+      return;
+    }
+    if (slot.slotStart <= selectedStartSlot.slotStart) {
+      setSelectedStartSlot(slot);
+      setSelectedEndSlot(null);
+      return;
+    }
+    const rangeSlots = timeSlots.filter(
+      (s) => s.slotStart >= selectedStartSlot.slotStart && s.slotStart < slot.slotStart
+    );
+    const hasOccupiedInside = rangeSlots.some((s) => s.occupied);
+    if (hasOccupiedInside) {
+      setErrors((prev) => ({ ...prev, time_range: 'Выбранный интервал содержит занятые часы' }));
+      return;
+    }
+    setErrors((prev) => {
+      const newErrors = { ...prev };
+      delete newErrors.time_range;
+      return newErrors;
+    });
+    setSelectedEndSlot(slot);
+  };
+
   const validate = () => {
     const newErrors = {};
     if (!formData.date) newErrors.date = 'Укажите дату';
     if (!formData.bath_id) newErrors.bath_id = 'Выберите баню';
+    if (!selectedStartSlot || !selectedEndSlot || selectedDurationHours < 1) {
+      newErrors.time_range = 'Выберите время заезда и время выезда';
+    }
     if (!formData.guests || formData.guests < 1) newErrors.guests = 'Укажите количество гостей';
     if (!formData.name?.trim()) newErrors.name = 'Введите имя';
     if (!formData.phone?.trim()) newErrors.phone = 'Введите телефон';
@@ -117,12 +202,13 @@ function Booking() {
 
       await createBooking({
         ...formData,
+        date: selectedStartSlot.slotStart.toISOString().slice(0, 10),
+        duration_hours: Math.round(selectedDurationHours),
         phone: normalizedPhone,
       }).unwrap();
       setShowSuccess(true);
       setFormData({
         date: '',
-        duration_hours: 1,
         bath_id: '',
         guests: 1,
         name: '',
@@ -130,6 +216,8 @@ function Booking() {
         email: '',
         notes: '',
       });
+      setSelectedStartSlot(null);
+      setSelectedEndSlot(null);
       setTimeout(() => setShowSuccess(false), 3000);
     } catch (err) {
       console.error('Ошибка отправки заявки:', err);
@@ -178,41 +266,6 @@ function Booking() {
               </div>
             )}
 
-            {/* Дата и часы */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <label htmlFor="date" className="block text-sm font-medium text-gray-700 mb-2">
-                  Дата посещения
-                </label>
-                <input
-                  type="date"
-                  id="date"
-                  name="date"
-                  value={formData.date}
-                  onChange={handleChange}
-                  className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-green-500 ${
-                    errors.date ? 'border-red-500' : 'border-gray-300'
-                  }`}
-                />
-                {errors.date && <p className="text-red-500 text-sm mt-1">{errors.date}</p>}
-              </div>
-              <div>
-                <label htmlFor="duration_hours" className="block text-sm font-medium text-gray-700 mb-2">
-                  Продолжительность (в часах)
-                </label>
-                <input
-                  type="number"
-                  id="duration_hours"
-                  name="duration_hours"
-                  min="1"
-                  max="12"
-                  value={formData.duration_hours}
-                  onChange={handleChange}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500"
-                />
-              </div>
-            </div>
-
             {/* Выбор бани */}
             <div>
               <label htmlFor="bath_id" className="block text-sm font-medium text-gray-700 mb-2">
@@ -240,6 +293,72 @@ function Booking() {
                 )}
               </select>
               {errors.bath_id && <p className="text-red-500 text-sm mt-1">{errors.bath_id}</p>}
+            </div>
+
+            {/* Дата и интервал */}
+            <div className="grid grid-cols-1 gap-6">
+              <div>
+                <label htmlFor="date" className="block text-sm font-medium text-gray-700 mb-2">
+                  Дата посещения
+                </label>
+                <input
+                  type="date"
+                  id="date"
+                  name="date"
+                  value={formData.date}
+                  onChange={handleChange}
+                  className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-green-500 ${
+                    errors.date ? 'border-red-500' : 'border-gray-300'
+                  }`}
+                />
+                {errors.date && <p className="text-red-500 text-sm mt-1">{errors.date}</p>}
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Время (1-й клик заезд, 2-й клик выезд)
+              </label>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2 max-h-72 overflow-y-auto border border-gray-200 rounded-xl p-3">
+                {timeSlots.map((slot) => {
+                  const isStart = selectedStartSlot?.slotStart.getTime() === slot.slotStart.getTime();
+                  const isEnd = selectedEndSlot?.slotStart.getTime() === slot.slotStart.getTime();
+                  const inRange =
+                    selectedStartSlot &&
+                    selectedEndSlot &&
+                    slot.slotStart >= selectedStartSlot.slotStart &&
+                    slot.slotStart < selectedEndSlot.slotStart;
+
+                  return (
+                    <button
+                      key={slot.slotStart.toISOString()}
+                      type="button"
+                      onClick={() => handleSlotClick(slot)}
+                      disabled={slot.occupied}
+                      className={`px-2 py-2 rounded-lg text-xs md:text-sm border transition ${
+                        slot.occupied
+                          ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
+                          : isStart || isEnd
+                            ? 'bg-green-600 text-white border-green-600'
+                            : inRange
+                              ? 'bg-green-100 text-green-800 border-green-200'
+                              : 'bg-white text-gray-700 border-gray-300 hover:bg-green-50'
+                      }`}
+                      title={formatSlotLabel(slot.slotStart)}
+                    >
+                      {slot.slotStart.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}
+                    </button>
+                  );
+                })}
+              </div>
+              {(errors.time_range || errors.time_range) && (
+                <p className="text-red-500 text-sm mt-1">{errors.time_range}</p>
+              )}
+              {selectedStartSlot && selectedEndSlot && (
+                <p className="text-sm text-gray-600 mt-2">
+                  Заезд: <b>{formatSlotLabel(selectedStartSlot.slotStart)}</b> | Выезд: <b>{formatSlotLabel(selectedEndSlot.slotStart)}</b> | Длительность: <b>{Math.round(selectedDurationHours)} ч.</b>
+                </p>
+              )}
             </div>
 
             {/* Гости */}

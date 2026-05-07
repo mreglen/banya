@@ -12,6 +12,21 @@ function RoleBasedRoute({ children, requiredPermission }) {
 
   // Проверяем, есть ли у пользователя нужное право
   if (requiredPermission) {
+    // Раздел администратора доступен только системному админу
+    if (requiredPermission.startsWith('administrator:') && !user.is_admin) {
+      return (
+        <div className="p-8 text-red-600">
+          <h2 className="text-xl font-bold">Доступ запрещён</h2>
+          <p>Раздел администратора доступен только администратору системы.</p>
+        </div>
+      );
+    }
+
+    // Админ и директор имеют все остальные права
+    if (user.is_admin || user.is_director) {
+      return children;
+    }
+
     const hasPermission = user.permissions?.some(
       p => p.code === requiredPermission
     );

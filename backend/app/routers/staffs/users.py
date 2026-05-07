@@ -51,11 +51,16 @@ def create_user(
     if db.query(User).filter(User.phone == normalized_phone).first():
         raise HTTPException(status_code=400, detail="Пользователь с таким телефоном уже существует")
 
-    db_role = None
     if user_data.role_id is not None:
         db_role = db.query(Role).filter(Role.id == user_data.role_id).first()
         if not db_role:
             raise HTTPException(status_code=400, detail="Роль не найдена")
+
+    if user_data.role_id is None and not (user_data.is_admin or user_data.is_director):
+        raise HTTPException(
+            status_code=400,
+            detail="Для сотрудника без супердоступа роль обязательна"
+        )
 
     # Хеширование пароля
     hashed_password = hash_password(user_data.password)
@@ -131,6 +136,12 @@ def update_user(
             setattr(db_user, "phone", normalized)
         elif key != "password" and key != "role_id":
             setattr(db_user, key, value)
+
+    if db_user.role_id is None and not (db_user.is_admin or db_user.is_director):
+        raise HTTPException(
+            status_code=400,
+            detail="Для сотрудника без супердоступа роль обязательна"
+        )
 
     db.commit()
     db.refresh(db_user)

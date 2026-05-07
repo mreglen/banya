@@ -40,6 +40,7 @@ function UserForm() {
 
   const [showPassword, setShowPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
+  const roleRequired = !form.is_admin && !form.is_director;
 
   // Загрузка данных при редактировании
   useEffect(() => {
@@ -111,6 +112,10 @@ function UserForm() {
 
     if (!full_name || !email || !phone) {
       alert('Пожалуйста, заполните обязательные поля: ФИО, email и телефон.');
+      return;
+    }
+    if (roleRequired && !form.role_id) {
+      alert('Для сотрудника без супердоступа обязательно выберите роль.');
       return;
     }
 
@@ -372,8 +377,9 @@ function UserForm() {
               value={form.role_id}
               onChange={handleChange}
               className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500"
+              required={roleRequired}
             >
-              <option value="">Без роли</option>
+              <option value="">{roleRequired ? 'Выберите роль' : 'Без роли'}</option>
               {roles.map((role) => (
                 <option key={role.id} value={role.id}>
                   {role.name}
@@ -381,7 +387,9 @@ function UserForm() {
               ))}
             </select>
             <p className="text-xs text-gray-500 mt-1">
-              Права доступа назначаются через роль.
+              {roleRequired
+                ? 'Права доступа назначаются через роль.'
+                : 'Для администратора или директора роль можно не назначать.'}
             </p>
           </div>
 

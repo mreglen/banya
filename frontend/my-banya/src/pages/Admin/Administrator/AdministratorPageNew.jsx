@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { useSelector } from 'react-redux';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useNavigate } from 'react-router-dom';
 import { useGetAuditLogsQuery, useGetUsersQuery } from '../../../redux/slices/apiSlice';
 import AuditLogDetailsModal from './AuditLogDetailsModal';
 
@@ -69,6 +69,7 @@ const INITIAL_FILTERS = {
 function AdministratorPageNew() {
   // 1. Сначала ВСЕ хуки (до любых условий)
   const { user } = useSelector((state) => state.auth);
+  const navigate = useNavigate();
   const { data: users = [] } = useGetUsersQuery();
   
   const [filters, setFilters] = useState(INITIAL_FILTERS);
@@ -128,6 +129,13 @@ function AdministratorPageNew() {
   return (
     <div className="min-h-screen bg-gray-50 p-3 sm:p-4 md:p-8">
       <div className="max-w-7xl mx-auto">
+        <button
+          type="button"
+          onClick={() => navigate('/admin/administrator')}
+          className="mb-4 px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition"
+        >
+          Вернуться
+        </button>
         <h1 className="text-2xl md:text-3xl font-bold text-gray-800 mb-4 md:mb-8">
           Журнал аудита
         </h1>

@@ -1,13 +1,18 @@
 // src/pages/Admin/Bookings/AdminBookings.jsx
 
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useGetBookingsQuery, useMarkBookingAsReadMutation } from '../../../redux/slices/apiSlice';
 import AdminBookingsSkeleton from './AdminBookingsSkeleton';
+import AddBookingModal from '../Reservations/AddBookingModal';
 
 function AdminBookings() {
+  const navigate = useNavigate();
   const [markAsRead] = useMarkBookingAsReadMutation();
   const [expandedNotes, setExpandedNotes] = useState(new Set());
   const [showReadBookings, setShowReadBookings] = useState(false);
+  const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
+  const [bookingToConfirm, setBookingToConfirm] = useState(null);
 
   const { data: bookings = [], isLoading, error } = useGetBookingsQuery();
   const unreadBookings = bookings.filter((booking) => !booking.is_read);
@@ -109,6 +114,15 @@ function AdminBookings() {
         </div>
         <div className="flex items-center gap-2 mt-3 md:mt-0">
           <button
+            onClick={() => {
+              setBookingToConfirm(booking);
+              setIsConfirmModalOpen(true);
+            }}
+            className="w-full md:w-auto px-4 py-2 rounded-lg text-xs md:text-sm font-medium transition min-h-[44px] bg-blue-100 text-blue-700 hover:bg-blue-200"
+          >
+            Подтвердить бронь
+          </button>
+          <button
             onClick={() => handleMarkAsRead(booking.booking_id)}
             disabled={booking.is_read}
             className={`w-full md:w-auto px-4 py-2 rounded-lg text-xs md:text-sm font-medium transition min-h-[44px] ${
@@ -166,6 +180,36 @@ function AdminBookings() {
           )}
         </div>
       </div>
+
+      {isConfirmModalOpen && bookingToConfirm && (
+        <AddBookingModal
+          isOpen={isConfirmModalOpen}
+          onClose={() => {
+            setIsConfirmModalOpen(false);
+            setBookingToConfirm(null);
+          }}
+          selectedDate={bookingToConfirm.date}
+          prefillData={{
+            bath_id: bookingToConfirm.bath_id,
+            date: bookingToConfirm.date,
+            start_time: '12:00',
+            duration_hours: bookingToConfirm.duration_hours || 1,
+            client_name: bookingToConfirm.name,
+            client_phone: bookingToConfirm.phone,
+            client_email: bookingToConfirm.email,
+            notes: bookingToConfirm.notes,
+            guests: bookingToConfirm.guests || 1,
+          }}
+          onCreateSuccess={async (createdReservation) => {
+            await handleMarkAsRead(bookingToConfirm.booking_id);
+            setIsConfirmModalOpen(false);
+            setBookingToConfirm(null);
+            navigate('/admin/reservations', {
+              state: { selectedDate: createdReservation?.selected_date || bookingToConfirm.date },
+            });
+          }}
+        />
+      )}
     </div>
   );
 }

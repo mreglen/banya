@@ -99,7 +99,7 @@ const normalizeGuestsDigits = (raw) => {
   return digits.replace(/^0+/, '') || '';
 };
 
-function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess, onCreateSuccess }) {
+function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess, onCreateSuccess, prefillData = null }) {
   const isEditing = !!booking;
   const today = formatLocalYmd(new Date());
   const currentUser = useSelector((state) => state.auth?.user);
@@ -209,6 +209,23 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
       selectedProducts: [],
     }));
   }, [isOpen, isEditing, selectedDate]);
+
+  useEffect(() => {
+    if (!isOpen || isEditing || !prefillData) return;
+    setFormData((prev) => ({
+      ...prev,
+      bath_id: prefillData.bath_id ? String(prefillData.bath_id) : prev.bath_id,
+      date: prefillData.date || prev.date,
+      start_time: prefillData.start_time || prev.start_time,
+      duration_hours: prefillData.duration_hours || prev.duration_hours,
+      client_name: prefillData.client_name || prev.client_name,
+      client_phone: prefillData.client_phone || prev.client_phone,
+      client_email: prefillData.client_email || prev.client_email,
+      notes: prefillData.notes || prev.notes,
+      guests: prefillData.guests ? String(prefillData.guests) : prev.guests,
+      selectedProducts: [],
+    }));
+  }, [isOpen, isEditing, prefillData]);
 
   // Закрытие модалки по клавише Escape
   useEffect(() => {

@@ -1,4 +1,5 @@
 import { useState, useMemo, useCallback } from 'react';
+import { useLocation } from 'react-router-dom';
 import ReservationsFilters from '../Reservations/ReservationsFilters';
 import BookingDetailsModal from '../Reservations/BookingDetailsModal';
 import AddBookingModal from '../Reservations/AddBookingModal';
@@ -62,8 +63,11 @@ const parseLocalYmd = (ymd) => {
 
 function AdminReservationsNew() {
   // 1. Все хуки в начале
+  const location = useLocation();
   const today = useMemo(() => getTodayDate(), []);
-  const [filters, setFilters] = useState(INITIAL_FILTERS);
+  const [filters, setFilters] = useState({
+    date: location.state?.selectedDate || INITIAL_FILTERS.date,
+  });
   const [selectedBooking, setSelectedBooking] = useState(null);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingBooking, setEditingBooking] = useState(null);
