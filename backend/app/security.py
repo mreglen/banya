@@ -14,9 +14,18 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 
 def check_permission(user, required_permission_code: str):
     """Проверяет, есть ли у пользователя нужное право"""
-    if not user or not hasattr(user, 'permissions'):
+    if not user:
         return False
-    return any(p.code == required_permission_code for p in user.permissions)
+    if getattr(user, "is_admin", False):
+        return True
+
+    permissions = getattr(user, "permissions", None)
+    if permissions is None and getattr(user, "role_rel", None):
+        permissions = getattr(user.role_rel, "permissions", [])
+
+    if not permissions:
+        return False
+    return any(p.code == required_permission_code for p in permissions)
 
 
 def require_permission(permission_code: str):

@@ -78,6 +78,7 @@ function Users() {
                 <th className="px-6 py-4 text-left text-sm font-medium text-gray-700 uppercase tracking-wider">ФИО</th>
                 <th className="px-6 py-4 text-left text-sm font-medium text-gray-700 uppercase tracking-wider">Email</th>
                 <th className="px-6 py-4 text-left text-sm font-medium text-gray-700 uppercase tracking-wider">Телефон</th>
+                <th className="px-6 py-4 text-left text-sm font-medium text-gray-700 uppercase tracking-wider">Роль</th>
                 <th className="px-6 py-4 text-left text-sm font-medium text-gray-700 uppercase tracking-wider">Статус</th>
                 <th className="px-6 py-4 text-left text-sm font-medium text-gray-700 uppercase tracking-wider">Дата рождения</th>
                 <th className="px-6 py-4 text-right text-sm font-medium text-gray-700 uppercase tracking-wider">Действия</th>
@@ -99,6 +100,9 @@ function Users() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
                       {user.phone || '—'}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                      {user.role_rel?.name || '—'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm">
                       <div className="flex flex-wrap gap-1">
@@ -156,7 +160,7 @@ function Users() {
                 ))
               ) : (
                 <tr>
-                  <td colSpan="6" className="px-6 py-12 text-center text-gray-500 text-lg">
+                  <td colSpan="7" className="px-6 py-12 text-center text-gray-500 text-lg">
                     Пользователи не найдены. Добавьте первого!
                   </td>
                 </tr>
@@ -190,6 +194,9 @@ function Users() {
                     </div>
                   )}
                   <div className="flex flex-wrap gap-1">
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-700">
+                      Роль: {user.role_rel?.name || '—'}
+                    </span>
                     {user.is_admin && (
                       <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
                         <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">

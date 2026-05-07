@@ -8,7 +8,7 @@ import {
   useDeleteBathPhotoMutation,
 } from '../../../redux/slices/apiSlice';
 import { useGetPromotionsQuery } from '../../../redux/slices/promotionsApiSlice';
-import { prepareImageForUpload, MAX_IMAGE_SIZE_MB } from '../../../utils/imageProcessing';
+import { prepareImageForUpload } from '../../../utils/imageProcessing';
 
 const MAX_FILES = 5;
 
@@ -33,6 +33,7 @@ function BathForm() {
     title: '',
     cost_weekday: '',
     cost_weekend: '',
+    min_booking_hours: 1,
     description: '',
     base_guests: 4,
     extra_guest_price: 500,
@@ -51,6 +52,7 @@ function BathForm() {
         title: bath.title,
         cost_weekday: bath.cost_weekday,
         cost_weekend: bath.cost_weekend,
+        min_booking_hours: bath.min_booking_hours || 1,
         description: bath.description || '',
         base_guests: bath.base_guests || 4,
         extra_guest_price: bath.extra_guest_price || 500,
@@ -74,6 +76,10 @@ function BathForm() {
       alert('Пожалуйста, заполните все обязательные поля');
       return;
     }
+    if (!formData.min_booking_hours || Number(formData.min_booking_hours) < 1) {
+      alert('Минимальное количество часов должно быть не меньше 1');
+      return;
+    }
 
     setIsSaving(true);
     setUploadProgress(0);
@@ -89,6 +95,7 @@ function BathForm() {
           title: formData.title,
           cost_weekday: Number(formData.cost_weekday),
           cost_weekend: Number(formData.cost_weekend),
+          min_booking_hours: Number(formData.min_booking_hours),
           description: formData.description || null,
           base_guests: Number(formData.base_guests),
           extra_guest_price: Number(formData.extra_guest_price),
@@ -101,6 +108,7 @@ function BathForm() {
           title: formData.title,
           cost_weekday: Number(formData.cost_weekday),
           cost_weekend: Number(formData.cost_weekend),
+          min_booking_hours: Number(formData.min_booking_hours),
           description: formData.description || null,
           base_guests: Number(formData.base_guests),
           extra_guest_price: Number(formData.extra_guest_price),
@@ -302,6 +310,22 @@ function BathForm() {
                 required
               />
             </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Минимум часов для брони *
+              </label>
+              <input
+                type="number"
+                min="1"
+                step="1"
+                value={formData.min_booking_hours}
+                onChange={(e) => setFormData({ ...formData, min_booking_hours: Number(e.target.value) })}
+                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500"
+                placeholder="1"
+                required
+              />
+            </div>
           </div>
 
           <div>
@@ -354,7 +378,7 @@ function BathForm() {
           {/* Загрузка фото */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Загрузить фото (до 5 шт., макс. {MAX_IMAGE_SIZE_MB} МБ каждое)
+              Загрузить фото (до 5 шт.)
             </label>
             <input
               type="file"

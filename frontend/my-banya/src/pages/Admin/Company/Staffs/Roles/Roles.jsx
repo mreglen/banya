@@ -1,211 +1,300 @@
-// src/components/Roles.jsx (или ваш путь)
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   useGetRolesQuery,
   useCreateRoleMutation,
   useUpdateRoleMutation,
   useDeleteRoleMutation,
+  useGetNewPermissionsQuery,
 } from '../../../../../redux/slices/apiSlice';
 import ActionDropdown from '../../../../../components/UI/ActionDropdown/ActionDropdown';
 
-function Roles({ isOpen, onClose }) {
-  const { data: roles = [], isLoading, refetch } = useGetRolesQuery();
+function Roles() {
+  const { data: roles = [], isLoading } = useGetRolesQuery();
+  const { data: permissions = [] } = useGetNewPermissionsQuery();
   const [createRole] = useCreateRoleMutation();
   const [updateRole] = useUpdateRoleMutation();
   const [deleteRole] = useDeleteRoleMutation();
 
-  const [newRoleName, setNewRoleName] = useState('');
-  const [editId, setEditId] = useState(null);
-  const [editName, setEditName] = useState('');
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editingRole, setEditingRole] = useState(null);
+  const [roleName, setRoleName] = useState('');
+  const [selectedPermissionIds, setSelectedPermissionIds] = useState([]);
   const [deleteConfirmId, setDeleteConfirmId] = useState(null);
   const [error, setError] = useState('');
 
-  const validateName = (name) => {
-    if (!name?.trim()) {
+  const getActionKey = (permission) => {
+    if (permission.code?.includes(':')) return permission.code.split(':')[1];
+    if (permission.code?.includes('_')) return permission.code.split('_').pop();
+    return permission.code || permission.name || '';
+  };
+
+  const getCategoryName = (category) => {
+    const names = {
+      reservations: 'Бронирования',
+      bookings: 'Заявки с сайта',
+      baths: 'Бани',
+      storage: 'Склад',
+      clients: 'Клиенты',
+      partners: 'Партнёры',
+      staff: 'Сотрудники',
+      documents: 'Документы',
+      promotions: 'Акции',
+      administrator: 'Администрирование',
+    };
+    return names[category] || category;
+  };
+
+  const getActionName = (action) => {
+    const names = {
+      view: 'Просмотр',
+      create: 'Создание',
+      edit: 'Редактирование',
+      update: 'Редактирование',
+      delete: 'Удаление',
+      manage: 'Управление',
+      roles: 'Роли',
+      audit: 'Аудит',
+    };
+    return names[action] || action;
+  };
+
+  const permissionsGrid = useMemo(() => {
+    const pages = [];
+    const pagesSet = new Set();
+    const actions = [];
+    const actionsSet = new Set();
+    const matrix = {};
+
+    permissions.forEach((permission) => {
+      if (permission.category === 'clients') return;
+      const page = permission.category || 'other';
+      const action = getActionKey(permission);
+      if (!pagesSet.has(page)) {
+        pagesSet.add(page);
+        pages.push(page);
+      }
+      if (!actionsSet.has(action)) {
+        actionsSet.add(action);
+        actions.push(action);
+      }
+      if (!matrix[page]) matrix[page] = {};
+      if (!matrix[page][action]) matrix[page][action] = [];
+      matrix[page][action].push(permission);
+    });
+
+    return { pages, actions, matrix };
+  }, [permissions]);
+
+  const openCreateModal = () => {
+    setEditingRole(null);
+    setRoleName('');
+    setSelectedPermissionIds([]);
+    setError('');
+    setModalOpen(true);
+  };
+
+  const openEditModal = (role) => {
+    setEditingRole(role);
+    setRoleName(role.name || '');
+    setSelectedPermissionIds((role.permissions || []).map((p) => p.id));
+    setError('');
+    setModalOpen(true);
+  };
+
+  const togglePermission = (permissionId, checked) => {
+    setSelectedPermissionIds((prev) => {
+      if (checked) return prev.includes(permissionId) ? prev : [...prev, permissionId];
+      return prev.filter((id) => id !== permissionId);
+    });
+  };
+
+  const handleSaveRole = async () => {
+    if (!roleName.trim()) {
       setError('Имя роли обязательно');
-      return false;
+      return;
     }
-    return true;
-  };
-
-  const handleCreateRole = async (e) => {
-    e.preventDefault();
-    if (!validateName(newRoleName)) return;
-
     try {
-      await createRole({ name: newRoleName.trim() }).unwrap();
-      setNewRoleName('');
-      setError('');
+      const payload = { name: roleName.trim(), permission_ids: selectedPermissionIds };
+      if (editingRole) {
+        await updateRole({ id: editingRole.id, ...payload }).unwrap();
+      } else {
+        await createRole(payload).unwrap();
+      }
+      setModalOpen(false);
+      setEditingRole(null);
+      setRoleName('');
+      setSelectedPermissionIds([]);
     } catch (err) {
-      setError(err?.data?.detail || 'Не удалось создать роль');
+      setError(err?.data?.detail || 'Не удалось сохранить роль');
     }
-  };
-
-  const handleEditStart = (role) => {
-    setEditId(role.id);
-    setEditName(role.name);
-    setError('');
-  };
-
-  const handleEditCancel = () => {
-    setEditId(null);
-    setEditName('');
-    setError('');
-  };
-
-  const handleEditSave = async () => {
-    if (!validateName(editName)) return;
-    try {
-      await updateRole({ id: editId, name: editName.trim() }).unwrap();
-      setEditId(null);
-      setEditName('');
-    } catch (err) {
-      setError(err?.data?.detail || 'Не удалось обновить роль');
-    }
-  };
-
-  const handleDeleteClick = (id) => {
-    setDeleteConfirmId(id);
   };
 
   const handleDeleteConfirm = async () => {
     try {
       await deleteRole(deleteConfirmId).unwrap();
       setDeleteConfirmId(null);
-      refetch(); // обновить список после удаления
     } catch (err) {
       alert(err?.data?.detail || 'Не удалось удалить роль');
       setDeleteConfirmId(null);
     }
   };
 
-  const handleDeleteCancel = () => {
-    setDeleteConfirmId(null);
-  };
-
-  if (!isOpen) return null;
-
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-md max-h-[80vh] overflow-y-auto">
-        <h2 className="text-xl font-bold text-gray-800 mb-4">Управление ролями</h2>
-
-        {/* Форма добавления */}
-        <form onSubmit={handleCreateRole} className="mb-6 p-4 bg-blue-50 rounded-lg">
-          <h3 className="font-medium text-gray-800 mb-3">Добавить новую роль</h3>
+    <div className="min-h-screen bg-gray-50 p-4 md:p-8">
+      <div className="max-w-7xl mx-auto">
+        <div className="mb-6 flex items-center justify-between">
           <div>
-            <label className="block text-sm text-gray-700 mb-1">
-              Название роли
-            </label>
-            <input
-              type="text"
-              value={newRoleName}
-              onChange={(e) => setNewRoleName(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded"
-              placeholder="Менеджер склада"
-              required
-            />
+            <h1 className="text-2xl md:text-3xl font-bold text-gray-800">Роли</h1>
+            <p className="text-gray-600 mt-1">Назначение ролей и прав доступа</p>
           </div>
-          {error && !editId && <p className="text-red-600 text-sm mt-2">{error}</p>}
           <button
-            type="submit"
-            className="mt-3 bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 text-sm"
+            onClick={openCreateModal}
+            className="bg-blue-600 text-white px-5 py-2.5 rounded-xl font-medium hover:bg-blue-700 transition"
           >
             Добавить роль
           </button>
-        </form>
-
-        {/* Список ролей */}
-        <div>
-          <h3 className="font-medium text-gray-800 mb-3">Существующие роли</h3>
-          {isLoading ? (
-            <p className="text-gray-500">Загрузка...</p>
-          ) : roles.length === 0 ? (
-            <p className="text-gray-500">Нет ролей</p>
-          ) : (
-            <ul className="space-y-3">
-              {roles.map((role) => (
-                <li
-                  key={role.id}
-                  className="p-3 border border-gray-200 rounded bg-gray-50 flex items-center justify-between"
-                >
-                  {editId === role.id ? (
-                    <div className="flex-1 mr-2">
-                      <input
-                        type="text"
-                        value={editName}
-                        onChange={(e) => setEditName(e.target.value)}
-                        className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
-                        autoFocus
-                      />
-                      {error && editId === role.id && (
-                        <p className="text-red-600 text-xs mt-1">{error}</p>
-                      )}
-                    </div>
-                  ) : (
-                    <span className="text-gray-800 text-sm">{role.name}</span>
-                  )}
-
-                  <ActionDropdown
-                    actions={
-                      editId === role.id
-                        ? [
-                            {
-                              label: 'Сохранить',
-                              icon: '✅',
-                              color: 'green',
-                              onClick: handleEditSave,
-                            },
-                            {
-                              label: 'Отмена',
-                              icon: '❌',
-                              color: 'gray',
-                              onClick: handleEditCancel,
-                            },
-                          ]
-                        : [
-                            {
-                              label: 'Редактировать',
-                              icon: '✏️',
-                              color: 'blue',
-                              onClick: () => handleEditStart(role),
-                            },
-                            {
-                              label: 'Удалить',
-                              icon: '🗑️',
-                              color: 'red',
-                              onClick: () => handleDeleteClick(role.id),
-                            },
-                          ]
-                    }
-                  />
-                </li>
-              ))}
-            </ul>
-          )}
         </div>
 
-        <div className="flex justify-end mt-6">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 bg-gray-300 text-gray-800 rounded hover:bg-gray-400 text-sm"
-          >
-            Закрыть
-          </button>
+        <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
+          {isLoading ? (
+            <div className="p-6 text-gray-500">Загрузка...</div>
+          ) : roles.length === 0 ? (
+            <div className="p-6 text-gray-500">Роли не найдены</div>
+          ) : (
+            <table className="w-full">
+              <thead className="bg-gray-50 border-b border-gray-200">
+                <tr>
+                  <th className="px-6 py-4 text-left text-sm font-medium text-gray-700 uppercase">Название роли</th>
+                  <th className="px-6 py-4 text-left text-sm font-medium text-gray-700 uppercase">Количество прав</th>
+                  <th className="px-6 py-4 text-right text-sm font-medium text-gray-700 uppercase">Действия</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {roles.map((role) => (
+                  <tr
+                    key={role.id}
+                    className="hover:bg-gray-50 cursor-pointer"
+                    onDoubleClick={() => openEditModal(role)}
+                  >
+                    <td className="px-6 py-4 text-sm font-medium text-gray-800">{role.name}</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">{(role.permissions || []).length}</td>
+                    <td className="px-6 py-4 text-right">
+                      <ActionDropdown
+                        actions={[
+                          {
+                            label: 'Редактировать',
+                            icon: '✏️',
+                            color: 'blue',
+                            onClick: () => openEditModal(role),
+                          },
+                          {
+                            label: 'Удалить',
+                            icon: '🗑️',
+                            color: 'red',
+                            onClick: () => setDeleteConfirmId(role.id),
+                          },
+                        ]}
+                      />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
         </div>
       </div>
 
-      {/* Модалка подтверждения удаления */}
+      {modalOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-6xl max-h-[85vh] overflow-hidden">
+            <div className="flex items-center justify-between p-6 border-b border-gray-200">
+              <h2 className="text-xl font-bold text-gray-800">
+                {editingRole ? 'Редактировать роль' : 'Новая роль'}
+              </h2>
+              <button onClick={() => setModalOpen(false)} className="text-gray-500 text-2xl leading-none">×</button>
+            </div>
+            <div className="p-6 overflow-y-auto max-h-[65vh] space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Название роли</label>
+                <input
+                  value={roleName}
+                  onChange={(e) => setRoleName(e.target.value)}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-xl"
+                  placeholder="Например: Менеджер"
+                />
+              </div>
+              <div className="overflow-x-auto border border-gray-200 rounded-xl">
+                <table className="min-w-[720px] w-full">
+                  <thead className="bg-gray-50 border-b border-gray-200">
+                    <tr>
+                      <th className="text-left px-4 py-3 text-sm font-semibold text-gray-700 sticky left-0 bg-gray-50 z-10 border-r border-gray-200">Страница</th>
+                      {permissionsGrid.actions.map((action) => (
+                        <th key={action} className="px-4 py-3 text-sm font-semibold text-gray-700 text-center whitespace-nowrap">
+                          {getActionName(action)}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {permissionsGrid.pages.map((page) => (
+                      <tr key={page} className="border-b border-gray-100 last:border-b-0">
+                        <td className="px-4 py-3 text-sm font-medium text-gray-800 sticky left-0 bg-white z-10 border-r border-gray-200">
+                          {getCategoryName(page)}
+                        </td>
+                        {permissionsGrid.actions.map((action) => {
+                          const cellPermissions = permissionsGrid.matrix[page]?.[action] || [];
+                          return (
+                            <td key={`${page}-${action}`} className="px-4 py-3 text-center">
+                              {cellPermissions.length > 0 ? (
+                                <input
+                                  type="checkbox"
+                                  checked={cellPermissions.every((perm) => selectedPermissionIds.includes(perm.id))}
+                                  onChange={(e) => {
+                                    cellPermissions.forEach((perm) => togglePermission(perm.id, e.target.checked));
+                                  }}
+                                  className="w-4 h-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
+                                />
+                              ) : (
+                                <span className="text-gray-300">-</span>
+                              )}
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {error && <p className="text-sm text-red-600">{error}</p>}
+            </div>
+            <div className="flex justify-end gap-3 p-6 border-t border-gray-200 bg-gray-50">
+              <button
+                onClick={() => setModalOpen(false)}
+                className="px-5 py-2 bg-gray-200 text-gray-800 rounded-xl hover:bg-gray-300 transition"
+              >
+                Отмена
+              </button>
+              <button
+                onClick={handleSaveRole}
+                className="px-5 py-2 bg-green-600 text-white rounded-xl hover:bg-green-700 transition"
+              >
+                Сохранить
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {deleteConfirmId !== null && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl p-6 max-w-sm w-full">
             <h3 className="font-bold text-gray-800 mb-2">Удалить роль?</h3>
             <p className="text-sm text-gray-600 mb-4">
-              Это действие нельзя отменить. Все пользователи с этой ролью потеряют доступ.
+              Это действие нельзя отменить. Пользователи с этой ролью останутся без роли.
             </p>
             <div className="flex justify-end space-x-3">
               <button
-                onClick={handleDeleteCancel}
+                onClick={() => setDeleteConfirmId(null)}
                 className="px-3 py-1.5 text-sm bg-gray-200 rounded hover:bg-gray-300"
               >
                 Отмена

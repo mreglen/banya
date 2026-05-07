@@ -129,11 +129,11 @@ function AddDocumentEntrance() {
           // noop
         }
       }
-      if (!responsibleName) {
-        dispatch(setInitialState({ responsibleName: loggedUsername }));
-      }
+      // При открытии формы создания всегда сбрасываем state формы,
+      // чтобы не подтягивался предыдущий черновик.
+      dispatch(setInitialState({ responsibleName: loggedUsername }));
     }
-  }, [isEditing, documentData, dispatch, responsibleName, units, isLoadingUnits]);
+  }, [isEditing, documentData, dispatch, units, isLoadingUnits]);
 
   useEffect(() => {
     if (selectedProductWithUnit) {

@@ -14,7 +14,7 @@ export function useHasAccess() {
     if (user.is_admin) return true;
     // Check if user has the specific permission
     if (!user.permissions) return false;
-    return user.permissions.includes(permission);
+    return user.permissions.some((p) => (typeof p === 'string' ? p === permission : p.code === permission));
   };
 }
 

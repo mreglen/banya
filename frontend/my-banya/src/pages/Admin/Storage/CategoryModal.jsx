@@ -1,6 +1,6 @@
 // src/components/CategoryModal.jsx
 import React, { useState, useEffect, useRef } from 'react';
-import { prepareImageForUpload, MAX_IMAGE_SIZE_MB } from '../../../utils/imageProcessing';
+import { prepareImageForUpload } from '../../../utils/imageProcessing';
 
 const CategoryModal = ({
   isOpen,
@@ -11,9 +11,9 @@ const CategoryModal = ({
 }) => {
   const [name, setName] = useState('');
   const [selectedParentId, setSelectedParentId] = useState(null);
-  const [imageFile, setImageFile] = useState(null);
-  const [currentImageUrl, setCurrentImageUrl] = useState(null);
-  const [previewUrl, setPreviewUrl] = useState(null);
+  const [imageFiles, setImageFiles] = useState([]);
+  const [currentImageUrls, setCurrentImageUrls] = useState([]);
+  const [previewUrls, setPreviewUrls] = useState([]);
   const [photoDeleted, setPhotoDeleted] = useState(false);
   const [isVisibleOnWebsite, setIsVisibleOnWebsite] = useState(false);
   const [expanded, setExpanded] = useState(new Set());
@@ -75,15 +75,21 @@ const CategoryModal = ({
       setName(category?.name || '');
       setSelectedParentId(category?.parent_id ?? null);
       setIsVisibleOnWebsite(Boolean(category?.is_visible_on_website));
-      setImageFile(null);
-      setPreviewUrl(null);
+      setImageFiles([]);
+      previewUrls.forEach((url) => URL.revokeObjectURL(url));
+      setPreviewUrls([]);
       setPhotoDeleted(false);
 
       // Для фото используем базовый URL сервера (без /api)
       const baseUrl = process.env.REACT_APP_API_URL ? process.env.REACT_APP_API_URL.replace('/api', '') : (window.location.origin || 'http://127.0.0.1:8000');
-      const imageUrl = category?.photos?.[0]?.image_url;
-      const cleanImageUrl = imageUrl?.startsWith('/') ? imageUrl.slice(1) : imageUrl;
-      setCurrentImageUrl(cleanImageUrl ? `${baseUrl}/${cleanImageUrl}` : null);
+      const urls = (category?.photos || [])
+        .map((photo) => photo?.image_url)
+        .filter(Boolean)
+        .map((imageUrl) => {
+          const cleanImageUrl = imageUrl.startsWith('/') ? imageUrl.slice(1) : imageUrl;
+          return `${baseUrl}/${cleanImageUrl}`;
+        });
+      setCurrentImageUrls(urls);
 
       setExpanded(new Set());
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -92,48 +98,63 @@ const CategoryModal = ({
 
   useEffect(() => {
     return () => {
-      if (previewUrl) {
-        URL.revokeObjectURL(previewUrl);
-      }
+      previewUrls.forEach((url) => URL.revokeObjectURL(url));
     };
-  }, [previewUrl]);
+  }, [previewUrls]);
 
   const handleDeletePhoto = () => {
-    if (previewUrl) {
-      URL.revokeObjectURL(previewUrl);
-    }
-    setImageFile(null);
-    setPreviewUrl(null);
+    previewUrls.forEach((url) => URL.revokeObjectURL(url));
+    setImageFiles([]);
+    setPreviewUrls([]);
     setPhotoDeleted(true);
-    setCurrentImageUrl(null);
+    setCurrentImageUrls([]);
+  };
+
+  const handleDeleteSingleCurrentPhoto = (indexToRemove) => {
+    setCurrentImageUrls((prev) => {
+      const updated = prev.filter((_, index) => index !== indexToRemove);
+      if (updated.length !== prev.length) {
+        setPhotoDeleted(true);
+      }
+      return updated;
+    });
+  };
+
+  const handleDeleteSingleNewPhoto = (indexToRemove) => {
+    setPreviewUrls((prev) => {
+      const updated = [...prev];
+      const [removed] = updated.splice(indexToRemove, 1);
+      if (removed) URL.revokeObjectURL(removed);
+      return updated;
+    });
+    setImageFiles((prev) => prev.filter((_, index) => index !== indexToRemove));
   };
 
   const handleFileChange = async (e) => {
-    const file = e.target.files?.[0] || null;
-    if (!file) {
-      return;
-    }
-
-    if (!file.type.startsWith('image/')) {
-      alert('Можно загрузить только изображение');
-      e.target.value = '';
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) {
       return;
     }
 
     try {
-      const preparedFile = await prepareImageForUpload(file);
-      if (previewUrl) {
-        URL.revokeObjectURL(previewUrl);
-      }
-      const newPreview = URL.createObjectURL(preparedFile);
-      setImageFile(preparedFile);
-      setPreviewUrl(newPreview);
+      const preparedFiles = await Promise.all(
+        files.map(async (file) => {
+          if (!file.type.startsWith('image/')) {
+            throw new Error('Можно загрузить только изображения');
+          }
+          return prepareImageForUpload(file);
+        })
+      );
+      previewUrls.forEach((url) => URL.revokeObjectURL(url));
+      const newPreviews = preparedFiles.map((file) => URL.createObjectURL(file));
+      setImageFiles(preparedFiles);
+      setPreviewUrls(newPreviews);
       setPhotoDeleted(false);
     } catch (err) {
       console.error('Ошибка обработки изображения категории:', err);
-      alert(err.message || `Не удалось подготовить фото. Максимум ${MAX_IMAGE_SIZE_MB} МБ`);
-      setImageFile(null);
-      setPreviewUrl(null);
+      alert(err.message || 'Не удалось подготовить фото');
+      setImageFiles([]);
+      setPreviewUrls([]);
     } finally {
       e.target.value = '';
     }
@@ -149,7 +170,7 @@ const CategoryModal = ({
       name,
       parent_id: selectedParentId,
       is_visible_on_website: isVisibleOnWebsite,
-      imageFile,
+      imageFiles,
       deletePhoto: photoDeleted,
     });
     onClose();
@@ -209,45 +230,65 @@ const CategoryModal = ({
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Изображение
             </label>
-            {(imageFile || (currentImageUrl && !photoDeleted)) && (
-              <div className="relative inline-block">
-                {imageFile ? (
-                  <img
-                    src={previewUrl}
-                    alt="Новое фото"
-                    className="h-20 sm:h-24 object-contain border rounded"
-                  />
-                ) : (
-                  <img
-                    src={currentImageUrl}
-                    alt="Текущее фото"
-                    className="h-20 sm:h-24 object-contain border rounded"
-                  />
-                )}
-                <button
-                  type="button"
-                  onClick={handleDeletePhoto}
-                  className="absolute -top-1.5 -right-1.5 bg-red-500 text-white rounded-full w-5 h-5 sm:w-6 sm:h-6 flex items-center justify-center text-xs shadow"
-                  title="Удалить фото"
-                >
-                  ×
-                </button>
+            {(previewUrls.length > 0 || (currentImageUrls.length > 0 && !photoDeleted)) && (
+              <div className="space-y-2">
+                <div className="flex flex-wrap gap-2">
+                  {!photoDeleted &&
+                    currentImageUrls.map((url, index) => (
+                      <div key={`current-${index}`} className="relative inline-block">
+                        <img
+                          src={url}
+                          alt="Текущее фото"
+                          className="h-20 sm:h-24 object-contain border rounded"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteSingleCurrentPhoto(index)}
+                          className="absolute -top-1.5 -right-1.5 bg-red-500 text-white rounded-full w-5 h-5 sm:w-6 sm:h-6 flex items-center justify-center text-xs shadow"
+                          title="Удалить фото"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))}
+                  {previewUrls.map((url, index) => {
+                    const name = imageFiles[index]?.name || 'Новое фото';
+                    return (
+                      <div key={`new-${index}`} className="relative inline-block">
+                        <img
+                          src={url}
+                          alt="Новое фото"
+                          className="h-20 sm:h-24 object-contain border rounded"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteSingleNewPhoto(index)}
+                          className="absolute -top-1.5 -right-1.5 bg-red-500 text-white rounded-full w-5 h-5 sm:w-6 sm:h-6 flex items-center justify-center text-xs shadow"
+                          title={`Удалить фото ${name}`}
+                        >
+                          ×
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             )}
           </div>
 
           <div className="mb-4">
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              {currentImageUrl && !photoDeleted ? 'Заменить изображение' : 'Добавить изображение'}
+              {currentImageUrls.length > 0 && !photoDeleted ? 'Заменить изображение' : 'Добавить изображение'}
             </label>
             <input
               ref={fileInputRef}
               type="file"
+              multiple
               accept="image/*"
               onChange={handleFileChange}
               className="w-full text-xs"
             />
-            <p className="mt-1 text-xs text-gray-500">Загружается только 1 фото, максимум {MAX_IMAGE_SIZE_MB} МБ после сжатия.</p>
+            <p className="mt-1 text-xs text-gray-500">Можно загрузить несколько фото.</p>
           </div>
 
           <div className="flex flex-col-reverse sm:flex-row justify-end gap-2">

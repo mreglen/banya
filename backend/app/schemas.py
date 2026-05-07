@@ -36,6 +36,7 @@ class BathBase(BaseModel):
     title: str
     cost_weekday: int
     cost_weekend: int
+    min_booking_hours: int = 1
     description: Optional[str] = None
     base_guests: int
     extra_guest_price: int
@@ -50,6 +51,7 @@ class BathUpdate(BaseModel):
     title: Optional[str] = None
     cost_weekday: Optional[int] = None
     cost_weekend: Optional[int] = None
+    min_booking_hours: Optional[int] = None
     description: Optional[str] = None
     base_guests: Optional[int] = None
     extra_guest_price: Optional[int] = None
@@ -181,7 +183,7 @@ class UserCreate(BaseModel):
     birth_date: Optional[date] = None
     is_admin: bool = False
     is_director: bool = False
-    permission_ids: List[int] = []
+    role_id: Optional[int] = None
 
 
 class UserUpdate(BaseModel):
@@ -192,7 +194,7 @@ class UserUpdate(BaseModel):
     birth_date: Optional[date] = None
     is_admin: Optional[bool] = None
     is_director: Optional[bool] = None
-    permission_ids: Optional[List[int]] = None
+    role_id: Optional[int] = None
 
     class Config:
         extra = "forbid"  # или используй exclude_unset в вызове
@@ -208,6 +210,13 @@ class PermissionResponse(BaseModel):
     class Config:
         from_attributes = True
 
+class RoleBrief(BaseModel):
+    id: int
+    name: str
+
+    class Config:
+        from_attributes = True
+
 
 class UserResponse(BaseModel):
     user_id: int
@@ -218,6 +227,7 @@ class UserResponse(BaseModel):
     is_admin: bool
     is_director: bool
     permissions: List[PermissionResponse] = []
+    role_rel: Optional[RoleBrief] = None
     is_active: bool
     created_at: datetime
 
@@ -290,10 +300,15 @@ class RoleBase(BaseModel):
     name: str
 
 class RoleCreate(RoleBase):
-    pass
+    permission_ids: List[int] = []
+
+class RoleUpdate(BaseModel):
+    name: Optional[str] = None
+    permission_ids: Optional[List[int]] = None
 
 class RoleResponse(RoleBase):
     id: int
+    permissions: List[PermissionResponse] = []
 
     class Config:
         from_attributes = True

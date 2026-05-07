@@ -1,34 +1,50 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from typing import List
 from app.database import get_db
-from app.models import Role
-from app.schemas import RoleCreate, RoleResponse
+from app.models import Role, Permission
+from app.schemas import RoleCreate, RoleResponse, RoleUpdate
 
 router = APIRouter(prefix="/admin/company/role", tags=["Roles"])
 
 @router.get("/", response_model=List[RoleResponse])
 def get_roles(db: Session = Depends(get_db)):
-    return db.query(Role).all()
+    return db.query(Role).options(joinedload(Role.permissions)).all()
 
 @router.post("/", response_model=RoleResponse, status_code=status.HTTP_201_CREATED)
 def create_role(role_data: RoleCreate, db: Session = Depends(get_db)):
     if db.query(Role).filter(Role.name == role_data.name).first():
         raise HTTPException(status_code=400, detail="Роль с таким именем уже существует")
-    db_role = Role(**role_data.dict())
+
+    permissions = []
+    if role_data.permission_ids:
+        permissions = db.query(Permission).filter(Permission.id.in_(role_data.permission_ids)).all()
+        if len(permissions) != len(role_data.permission_ids):
+            raise HTTPException(status_code=400, detail="Некоторые права не найдены")
+
+    db_role = Role(name=role_data.name, permissions=permissions)
     db.add(db_role)
     db.commit()
     db.refresh(db_role)
     return db_role
 
 @router.put("/{id}", response_model=RoleResponse)
-def update_role(id: int, role_data: RoleCreate, db: Session = Depends(get_db)):
+def update_role(id: int, role_data: RoleUpdate, db: Session = Depends(get_db)):
     db_role = db.query(Role).filter(Role.id == id).first()
     if not db_role:
         raise HTTPException(status_code=404, detail="Роль не найдена")
-    if db.query(Role).filter(Role.name == role_data.name, Role.id != id).first():
-        raise HTTPException(status_code=400, detail="Роль с таким именем уже существует")
-    db_role.name = role_data.name
+
+    if role_data.name is not None:
+        if db.query(Role).filter(Role.name == role_data.name, Role.id != id).first():
+            raise HTTPException(status_code=400, detail="Роль с таким именем уже существует")
+        db_role.name = role_data.name
+
+    if role_data.permission_ids is not None:
+        permissions = db.query(Permission).filter(Permission.id.in_(role_data.permission_ids)).all()
+        if len(permissions) != len(role_data.permission_ids):
+            raise HTTPException(status_code=400, detail="Некоторые права не найдены")
+        db_role.permissions = permissions
+
     db.commit()
     db.refresh(db_role)
     return db_role

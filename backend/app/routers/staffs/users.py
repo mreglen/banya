@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks, 
 from sqlalchemy.orm import Session, joinedload
 from typing import List
 from app.database import get_db, SessionLocal
-from app.models import User, Permission
+from app.models import User, Role
 from app.schemas import UserCreate, UserUpdate, UserResponse
 from app.security import hash_password
 from app.phone_utils import normalize_phone
@@ -15,12 +15,16 @@ router = APIRouter(prefix="/admin/company/users", tags=["Users"])
 @router.get("/", response_model=List[UserResponse])
 def get_users(db: Session = Depends(get_db)):
     # Исключаем администраторов из списка (is_admin=true)
-    return db.query(User).options(joinedload(User.permissions)).filter(User.is_admin == False).all()
+    return db.query(User).options(
+        joinedload(User.role_rel).joinedload(Role.permissions)
+    ).filter(User.is_admin == False).all()
 
 
 @router.get("/{user_id}", response_model=UserResponse)
 def get_user(user_id: int, db: Session = Depends(get_db)):
-    user = db.query(User).options(joinedload(User.permissions)).filter(User.user_id == user_id).first()
+    user = db.query(User).options(
+        joinedload(User.role_rel).joinedload(Role.permissions)
+    ).filter(User.user_id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="Пользователь не найден")
     return user
@@ -47,13 +51,11 @@ def create_user(
     if db.query(User).filter(User.phone == normalized_phone).first():
         raise HTTPException(status_code=400, detail="Пользователь с таким телефоном уже существует")
 
-    # Проверка существования прав
-    if user_data.permission_ids:
-        permissions = db.query(Permission).filter(Permission.id.in_(user_data.permission_ids)).all()
-        if len(permissions) != len(user_data.permission_ids):
-            raise HTTPException(status_code=400, detail="Некоторые права не найдены")
-    else:
-        permissions = []
+    db_role = None
+    if user_data.role_id is not None:
+        db_role = db.query(Role).filter(Role.id == user_data.role_id).first()
+        if not db_role:
+            raise HTTPException(status_code=400, detail="Роль не найдена")
 
     # Хеширование пароля
     hashed_password = hash_password(user_data.password)
@@ -67,7 +69,7 @@ def create_user(
         birth_date=user_data.birth_date,
         is_admin=user_data.is_admin,
         is_director=user_data.is_director,
-        permissions=permissions,
+        role_id=user_data.role_id,
         is_active=True
     )
     db.add(db_user)
@@ -108,12 +110,12 @@ def update_user(
     if not db_user:
         raise HTTPException(status_code=404, detail="Пользователь не найден")
 
-    # Если обновляются права — проверить их существование
-    if user_data.permission_ids is not None:
-        permissions = db.query(Permission).filter(Permission.id.in_(user_data.permission_ids)).all()
-        if len(permissions) != len(user_data.permission_ids):
-            raise HTTPException(status_code=400, detail="Некоторые права не найдены")
-        db_user.permissions = permissions
+    # Если обновляется роль — проверить её существование
+    if user_data.role_id is not None:
+        db_role = db.query(Role).filter(Role.id == user_data.role_id).first()
+        if not db_role:
+            raise HTTPException(status_code=400, detail="Роль не найдена")
+        db_user.role_id = user_data.role_id
 
     # Обновление полей
     update_data = user_data.dict(exclude_unset=True)
@@ -127,7 +129,7 @@ def update_user(
             if not normalized:
                 raise HTTPException(status_code=400, detail="Неверный формат телефона")
             setattr(db_user, "phone", normalized)
-        elif key != "password" and key != "permission_ids":
+        elif key != "password" and key != "role_id":
             setattr(db_user, key, value)
 
     db.commit()

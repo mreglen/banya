@@ -128,15 +128,14 @@ function AdministratorPageNew() {
   return (
     <div className="min-h-screen bg-gray-50 p-3 sm:p-4 md:p-8">
       <div className="max-w-7xl mx-auto">
-        {/* Заголовок */}
         <h1 className="text-2xl md:text-3xl font-bold text-gray-800 mb-4 md:mb-8">
-          🔐 Панель администратора
+          Журнал аудита
         </h1>
 
         {/* Журнал аудита */}
         <div className="bg-white rounded-2xl shadow-lg p-4 sm:p-5 md:p-8">
           <h2 className="text-xl md:text-2xl font-bold text-gray-800 mb-4 md:mb-6">
-            📋 Журнал аудита
+            История действий
           </h2>
 
           {/* Фильтры */}

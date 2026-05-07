@@ -9,6 +9,11 @@ import {
   useGetUnitsOfMeasurementQuery,
 } from '../../../redux/slices/productsApiSlice';
 import CategorySelectModal from './CategorySelectModal';
+import { prepareImageForUpload } from '../../../utils/imageProcessing';
+import UnitCreateModal from './UnitCreateModal';
+
+const MAX_PRODUCT_IMAGES = 5;
+const ADD_UNIT_OPTION_VALUE = '__add_unit__';
 
 const findCategoryById = (categories, categoryId) => {
   if (categoryId == null) return null;
@@ -33,10 +38,11 @@ function Product() {
 
   const { data: product, isLoading: isLoadingProduct, isError: isErrorProduct } = useGetProductByIdQuery(productId, { skip: !isEditing });
   const { data: categories = [], isLoading: isLoadingCategories } = useGetCategoriesQuery();
-  const { data: units = [], isLoading: isLoadingUnits } = useGetUnitsOfMeasurementQuery();
+  const { data: units = [], isLoading: isLoadingUnits, refetch: refetchUnits } = useGetUnitsOfMeasurementQuery();
   const [updateProduct, { isLoading: isUpdating }] = useUpdateProductMutation();
   const [uploadPhotos, { isLoading: isUploadingPhotos }] = useUploadProductPhotosMutation();
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
+  const [isUnitModalOpen, setIsUnitModalOpen] = useState(false);
 
   const [form, setForm] = useState({
     name: '',
@@ -50,8 +56,9 @@ function Product() {
     is_visible_on_website: true,
   });
 
-  const [imageFiles, setImageFiles] = useState([]);
-  const [tempImagePreviews, setTempImagePreviews] = useState([]);
+  const [existingImages, setExistingImages] = useState([]);
+  const [newImages, setNewImages] = useState([]);
+  const [photosTouched, setPhotosTouched] = useState(false);
 
   useEffect(() => {
     if (isEditing && product) {
@@ -78,10 +85,21 @@ function Product() {
             ? `${baseUrl}${url}`
             : `${baseUrl}/${url}`;
         });
-        setTempImagePreviews(fullUrls);
+        setExistingImages(fullUrls);
+      } else {
+        setExistingImages([]);
       }
+      newImages.forEach((item) => URL.revokeObjectURL(item.preview));
+      setNewImages([]);
+      setPhotosTouched(false);
     }
   }, [isEditing, product, categories]);
+
+  useEffect(() => {
+    return () => {
+      newImages.forEach((item) => URL.revokeObjectURL(item.preview));
+    };
+  }, [newImages]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -97,23 +115,56 @@ function Product() {
     }));
   };
 
-  const handleImageChange = (e) => {
-    const files = Array.from(e.target.files);
-    const totalImages = tempImagePreviews.length + files.length;
+  const handleImageChange = async (e) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
 
-    if (totalImages > 5) {
-      alert('Можно загрузить не более 5 изображений');
+    const usedSlots = existingImages.length + newImages.length;
+    const availableSlots = MAX_PRODUCT_IMAGES - usedSlots;
+    if (availableSlots <= 0) {
+      alert(`Можно загрузить не более ${MAX_PRODUCT_IMAGES} изображений`);
+      e.target.value = '';
       return;
     }
 
-    const newPreviews = files.map(file => URL.createObjectURL(file));
-    setTempImagePreviews(prev => [...prev, ...newPreviews]);
-    setImageFiles(prev => [...prev, ...files]);
+    const filesToProcess = files.slice(0, availableSlots);
+    if (files.length > availableSlots) {
+      alert(`Будут добавлены только первые ${availableSlots} изображений (лимит ${MAX_PRODUCT_IMAGES})`);
+    }
+
+    try {
+      const processed = await Promise.all(
+        filesToProcess.map(async (file) => {
+          if (!file.type.startsWith('image/')) {
+            throw new Error('Можно загружать только изображения');
+          }
+          const preparedFile = await prepareImageForUpload(file);
+          return { file: preparedFile, preview: URL.createObjectURL(preparedFile) };
+        })
+      );
+      setNewImages((prev) => [...prev, ...processed]);
+      setPhotosTouched(true);
+    } catch (err) {
+      console.error('Ошибка обработки изображений товара:', err);
+      alert(err.message || 'Не удалось подготовить фото');
+    } finally {
+      e.target.value = '';
+    }
   };
 
-  const removeImage = (indexToRemove) => {
-    setTempImagePreviews(prev => prev.filter((_, index) => index !== indexToRemove));
-    setImageFiles(prev => prev.filter((_, index) => index !== indexToRemove));
+  const removeExistingImage = (indexToRemove) => {
+    setExistingImages((prev) => prev.filter((_, index) => index !== indexToRemove));
+    setPhotosTouched(true);
+  };
+
+  const removeNewImage = (indexToRemove) => {
+    setNewImages((prev) => {
+      const updated = [...prev];
+      URL.revokeObjectURL(updated[indexToRemove].preview);
+      updated.splice(indexToRemove, 1);
+      return updated;
+    });
+    setPhotosTouched(true);
   };
 
   const handleCategorySelect = (categoryId) => {
@@ -149,9 +200,9 @@ function Product() {
 
       await updateProduct(productData).unwrap();
 
-      if (imageFiles.length > 0) {
+      if (photosTouched) {
         const formData = new FormData();
-        imageFiles.forEach(file => {
+        newImages.forEach(({ file }) => {
           formData.append('files', file);
         });
         await uploadPhotos({ productId, formData }).unwrap();
@@ -223,7 +274,13 @@ function Product() {
               <select
                 name="unit_id"
                 value={form.unit_id || ''}
-                onChange={handleChange}
+                onChange={(e) => {
+                  if (e.target.value === ADD_UNIT_OPTION_VALUE) {
+                    setIsUnitModalOpen(true);
+                    return;
+                  }
+                  handleChange(e);
+                }}
                 className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="">Не выбрана</option>
@@ -232,6 +289,7 @@ function Product() {
                     {unit.name} — {unit.description || unit.name}
                   </option>
                 ))}
+                <option value={ADD_UNIT_OPTION_VALUE}>+ Добавить единицу измерения</option>
               </select>
             </div>
 
@@ -240,9 +298,9 @@ function Product() {
                 Фотографии (макс. 5)
               </label>
 
-              {(tempImagePreviews.length > 0) && (
+              {(existingImages.length > 0 || newImages.length > 0) && (
                 <div className="grid grid-cols-3 sm:grid-cols-5 gap-3 mb-4">
-                  {tempImagePreviews.map((url, index) => (
+                  {existingImages.map((url, index) => (
                     <div key={index} className="relative group">
                       <img
                         src={url}
@@ -251,7 +309,24 @@ function Product() {
                       />
                       <button
                         type="button"
-                        onClick={() => removeImage(index)}
+                        onClick={() => removeExistingImage(index)}
+                        className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow"
+                        title="Удалить фото"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                  {newImages.map((item, index) => (
+                    <div key={`new-${index}`} className="relative group">
+                      <img
+                        src={item.preview}
+                        alt={`Новое фото ${index + 1}`}
+                        className="w-full h-24 object-cover rounded-lg border"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => removeNewImage(index)}
                         className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow"
                         title="Удалить фото"
                       >
@@ -262,7 +337,7 @@ function Product() {
                 </div>
               )}
 
-              {tempImagePreviews.length < 5 && (
+              {existingImages.length + newImages.length < MAX_PRODUCT_IMAGES && (
                 <label className="block w-full px-4 py-3 bg-white border-2 border-dashed border-gray-300 rounded-xl text-center text-gray-600 cursor-pointer hover:border-blue-500 hover:text-blue-500 transition">
                   <span>Выберите файлы или перетащите сюда</span>
                   <input
@@ -271,13 +346,13 @@ function Product() {
                     accept="image/*"
                     onChange={handleImageChange}
                     className="hidden"
-                    title={`Можно выбрать до ${5 - tempImagePreviews.length} изображений`}
+                    title={`Можно выбрать до ${MAX_PRODUCT_IMAGES - (existingImages.length + newImages.length)} изображений`}
                   />
                 </label>
               )}
 
               <p className="text-xs text-gray-500 mt-1">
-                Поддерживаются JPG, PNG. Максимум 5 изображений.
+                Поддерживаются только изображения. Максимум {MAX_PRODUCT_IMAGES} фото.
               </p>
             </div>
 
@@ -412,6 +487,14 @@ function Product() {
         onSelect={handleCategorySelect}
         categoriesTree={categories}
         currentCategoryId={form.category_id}
+      />
+      <UnitCreateModal
+        isOpen={isUnitModalOpen}
+        onClose={() => setIsUnitModalOpen(false)}
+        onCreated={async (unit) => {
+          await refetchUnits();
+          setForm((prev) => ({ ...prev, unit_id: unit?.id ?? prev.unit_id }));
+        }}
       />
     </div>
   );

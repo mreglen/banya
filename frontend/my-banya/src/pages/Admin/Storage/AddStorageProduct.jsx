@@ -8,6 +8,7 @@ import {
   useGetUnitsOfMeasurementQuery,
 } from '../../../redux/slices/productsApiSlice';
 import CategorySelectModal from './CategorySelectModal';
+import UnitCreateModal from './UnitCreateModal';
 
 const findCategoryById = (cats, id) => {
   for (const cat of cats) {
@@ -21,6 +22,7 @@ const findCategoryById = (cats, id) => {
 };
 
 const AddStorageProduct = () => {
+  const ADD_UNIT_OPTION_VALUE = '__add_unit__';
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -35,9 +37,10 @@ const AddStorageProduct = () => {
 
   const [images, setImages] = useState([]);
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
+  const [isUnitModalOpen, setIsUnitModalOpen] = useState(false);
 
   const { data: categoriesTree = [] } = useGetCategoriesQuery();
-  const { data: units = [], isLoading: isLoadingUnits } = useGetUnitsOfMeasurementQuery();
+  const { data: units = [], isLoading: isLoadingUnits, refetch: refetchUnits } = useGetUnitsOfMeasurementQuery();
   const [createProduct, { isLoading: isCreating }] = useCreateProductMutation();
   const [uploadProductPhotos, { isLoading: isUploading }] = useUploadProductPhotosMutation();
 
@@ -209,7 +212,13 @@ const AddStorageProduct = () => {
                 id="unit_id"
                 name="unit_id"
                 value={formData.unit_id ?? ''}
-                onChange={handleInputChange}
+                onChange={(e) => {
+                  if (e.target.value === ADD_UNIT_OPTION_VALUE) {
+                    setIsUnitModalOpen(true);
+                    return;
+                  }
+                  handleInputChange(e);
+                }}
                 className="w-full p-2 border border-gray-300 rounded"
               >
                 <option value="">Не выбрана</option>
@@ -218,6 +227,7 @@ const AddStorageProduct = () => {
                     {unit.name} — {unit.description || unit.name}
                   </option>
                 ))}
+                <option value={ADD_UNIT_OPTION_VALUE}>+ Добавить единицу измерения</option>
               </select>
             )}
           </div>
@@ -291,6 +301,14 @@ const AddStorageProduct = () => {
         onSelect={handleCategorySelect}
         categoriesTree={categoriesTree}
         currentCategoryId={formData.categoryPath?.id || null}
+      />
+      <UnitCreateModal
+        isOpen={isUnitModalOpen}
+        onClose={() => setIsUnitModalOpen(false)}
+        onCreated={async (unit) => {
+          await refetchUnits();
+          setFormData((prev) => ({ ...prev, unit_id: unit?.id ?? prev.unit_id }));
+        }}
       />
     </div>
   );

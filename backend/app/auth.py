@@ -140,7 +140,7 @@ def get_current_user(
     
     # Get user
     user = db.query(models.User).options(
-        joinedload(models.User.permissions)
+        joinedload(models.User.role_rel).joinedload(models.Role.permissions)
     ).filter(models.User.user_id == int(user_id)).first()
     
     if user is None or not user.is_active:

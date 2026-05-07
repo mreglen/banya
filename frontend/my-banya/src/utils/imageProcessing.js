@@ -1,6 +1,3 @@
-export const MAX_IMAGE_SIZE_MB = 5;
-export const MAX_IMAGE_SIZE_BYTES = MAX_IMAGE_SIZE_MB * 1024 * 1024;
-
 export const compressImageFile = (file, maxWidth = 1920, quality = 0.82) =>
   new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -40,14 +37,7 @@ export const compressImageFile = (file, maxWidth = 1920, quality = 0.82) =>
   });
 
 export const prepareImageForUpload = async (file) => {
-  const preparedFile =
-    file.type === 'image/webp' && file.size <= MAX_IMAGE_SIZE_BYTES
-      ? file
-      : await compressImageFile(file);
-
-  if (preparedFile.size > MAX_IMAGE_SIZE_BYTES) {
-    throw new Error(`Файл превышает ${MAX_IMAGE_SIZE_MB} МБ даже после сжатия`);
-  }
+  const preparedFile = file.type === 'image/webp' ? file : await compressImageFile(file);
 
   return preparedFile;
 };

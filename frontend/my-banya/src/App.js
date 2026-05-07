@@ -37,7 +37,9 @@ import AdminDashboard from './pages/Admin/AdminDashboard';
 import PasswordResetRequest from './pages/Admin/AdminLogin/PasswordResetRequest';
 import PasswordResetVerify from './pages/Admin/AdminLogin/PasswordResetVerify';
 import PasswordResetComplete from './pages/Admin/AdminLogin/PasswordResetComplete';
-import AdministratorPage from './pages/Admin/Administrator/AdministratorPageNew';
+import AdministratorHubPage from './pages/Admin/Administrator/AdministratorHubPage';
+import AdministratorAuditPage from './pages/Admin/Administrator/AdministratorPageNew';
+import Roles from './pages/Admin/Company/Staffs/Roles/Roles';
 import Promotions from './pages/Admin/Promotions/Promotions';
 import SettingsPage from './pages/Admin/Settings/SettingsPage';
 import SupportPage from './pages/Admin/Support/SupportPage';
@@ -99,7 +101,9 @@ function AppWithLayout() {
           {/* <Route index element={<div>Добро пожаловать в админ-панель</div>} /> */}
           <Route index element={<AdminDashboard />} />
 
-          <Route path="administrator" element={<AdministratorPage />} />
+          <Route path="administrator" element={<AdministratorHubPage />} />
+          <Route path="administrator/audit" element={<AdministratorAuditPage />} />
+          <Route path="administrator/roles" element={<Roles />} />
           <Route path="reservations" element={<RoleBasedRoute requiredPermission="reservations:view"><AdminReservations /></RoleBasedRoute>} />
           <Route path="reservations/print/:id" element={<RoleBasedRoute requiredPermission="reservations:view"><ReservationPrintDocument /></RoleBasedRoute>} />
           <Route path="bookings" element={<RoleBasedRoute requiredPermission="bookings:view"><AdminBookings /></RoleBasedRoute>} />

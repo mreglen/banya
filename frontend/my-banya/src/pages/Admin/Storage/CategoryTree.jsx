@@ -140,7 +140,7 @@ const CategoryTree = ({
   };
 
   const handleModalSubmit = async (data) => {
-    const { id, name, parent_id, is_visible_on_website, imageFile, deletePhoto } = data;
+    const { id, name, parent_id, is_visible_on_website, imageFiles, deletePhoto } = data;
 
     console.log('Submitting category update:', { id, name, parent_id, is_visible_on_website });
 
@@ -162,10 +162,10 @@ const CategoryTree = ({
       if (deletePhoto) {
         // Удаляем фото
         await uploadCategoryPhotos({ categoryId, formData: new FormData() }).unwrap();
-      } else if (imageFile) {
-        // Загружаем новое фото
+      } else if (imageFiles?.length) {
+        // Загружаем новые фото
         const formData = new FormData();
-        formData.set('files', imageFile);
+        imageFiles.forEach((file) => formData.append('files', file));
         await uploadCategoryPhotos({ categoryId, formData }).unwrap();
       }
 

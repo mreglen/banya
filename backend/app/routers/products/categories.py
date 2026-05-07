@@ -12,7 +12,6 @@ router = APIRouter(prefix="/admin/categories", tags=["categories"])
 
 UPLOAD_DIR = Path("uploads/photos/categories/")
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-MAX_FILE_SIZE = 10 * 1024 * 1024  # 10 MB limit
 
 
 @router.get("/", response_model=List[CategorySchema])
@@ -136,9 +135,6 @@ async def upload_category_photos(
     if not db_category:
         raise HTTPException(status_code=404, detail="Category not found")
 
-    if files and len(files) > 1:
-        raise HTTPException(status_code=400, detail="Для категории можно загрузить только 1 фотографию")
-
     # Удаляем все существующие фото
     db.query(Photo).filter(Photo.category_id == category_id).delete()
 
@@ -146,12 +142,6 @@ async def upload_category_photos(
     if files:  # только если файлы переданы
         for file in files:
             content = await file.read()
-
-            if len(content) > MAX_FILE_SIZE:
-                raise HTTPException(
-                    status_code=413,
-                    detail=f"Файл {file.filename} слишком большой. Максимальный размер: {MAX_FILE_SIZE // (1024 * 1024)} МБ",
-                )
 
             try:
                 webp_bytes = process_image_to_webp(content)

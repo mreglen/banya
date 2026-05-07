@@ -3,18 +3,21 @@ from sqlalchemy.orm import Session, joinedload
 from typing import List, Optional
 import os
 from pathlib import Path
+import hashlib
 from app.database import get_db
 from app.database import SessionLocal
 from app.models import Product as ProductModel, Category, Photo, UnitOfMeasurement, User
 from app.schemas import Product, ProductCreate, UnitOfMeasurementResponse, StockProduct, UnitOfMeasurementBase
 from app.auth import get_current_user
 from app.audit_logger import log_detailed_action, get_client_ip
+from app.image_utils import process_image_to_webp
 
 router = APIRouter(prefix="/admin/products", tags=["products"])
 
 
-UPLOAD_DIR = Path("public/img/products/")
+UPLOAD_DIR = Path("uploads/photos/products/")
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+MAX_PRODUCT_FILES = 5
 
 
 def create_product_with_photos(db: Session, product_data: ProductCreate, photo_urls: List[str] = None):
@@ -141,27 +144,37 @@ async def upload_product_photos(
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
 
+    if len(files) > MAX_PRODUCT_FILES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Можно загрузить не более {MAX_PRODUCT_FILES} изображений"
+        )
+
     db.query(Photo).filter(Photo.product_id == product_id).delete()
 
     urls = []
     for file in files:
-        # Генерируем безопасное имя файла
-        extension = file.filename.split('.')[-1].lower()
-        safe_filename = f"{product_id}_{file.filename.replace(' ', '_').replace('.', '_')}.{extension}"
+        content = await file.read()
+
+        try:
+            webp_bytes = process_image_to_webp(content)
+        except Exception:
+            raise HTTPException(status_code=400, detail=f"Не удалось обработать изображение: {file.filename}")
+
+        file_hash = hashlib.sha256(webp_bytes).hexdigest()[:16]
+        safe_filename = f"{file_hash}.webp"
         filepath = UPLOAD_DIR / safe_filename
 
-        # Сохраняем файл
-        content = await file.read()
         with open(filepath, "wb") as f:
-            f.write(content)
+            f.write(webp_bytes)
 
         # Сохраняем URL в БД
         db_photo = Photo(
-            image_url=f"/img/products/{safe_filename}",
+            image_url=f"/uploads/photos/products/{safe_filename}",
             product_id=product_id
         )
         db.add(db_photo)
-        urls.append(f"/img/products/{safe_filename}")
+        urls.append(f"/uploads/photos/products/{safe_filename}")
 
     db.commit()
     return urls

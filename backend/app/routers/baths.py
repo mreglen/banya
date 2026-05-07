@@ -50,6 +50,7 @@ def get_bath(slug: str, db: Session = Depends(get_db)):
         "title": bath.title,
         "cost_weekday": bath.cost_weekday,
         "cost_weekend": bath.cost_weekend,
+        "min_booking_hours": bath.min_booking_hours,
         "description": bath.description,
         "base_guests": bath.base_guests,
         "extra_guest_price": bath.extra_guest_price,
@@ -97,6 +98,7 @@ def create_bath(
         title=bath.title,
         cost_weekday=bath.cost_weekday,
         cost_weekend=bath.cost_weekend,
+        min_booking_hours=bath.min_booking_hours,
         description=bath.description,
         base_guests=bath.base_guests,
         extra_guest_price=bath.extra_guest_price,
@@ -214,7 +216,6 @@ def delete_bath_photo(
 # добавить фото
 UPLOAD_DIR = Path("uploads/photos/baths/")
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-MAX_FILE_SIZE = 10 * 1024 * 1024  # 10 MB limit
 
 @router.post("/{bath_id}/upload", response_model=List[str])
 async def upload_bath_photos(
@@ -231,13 +232,7 @@ async def upload_bath_photos(
 
     urls = []
     for file in files:
-        # Check file size
         content = await file.read()
-        if len(content) > MAX_FILE_SIZE:
-            raise HTTPException(
-                status_code=413,
-                detail=f"Файл {file.filename} слишком большой. Максимальный размер: {MAX_FILE_SIZE // (1024*1024)} МБ"
-            )
         
         # Process: compress, convert to WebP, strip metadata
         webp_bytes = process_image_to_webp(content)

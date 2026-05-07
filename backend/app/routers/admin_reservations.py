@@ -161,6 +161,12 @@ def create_reservation(
 
     # 5.1 Стоимость бани + гости
     duration_hours = (end_dt - start_dt).total_seconds() / 3600
+    min_booking_hours = max(1, int(getattr(bath, "min_booking_hours", 1) or 1))
+    if duration_hours < min_booking_hours:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Минимальная длительность брони для бани \"{bath.name}\" — {min_booking_hours} ч."
+        )
     # Определяем день недели для начала бронирования (0=понедельник, 6=воскресенье)
     weekday = start_dt.weekday()
     # пн=0, вт=1, ср=2, чт=3 → будни; пт=4, сб=5, вс=6 → выходные
@@ -511,6 +517,12 @@ def update_reservation(
                     raise HTTPException(status_code=500, detail="Баня, связанная с бронью, не найдена")
 
                 duration_hours = (end_dt - start_dt).total_seconds() / 3600
+                min_booking_hours = max(1, int(getattr(bath, "min_booking_hours", 1) or 1))
+                if duration_hours < min_booking_hours:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Минимальная длительность брони для бани \"{bath.name}\" — {min_booking_hours} ч."
+                    )
                 print(f"Duration: {duration_hours} hours")
                 # Определяем день недели для начала бронирования (0=понедельник, 6=воскресенье)
                 weekday = start_dt.weekday()

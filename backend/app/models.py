@@ -14,6 +14,7 @@ class Bath(Base):
     title = Column(String(200), nullable=False)
     cost_weekday = Column(Integer, nullable=False)
     cost_weekend = Column(Integer, nullable=False)
+    min_booking_hours = Column(Integer, nullable=False, default=1)
     description = Column(Text, nullable=True)
     base_guests = Column(Integer, nullable=False)
     extra_guest_price = Column(Integer, nullable=False)
@@ -223,11 +224,19 @@ class Permission(Base):
     description = Column(String(255), nullable=True)
 
 
-# Таблица many-to-many для связи User-Permission
+# Таблица many-to-many для связи User-Permission (legacy)
 user_permissions = Table(
     'user_permissions',
     Base.metadata,
     Column('user_id', Integer, ForeignKey('users.user_id'), primary_key=True),
+    Column('permission_id', Integer, ForeignKey('permissions.id'), primary_key=True)
+)
+
+# Таблица many-to-many для связи Role-Permission
+role_permissions = Table(
+    'role_permissions',
+    Base.metadata,
+    Column('role_id', Integer, ForeignKey('roles.id'), primary_key=True),
     Column('permission_id', Integer, ForeignKey('permissions.id'), primary_key=True)
 )
 
@@ -249,6 +258,7 @@ class Role(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, unique=True, nullable=False)
+    permissions = relationship("Permission", secondary=role_permissions, backref="roles")
 
 
 class User(Base):
@@ -269,7 +279,12 @@ class User(Base):
     birth_date = Column(Date)
 
     role_rel = relationship("Role")
-    permissions = relationship("Permission", secondary=user_permissions, backref="users")
+
+    @property
+    def permissions(self):
+        if self.role_rel and self.role_rel.permissions:
+            return self.role_rel.permissions
+        return []
 
 
 class PasswordReset(Base):

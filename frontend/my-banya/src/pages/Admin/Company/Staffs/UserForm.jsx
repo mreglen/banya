@@ -1,12 +1,12 @@
 // src/pages/Admin/Company/user/UserForm.jsx
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { 
   useGetUserByIdQuery, 
   useCreateUserMutation, 
   useUpdateUserMutation,
-  useGetNewPermissionsQuery 
+  useGetRolesQuery,
 } from '../../../../redux/slices/apiSlice'; 
 
 function UserForm() {
@@ -22,7 +22,7 @@ function UserForm() {
     skip: !isEditing,
   });
 
-  const { data: permissions = [], isLoading: isLoadingPermissions } = useGetNewPermissionsQuery();
+  const { data: roles = [], isLoading: isLoadingRoles } = useGetRolesQuery();
 
   const [createUser] = useCreateUserMutation();
   const [updateUser] = useUpdateUserMutation();
@@ -35,53 +35,11 @@ function UserForm() {
     birth_date: '',
     is_admin: false,
     is_director: false,
+    role_id: '',
   });
 
-  const [selectedPermissions, setSelectedPermissions] = useState([]);
-  const [showPermissionsModal, setShowPermissionsModal] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
-
-  // Группировка прав по категориям (исключая 'clients')
-  const groupedPermissions = useMemo(() => {
-    const grouped = {};
-    permissions.forEach(perm => {
-      // Скрываем права, связанные с клиентами, но оставляем их в БД
-      if (perm.category === 'clients') {
-        return;
-      }
-      if (!grouped[perm.category]) {
-        grouped[perm.category] = [];
-      }
-      grouped[perm.category].push(perm);
-    });
-    return grouped;
-  }, [permissions]);
-
-  // Названия категорий на русском
-  const getCategoryName = (category) => {
-    const names = {
-      reservations: 'Бронирования',
-      bookings: 'Заявки с сайта',
-      baths: 'Бани',
-      storage: 'Склад',
-      clients: 'Клиенты',
-      partners: 'Партнёры',
-      staff: 'Сотрудники',
-      documents: 'Документы',
-      promotions: 'Акции',
-    };
-    return names[category] || category;
-  };
-
-  // Переключение права
-  const togglePermission = (permissionId, checked) => {
-    if (checked) {
-      setSelectedPermissions(prev => [...prev, permissionId]);
-    } else {
-      setSelectedPermissions(prev => prev.filter(id => id !== permissionId));
-    }
-  };
 
   // Загрузка данных при редактировании
   useEffect(() => {
@@ -94,11 +52,8 @@ function UserForm() {
         birth_date: user.birth_date ? user.birth_date.split('T')[0] : '',
         is_admin: user.is_admin || false,
         is_director: user.is_director || false,
+        role_id: user.role_rel?.id ? String(user.role_rel.id) : '',
       });
-      // Установка выбранных прав
-      if (user.permissions && user.permissions.length > 0) {
-        setSelectedPermissions(user.permissions.map(p => p.id));
-      }
     }
   }, [isEditing, user]);
 
@@ -204,7 +159,7 @@ function UserForm() {
         const payload = { 
           ...form,
           phone: normalizedPhone,
-          permission_ids: selectedPermissions,
+          role_id: form.role_id ? Number(form.role_id) : null,
         };
         if (!payload.password) delete payload.password;
         console.log('📤 Updating user payload:', payload);
@@ -213,7 +168,7 @@ function UserForm() {
         const payload = {
           ...form,
           phone: normalizedPhone,
-          permission_ids: selectedPermissions,
+          role_id: form.role_id ? Number(form.role_id) : null,
         };
         console.log('📤 Creating user payload:', payload);
         await createUser(payload).unwrap();
@@ -232,7 +187,7 @@ function UserForm() {
     }
   };
 
-  const isLoading = (isEditing && isLoadingUser) || isLoadingPermissions;
+  const isLoading = (isEditing && isLoadingUser) || isLoadingRoles;
 
   if (isLoading) {
     return (
@@ -408,35 +363,26 @@ function UserForm() {
             />
           </div>
 
-          {/* Выбор прав доступа - кнопка для открытия модалки */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Права доступа
+              Роль сотрудника
             </label>
-            <button
-              type="button"
-              onClick={() => setShowPermissionsModal(true)}
-              className="w-full px-4 py-3 border-2 border-dashed border-gray-300 rounded-xl hover:border-green-500 hover:bg-green-50 transition group cursor-pointer text-left"
+            <select
+              name="role_id"
+              value={form.role_id}
+              onChange={handleChange}
+              className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500"
             >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <svg className="w-5 h-5 text-gray-400 group-hover:text-green-600 transition" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  <span className="text-sm font-medium text-gray-700 group-hover:text-green-700 transition">
-                    Выберите права доступа
-                  </span>
-                </div>
-                <svg className="w-5 h-5 text-gray-400 group-hover:text-green-600 transition" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                </svg>
-              </div>
-              {selectedPermissions.length > 0 && (
-                <div className="mt-2 text-xs text-gray-500">
-                  Выбрано прав: {selectedPermissions.length}
-                </div>
-              )}
-            </button>
+              <option value="">Без роли</option>
+              {roles.map((role) => (
+                <option key={role.id} value={role.id}>
+                  {role.name}
+                </option>
+              ))}
+            </select>
+            <p className="text-xs text-gray-500 mt-1">
+              Права доступа назначаются через роль.
+            </p>
           </div>
 
           <div className="flex space-x-4 pt-4">
@@ -457,67 +403,6 @@ function UserForm() {
         </form>
       </div>
 
-      {/* Модалка выбора прав доступа */}
-      {showPermissionsModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[80vh] overflow-hidden">
-            {/* Header */}
-            <div className="flex items-center justify-between p-6 border-b border-gray-200">
-              <h2 className="text-xl font-bold text-gray-800">Права доступа</h2>
-              <button
-                onClick={() => setShowPermissionsModal(false)}
-                className="text-gray-400 hover:text-gray-600 transition"
-              >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-
-            {/* Content */}
-            <div className="p-6 overflow-y-auto max-h-[60vh]">
-              {Object.entries(groupedPermissions).map(([category, perms]) => (
-                <div key={category} className="mb-6 last:mb-0">
-                  <h4 className="font-semibold text-gray-800 mb-3 text-base">
-                    {getCategoryName(category)}
-                  </h4>
-                  <div className="space-y-2 ml-4">
-                    {perms.map(permission => (
-                      <label key={permission.id} className="flex items-center space-x-3 cursor-pointer hover:bg-gray-50 p-2 rounded-lg transition">
-                        <input
-                          type="checkbox"
-                          checked={selectedPermissions.includes(permission.id)}
-                          onChange={(e) => togglePermission(permission.id, e.target.checked)}
-                          className="w-4 h-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
-                        />
-                        <div className="flex-1">
-                          <span className="text-sm text-gray-700 font-medium">{permission.name}</span>
-                          {permission.description && (
-                            <p className="text-xs text-gray-500 mt-0.5">{permission.description}</p>
-                          )}
-                        </div>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-              ))}
-              {permissions.length === 0 && (
-                <p className="text-gray-500 text-center py-8">Права доступа не загружены</p>
-              )}
-            </div>
-
-            {/* Footer */}
-            <div className="flex justify-end gap-3 p-6 border-t border-gray-200 bg-gray-50">
-              <button
-                onClick={() => setShowPermissionsModal(false)}
-                className="px-6 py-2 bg-gray-200 text-gray-800 rounded-xl font-medium hover:bg-gray-300 transition"
-              >
-                Закрыть
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

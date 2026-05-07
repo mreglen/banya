@@ -27,6 +27,12 @@ function BookingDetailsModal({ booking, onClose, onDelete }) {
   const { data: units = [] } = useGetUnitsOfMeasurementQuery();
   const { data: statusOptions = [] } = useGetReservationStatusesQuery();
   const [updateReservation] = useUpdateReservationMutation();
+  const permissionCodes = new Set((currentUser?.permissions || []).map((p) => p.code));
+  const canManageReservation = Boolean(
+    currentUser?.is_admin ||
+    currentUser?.is_director ||
+    permissionCodes.has('reservations:manage')
+  );
 
   // Сброс режима при смене брони
   useEffect(() => {
@@ -168,6 +174,7 @@ function BookingDetailsModal({ booking, onClose, onDelete }) {
         <div className="flex-1 overflow-y-auto">
           <div className="p-4 sm:p-6 space-y-4 text-sm">
             <div><strong>Клиент:</strong> {booking.client_name}</div>
+            <div><strong>Роль сотрудника:</strong> {currentUser?.role_rel?.name || 'Без роли'}</div>
             <div><strong>Телефон:</strong> {booking.client_phone}</div>
             {booking.client_email && <div><strong>Email:</strong> {booking.client_email}</div>}
             <div><strong>Баня:</strong> {bathName}</div>
@@ -232,8 +239,12 @@ function BookingDetailsModal({ booking, onClose, onDelete }) {
                 <select
                   value={selectedStatusId || ''}
                   onChange={handleStatusChange}
-                  disabled={isSavingStatus || lockStatus}
-                  title={lockStatus ? 'Изменить статус закрытой брони может только администратор или директор' : undefined}
+                  disabled={isSavingStatus || lockStatus || !canManageReservation}
+                  title={
+                    lockStatus
+                      ? 'Изменить статус закрытой брони может только администратор или директор'
+                      : (!canManageReservation ? 'Недостаточно прав для изменения статуса' : undefined)
+                  }
                   className={`w-full sm:w-auto sm:min-w-[220px] px-3 py-2 rounded-lg border text-sm font-medium transition-colors ${
                     isSavingStatus || lockStatus
                       ? 'bg-gray-100 text-gray-500 cursor-not-allowed'
@@ -440,18 +451,23 @@ function BookingDetailsModal({ booking, onClose, onDelete }) {
           </button>
           <button
             onClick={() => setIsEditing(true)}
-            className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition font-medium"
+            disabled={!canManageReservation}
+            className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+            title={!canManageReservation ? 'Недостаточно прав для редактирования брони' : undefined}
           >
             Редактировать
           </button>
           <button
             onClick={() => {
+              if (!canManageReservation) return;
               if (window.confirm('Удалить бронь?')) {
                 onDelete(booking.reservation_id);
                 onClose(); // закрыть после удаления
               }
             }}
-            className="flex-1 bg-red-100 text-red-700 py-2 px-4 rounded-lg hover:bg-red-200 transition font-medium"
+            disabled={!canManageReservation}
+            className="flex-1 bg-red-100 text-red-700 py-2 px-4 rounded-lg hover:bg-red-200 transition font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+            title={!canManageReservation ? 'Недостаточно прав для удаления брони' : undefined}
           >
             Удалить
           </button>

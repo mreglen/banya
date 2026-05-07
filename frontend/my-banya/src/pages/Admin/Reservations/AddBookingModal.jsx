@@ -103,9 +103,15 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
   const isEditing = !!booking;
   const today = formatLocalYmd(new Date());
   const currentUser = useSelector((state) => state.auth?.user);
+  const permissionCodes = new Set((currentUser?.permissions || []).map((p) => p.code));
+  const canManageReservation = Boolean(
+    currentUser?.is_admin ||
+    currentUser?.is_director ||
+    permissionCodes.has('reservations:manage')
+  );
   const isClosedBooking = isEditing && booking?.status === 'закрыт';
   const canRevertClosed = !!(currentUser?.is_admin || currentUser?.is_director);
-  const lockStatus = isClosedBooking && !canRevertClosed;
+  const lockStatus = (isClosedBooking && !canRevertClosed) || !canManageReservation;
   const [updateReservation, { isLoading: isUpdating }] = useUpdateReservationMutation();
   const [createReservation, { isLoading: isCreating }] = useCreateReservationMutation();
 
@@ -151,6 +157,8 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
     error: statusesError
   } = useGetReservationStatusesQuery();
   const selectedBathIdNum = formData.bath_id ? Number(formData.bath_id) : null;
+  const selectedBath = baths.find((bath) => Number(bath.bath_id) === selectedBathIdNum);
+  const minBookingHours = Math.max(1, Number(selectedBath?.min_booking_hours) || 1);
   const { data: reservationsForDate = [] } = useGetReservationsByDateQuery(
     { date: formData.date, bathId: selectedBathIdNum },
     { skip: !isOpen || !formData.date || !selectedBathIdNum }
@@ -344,6 +352,14 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
         const n = parseFloat(value);
         setFormData((prev) => ({ ...prev, duration_hours: Number.isNaN(n) ? prev.duration_hours : n }));
       }
+    } else if (name === 'bath_id') {
+      const selected = baths.find((bath) => String(bath.bath_id) === String(value));
+      const minHours = Math.max(1, Number(selected?.min_booking_hours) || 1);
+      setFormData((prev) => ({
+        ...prev,
+        bath_id: value,
+        duration_hours: Number(prev.duration_hours) < minHours ? minHours : prev.duration_hours,
+      }));
     } else {
       setFormData((prev) => ({ ...prev, [name]: value }));
     }
@@ -497,8 +513,8 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
       formData.duration_hours === '' || formData.duration_hours == null
         ? NaN
         : Number(formData.duration_hours);
-    if (Number.isNaN(dh) || dh < 0.5) {
-      errors.duration_hours = 'Минимум 0.5 часа';
+    if (Number.isNaN(dh) || dh < minBookingHours) {
+      errors.duration_hours = `Минимум ${minBookingHours} ч. для выбранной бани`;
     } else {
       const stepped = Math.round(dh * 2) / 2;
       if (Math.abs(dh - stepped) > 1e-6) {
@@ -547,7 +563,9 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
       formData.duration_hours === '' || formData.duration_hours == null
         ? NaN
         : Number(formData.duration_hours);
-    if (Number.isNaN(dh) || dh < 0.5) return 'Укажите длительность (от 0.5 ч, шаг 0.5)';
+    if (Number.isNaN(dh) || dh < minBookingHours) {
+      return `Укажите длительность (от ${minBookingHours} ч, шаг 0.5)`;
+    }
 
     const start = new Date(`${formData.date}T${formData.start_time}:00`);
     const { endDate, endHm } = computeEndDateTime(formData.date, formData.start_time, dh);
@@ -587,6 +605,10 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!canManageReservation) {
+      showToast('Недостаточно прав для управления бронированием', 'error');
+      return;
+    }
     console.log('🔵 Form submitted');
 
     // Сбрасываем предыдущие ошибки
@@ -740,6 +762,9 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
           <h2 className="text-lg sm:text-xl font-semibold text-gray-800">
             {isEditing ? 'Редактировать бронь' : 'Добавить бронь'}
           </h2>
+          <p className="text-xs text-gray-500 mt-1">
+            Роль: {currentUser?.role_rel?.name || 'Без роли'}
+          </p>
           <button
             onClick={onClose}
             className="absolute top-3 right-3 sm:top-5 sm:right-5 w-11 h-11 sm:w-12 sm:h-12 rounded-full text-gray-500 hover:text-gray-700 hover:bg-gray-200 text-3xl sm:text-4xl leading-none flex items-center justify-center transition-colors"
@@ -904,16 +929,21 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Количество часов * <span className="text-gray-500 font-normal">(шаг 0.5)</span>
               </label>
+              {formData.bath_id && (
+                <p className="mb-2 text-xs text-gray-600">
+                  Минимально для этой бани: <strong>{minBookingHours}</strong> ч.
+                </p>
+              )}
               <input
                 type="number"
                 name="duration_hours"
-                min="0.5"
+                min={minBookingHours}
                 step="0.5"
                 value={formData.duration_hours}
                 onChange={handleChange}
                 onBlur={() => {
                   const n = Number(formData.duration_hours);
-                  if (Number.isNaN(n) || n < 0.5) return;
+                  if (Number.isNaN(n) || n < minBookingHours) return;
                   const stepped = Math.round(n * 2) / 2;
                   setFormData((prev) => ({ ...prev, duration_hours: stepped }));
                 }}
@@ -1171,10 +1201,12 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
           <div className="flex flex-col sm:flex-row gap-3">
             <button
               type="submit"
-              disabled={isSubmitting || isLoadingUnits}
+              disabled={isSubmitting || isLoadingUnits || !canManageReservation}
               className="flex-1 bg-green-600 text-white py-2.5 sm:py-3 px-4 rounded-xl font-medium text-sm sm:text-base hover:bg-green-700 active:bg-green-800 transition disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {isSubmitting ? 'Сохранение...' : isEditing ? 'Сохранить изменения' : 'Создать бронь'}
+              {!canManageReservation
+                ? 'Недостаточно прав'
+                : (isSubmitting ? 'Сохранение...' : isEditing ? 'Сохранить изменения' : 'Создать бронь')}
             </button>
             <button
               type="button"
