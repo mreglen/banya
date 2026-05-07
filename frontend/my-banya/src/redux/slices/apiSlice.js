@@ -4,7 +4,7 @@ import baseQuery from '../../utils/baseQuery';
 export const apiSlice = createApi({
   reducerPath: 'api',
   baseQuery,
-  tagTypes: ['Baths', 'Partners', 'Clients', 'Users', 'Roles', 'Reservations', 'Bookings', 'ReservationStatus', 'Permissions', 'Promotions', 'AuditLogs'],
+  tagTypes: ['Baths', 'Partners', 'Clients', 'Users', 'Roles', 'Reservations', 'Bookings', 'ReservationStatus', 'Permissions', 'Promotions', 'AuditLogs', 'Organization'],
 
   endpoints: (builder) => ({
     // ========================
@@ -153,6 +153,28 @@ export const apiSlice = createApi({
     getBookingAvailability: builder.query({
       query: ({ date, bath_id, days = 2 }) =>
         `/bookings/availability?date=${encodeURIComponent(date)}&bath_id=${bath_id}&days=${days}`,
+    }),
+
+    // ========================
+    // 🏢 ОРГАНИЗАЦИЯ — РЕКВИЗИТЫ
+    // ========================
+    getOrganization: builder.query({
+      query: () => '/organization/',
+      providesTags: [{ type: 'Organization', id: 'SINGLE' }],
+    }),
+
+    adminGetOrganization: builder.query({
+      query: () => '/admin/organization/',
+      providesTags: [{ type: 'Organization', id: 'SINGLE' }],
+    }),
+
+    adminUpdateOrganization: builder.mutation({
+      query: (body) => ({
+        url: '/admin/organization/',
+        method: 'PUT',
+        body,
+      }),
+      invalidatesTags: [{ type: 'Organization', id: 'SINGLE' }],
     }),
 
     // ========================
@@ -364,6 +386,10 @@ export const {
   useMarkBookingAsReadMutation,
   useCreateBookingMutation,
   useGetBookingAvailabilityQuery,
+
+  useGetOrganizationQuery,
+  useAdminGetOrganizationQuery,
+  useAdminUpdateOrganizationMutation,
 
   useGetPartnersQuery,
   useGetPartnerByIdQuery,

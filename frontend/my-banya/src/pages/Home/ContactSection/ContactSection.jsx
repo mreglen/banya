@@ -1,10 +1,12 @@
-import { useState, useRef } from 'react';
+import { useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useGetOrganizationQuery } from '../../../redux/slices/apiSlice';
 
 function ContactSection() {
     const navigate = useNavigate();
     const clickCountRef = useRef(0);
     const timerRef = useRef(null);
+    const { data: org } = useGetOrganizationQuery();
 
     const handleIconClick = (e) => {
         // Don't prevent default or stop propagation - keep it invisible
@@ -74,7 +76,19 @@ function ContactSection() {
                                 <div>
                                     <p className="text-base font-semibold text-white">Адрес</p>
                                     <p className="text-gray-300 leading-snug mt-1">
-                                        г. Екатеринбург<br />ул. Кизеловская 18
+                                        {org?.address
+                                            ? org.address.split('\n').map((line, idx) => (
+                                                <span key={idx}>
+                                                    {line}
+                                                    <br />
+                                                </span>
+                                            ))
+                                            : (
+                                                <>
+                                                    г. Екатеринбург<br />ул. Кизеловская 18
+                                                </>
+                                            )
+                                        }
                                     </p>
                                 </div>
                             </div>
@@ -107,6 +121,40 @@ function ContactSection() {
                                 </div>
                             </div>
                         </div>
+
+                        {(org?.inn || org?.kpp) && (
+                            <div className="rounded-2xl border border-gray-700 bg-gray-800/40 backdrop-blur-sm p-5">
+                                <div className="flex items-start gap-4">
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-green-400 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m2 8H7a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v12a2 2 0 01-2 2z" />
+                                    </svg>
+                                    <div>
+                                        <p className="text-base font-semibold text-white">Реквизиты</p>
+                                        <p className="text-gray-300 leading-snug mt-1">
+                                            {org?.inn ? <>ИНН: {org.inn}</> : null}
+                                            {org?.inn && org?.kpp ? <><br /></> : null}
+                                            {org?.kpp ? <>КПП: {org.kpp}</> : null}
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {org?.requisites && (
+                            <div className="rounded-2xl border border-gray-700 bg-gray-800/40 backdrop-blur-sm p-5">
+                                <div className="flex items-start gap-4">
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-green-400 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" />
+                                    </svg>
+                                    <div>
+                                        <p className="text-base font-semibold text-white">Полные реквизиты</p>
+                                        <p className="text-gray-300 leading-snug mt-1 whitespace-pre-line">
+                                            {org.requisites}
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
                     </div>
 
                     <div className="pt-4 mt-auto">

@@ -61,6 +61,19 @@ function Booking() {
     return slots;
   }, [formData.date, occupiedIntervals]);
 
+  const startOptions = useMemo(() => timeSlots.filter((s) => !s.occupied), [timeSlots]);
+
+  const endOptions = useMemo(() => {
+    if (!selectedStartSlot) return [];
+    const candidates = timeSlots.filter((s) => s.slotStart > selectedStartSlot.slotStart && !s.occupied);
+    return candidates.filter((endSlot) => {
+      const rangeSlots = timeSlots.filter(
+        (s) => s.slotStart >= selectedStartSlot.slotStart && s.slotStart < endSlot.slotStart
+      );
+      return !rangeSlots.some((s) => s.occupied);
+    });
+  }, [timeSlots, selectedStartSlot]);
+
   const selectedDurationHours = useMemo(() => {
     if (!selectedStartSlot || !selectedEndSlot) return 0;
     const diff = (selectedEndSlot.slotStart - selectedStartSlot.slotStart) / (1000 * 60 * 60);
@@ -137,32 +150,35 @@ function Booking() {
     return `${day} ${time}`;
   };
 
-  const handleSlotClick = (slot) => {
-    if (slot.occupied) return;
-    if (!selectedStartSlot || (selectedStartSlot && selectedEndSlot)) {
-      setSelectedStartSlot(slot);
-      setSelectedEndSlot(null);
-      return;
-    }
-    if (slot.slotStart <= selectedStartSlot.slotStart) {
-      setSelectedStartSlot(slot);
-      setSelectedEndSlot(null);
-      return;
-    }
-    const rangeSlots = timeSlots.filter(
-      (s) => s.slotStart >= selectedStartSlot.slotStart && s.slotStart < slot.slotStart
-    );
-    const hasOccupiedInside = rangeSlots.some((s) => s.occupied);
-    if (hasOccupiedInside) {
-      setErrors((prev) => ({ ...prev, time_range: 'Выбранный интервал содержит занятые часы' }));
-      return;
-    }
+  const handleStartChange = (iso) => {
+    const slot = timeSlots.find((s) => s.slotStart.toISOString() === iso) || null;
+    setSelectedStartSlot(slot);
+    setSelectedEndSlot(null);
     setErrors((prev) => {
-      const newErrors = { ...prev };
-      delete newErrors.time_range;
-      return newErrors;
+      const next = { ...prev };
+      delete next.time_range;
+      return next;
     });
+  };
+
+  const handleEndChange = (iso) => {
+    const slot = timeSlots.find((s) => s.slotStart.toISOString() === iso) || null;
     setSelectedEndSlot(slot);
+    setErrors((prev) => {
+      const next = { ...prev };
+      delete next.time_range;
+      return next;
+    });
+  };
+
+  const resetTimeRange = () => {
+    setSelectedStartSlot(null);
+    setSelectedEndSlot(null);
+    setErrors((prev) => {
+      const next = { ...prev };
+      delete next.time_range;
+      return next;
+    });
   };
 
   const validate = () => {
@@ -316,44 +332,59 @@ function Booking() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Время (1-й клик заезд, 2-й клик выезд)
-              </label>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-2 max-h-72 overflow-y-auto border border-gray-200 rounded-xl p-3">
-                {timeSlots.map((slot) => {
-                  const isStart = selectedStartSlot?.slotStart.getTime() === slot.slotStart.getTime();
-                  const isEnd = selectedEndSlot?.slotStart.getTime() === slot.slotStart.getTime();
-                  const inRange =
-                    selectedStartSlot &&
-                    selectedEndSlot &&
-                    slot.slotStart >= selectedStartSlot.slotStart &&
-                    slot.slotStart < selectedEndSlot.slotStart;
-
-                  return (
-                    <button
-                      key={slot.slotStart.toISOString()}
-                      type="button"
-                      onClick={() => handleSlotClick(slot)}
-                      disabled={slot.occupied}
-                      className={`px-2 py-2 rounded-lg text-xs md:text-sm border transition ${
-                        slot.occupied
-                          ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
-                          : isStart || isEnd
-                            ? 'bg-green-600 text-white border-green-600'
-                            : inRange
-                              ? 'bg-green-100 text-green-800 border-green-200'
-                              : 'bg-white text-gray-700 border-gray-300 hover:bg-green-50'
-                      }`}
-                      title={formatSlotLabel(slot.slotStart)}
-                    >
-                      {slot.slotStart.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}
-                    </button>
-                  );
-                })}
+              <div className="flex items-center justify-between gap-3 mb-2">
+                <label className="block text-sm font-medium text-gray-700">
+                  Время посещения
+                </label>
+                <button
+                  type="button"
+                  onClick={resetTimeRange}
+                  className="text-xs px-3 py-1.5 rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 transition"
+                >
+                  Сбросить
+                </button>
               </div>
-              {(errors.time_range || errors.time_range) && (
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Заезд</label>
+                  <select
+                    value={selectedStartSlot ? selectedStartSlot.slotStart.toISOString() : ''}
+                    onChange={(e) => handleStartChange(e.target.value)}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-xl bg-white focus:ring-2 focus:ring-green-500"
+                    disabled={!formData.date || !formData.bath_id}
+                  >
+                    <option value="">Выберите время заезда</option>
+                    {startOptions.map((s) => (
+                      <option key={s.slotStart.toISOString()} value={s.slotStart.toISOString()}>
+                        {formatSlotLabel(s.slotStart)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Выезд</label>
+                  <select
+                    value={selectedEndSlot ? selectedEndSlot.slotStart.toISOString() : ''}
+                    onChange={(e) => handleEndChange(e.target.value)}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-xl bg-white focus:ring-2 focus:ring-green-500"
+                    disabled={!selectedStartSlot}
+                  >
+                    <option value="">Выберите время выезда</option>
+                    {endOptions.map((s) => (
+                      <option key={s.slotStart.toISOString()} value={s.slotStart.toISOString()}>
+                        {formatSlotLabel(s.slotStart)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {errors.time_range && (
                 <p className="text-red-500 text-sm mt-1">{errors.time_range}</p>
               )}
+
               {selectedStartSlot && selectedEndSlot && (
                 <p className="text-sm text-gray-600 mt-2">
                   Заезд: <b>{formatSlotLabel(selectedStartSlot.slotStart)}</b> | Выезд: <b>{formatSlotLabel(selectedEndSlot.slotStart)}</b> | Длительность: <b>{Math.round(selectedDurationHours)} ч.</b>

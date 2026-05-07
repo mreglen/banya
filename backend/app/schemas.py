@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from datetime import datetime
 from typing import Optional, List
 from datetime import date
@@ -172,6 +172,57 @@ class BookingOut(BookingBase):
 
     class Config:
         from_attributes = True
+
+
+# === Реквизиты организации ===
+class OrganizationDetailsBase(BaseModel):
+    address: str = ""
+    inn: str = ""
+    kpp: str = ""
+    requisites: str = ""
+
+
+class OrganizationDetailsOut(OrganizationDetailsBase):
+    id: int
+    updated_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+class OrganizationDetailsUpdate(BaseModel):
+    address: Optional[str] = None
+    inn: Optional[str] = None
+    kpp: Optional[str] = None
+    requisites: Optional[str] = None
+
+    @field_validator("inn")
+    @classmethod
+    def validate_inn(cls, v: Optional[str]):
+        if v is None:
+            return v
+        v = v.strip()
+        if v == "":
+            return v
+        if not v.isdigit():
+            raise ValueError("ИНН должен содержать только цифры")
+        if len(v) not in (10, 12):
+            raise ValueError("ИНН должен быть длиной 10 или 12 цифр")
+        return v
+
+    @field_validator("kpp")
+    @classmethod
+    def validate_kpp(cls, v: Optional[str]):
+        if v is None:
+            return v
+        v = v.strip()
+        if v == "":
+            return v
+        if not v.isdigit():
+            raise ValueError("КПП должен содержать только цифры")
+        if len(v) != 9:
+            raise ValueError("КПП должен быть длиной 9 цифр")
+        return v
 
 
 # === Авторизация / Пользователи ===

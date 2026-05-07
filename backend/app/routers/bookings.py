@@ -97,14 +97,17 @@ def create_booking(booking: schemas.BookingCreate, db: Session = Depends(databas
         "created_at": db_booking.created_at.isoformat(),
         "bath": {
             "bath_id": bath.bath_id,
+            "slug": bath.slug,
             "name": bath.name,
             "title": bath.title,
             "cost_weekday": bath.cost_weekday,
             "cost_weekend": bath.cost_weekend,
+            "min_booking_hours": getattr(bath, "min_booking_hours", 1) or 1,
             "description": bath.description,
             "base_guests": bath.base_guests,
             "extra_guest_price": bath.extra_guest_price,
             "photos": [],
+            "promotions": [],
         }
     }
 
@@ -128,14 +131,17 @@ def get_all_bookings(db: Session = Depends(database.get_db)):
             "created_at": booking.created_at.isoformat(),
             "bath": {
                 "bath_id": booking.bath.bath_id,
+                "slug": booking.bath.slug,
                 "name": booking.bath.name,
                 "title": booking.bath.title,
                 "cost_weekday": booking.bath.cost_weekday,
                 "cost_weekend": booking.bath.cost_weekend,
+                "min_booking_hours": getattr(booking.bath, "min_booking_hours", 1) or 1,
                 "description": booking.bath.description,
                 "base_guests": booking.bath.base_guests,
                 "extra_guest_price": booking.bath.extra_guest_price,
                 "photos": [],
+                "promotions": [],
             } if booking.bath else None,
         }
         result.append(booking_data)

@@ -33,6 +33,7 @@ import DeletionRequestsPage from './pages/Admin/DeletionRequestsPage/DeletionReq
 import Users from './pages/Admin/Company/Staffs/Users';
 import UserForm from './pages/Admin/Company/Staffs/UserForm';
 import RoleBasedRoute from './pages/Admin/Company/RoleBasedRoute/RoleBasedRoute';
+import Organization from './pages/Admin/Company/Organization/Organization';
 import AdminDashboard from './pages/Admin/AdminDashboard';
 import PasswordResetRequest from './pages/Admin/AdminLogin/PasswordResetRequest';
 import PasswordResetVerify from './pages/Admin/AdminLogin/PasswordResetVerify';
@@ -124,6 +125,7 @@ function AppWithLayout() {
           <Route path="company/partner" element={<RoleBasedRoute requiredPermission="partners:view"><Partner /></RoleBasedRoute>} />
           <Route path="company/partner/edit/:id" element={<RoleBasedRoute requiredPermission="partners:manage"><PartnerForm /></RoleBasedRoute>} />
           <Route path="company/partner/add" element={<RoleBasedRoute requiredPermission="partners:manage"><PartnerForm /></RoleBasedRoute>} />
+          <Route path="company/organization" element={<Organization />} />
           <Route path="storage/nomenclature" element={<RoleBasedRoute requiredPermission="storage:view"><Storage /></RoleBasedRoute>} />
           <Route path="storage/nomenclature/add/product" element={<RoleBasedRoute requiredPermission="storage:manage"><AddStorageProduct /></RoleBasedRoute>} />
           <Route path="storage/product/:id" element={<RoleBasedRoute requiredPermission="storage:view"><Product /></RoleBasedRoute>} />

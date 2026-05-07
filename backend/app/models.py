@@ -308,6 +308,18 @@ class Settings(Base):
     description = Column(String(255), nullable=True)
 
 
+class OrganizationDetails(Base):
+    __tablename__ = "organization_details"
+
+    id = Column(Integer, primary_key=True)
+    address = Column(Text, nullable=False, default="")
+    inn = Column(Text, nullable=False, default="")
+    kpp = Column(Text, nullable=False, default="")
+    requisites = Column(Text, nullable=False, default="")
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
 class UserSession(Base):
     __tablename__ = "user_sessions"
 

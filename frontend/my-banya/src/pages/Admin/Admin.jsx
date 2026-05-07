@@ -26,6 +26,7 @@ function Admin() {
       '/admin/reservations': 'Бронирование',
       '/admin/company/user': 'Сотрудники',
       '/admin/company/partner': 'Поставщики',
+      '/admin/company/organization': 'Организация',
       '/admin/documents/entrance': 'Поступление',
       '/admin/documents/realization': 'Реализация',
       '/admin/documents/product-requests': 'Заявки на товар',
@@ -129,7 +130,8 @@ function Admin() {
 
         {/* Компания */}
         {(hasAccess('/admin/company/user') ||
-          hasAccess('/admin/company/partner')) && (
+          hasAccess('/admin/company/partner') ||
+          hasAccess('/admin/company/organization')) && (
             <div>
               <button
                 onClick={toggleCompany}
@@ -186,6 +188,23 @@ function Admin() {
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
                       </svg>
                       Поставщики
+                    </NavLink>
+                  )}
+
+                  {hasAccess('/admin/company/organization') && (
+                    <NavLink
+                      to="/admin/company/organization"
+                      className={({ isActive }) =>
+                        `flex items-center px-4 py-2 rounded-lg text-sm transition ${isActive
+                          ? 'bg-green-100 text-green-800 font-medium'
+                          : 'text-gray-600 hover:bg-green-50 hover:text-green-700'
+                        }`
+                      }
+                    >
+                      <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 21h18M4 21V7a2 2 0 012-2h12a2 2 0 012 2v14M9 21v-6a1 1 0 011-1h4a1 1 0 011 1v6M8 10h.01M12 10h.01M16 10h.01M8 14h.01M12 14h.01M16 14h.01" />
+                      </svg>
+                      Организация
                     </NavLink>
                   )}
                 </div>
