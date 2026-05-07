@@ -1,5 +1,6 @@
 // src/components/CategoryModal.jsx
 import React, { useState, useEffect, useRef } from 'react';
+import { prepareImageForUpload, MAX_IMAGE_SIZE_MB } from '../../../utils/imageProcessing';
 
 const CategoryModal = ({
   isOpen,
@@ -12,6 +13,7 @@ const CategoryModal = ({
   const [selectedParentId, setSelectedParentId] = useState(null);
   const [imageFile, setImageFile] = useState(null);
   const [currentImageUrl, setCurrentImageUrl] = useState(null);
+  const [previewUrl, setPreviewUrl] = useState(null);
   const [photoDeleted, setPhotoDeleted] = useState(false);
   const [isVisibleOnWebsite, setIsVisibleOnWebsite] = useState(false);
   const [expanded, setExpanded] = useState(new Set());
@@ -74,6 +76,7 @@ const CategoryModal = ({
       setSelectedParentId(category?.parent_id ?? null);
       setIsVisibleOnWebsite(Boolean(category?.is_visible_on_website));
       setImageFile(null);
+      setPreviewUrl(null);
       setPhotoDeleted(false);
 
       // Для фото используем базовый URL сервера (без /api)
@@ -87,10 +90,53 @@ const CategoryModal = ({
     }
   }, [isOpen, category]);
 
+  useEffect(() => {
+    return () => {
+      if (previewUrl) {
+        URL.revokeObjectURL(previewUrl);
+      }
+    };
+  }, [previewUrl]);
+
   const handleDeletePhoto = () => {
+    if (previewUrl) {
+      URL.revokeObjectURL(previewUrl);
+    }
     setImageFile(null);
+    setPreviewUrl(null);
     setPhotoDeleted(true);
     setCurrentImageUrl(null);
+  };
+
+  const handleFileChange = async (e) => {
+    const file = e.target.files?.[0] || null;
+    if (!file) {
+      return;
+    }
+
+    if (!file.type.startsWith('image/')) {
+      alert('Можно загрузить только изображение');
+      e.target.value = '';
+      return;
+    }
+
+    try {
+      const preparedFile = await prepareImageForUpload(file);
+      if (previewUrl) {
+        URL.revokeObjectURL(previewUrl);
+      }
+      const newPreview = URL.createObjectURL(preparedFile);
+      setImageFile(preparedFile);
+      setPreviewUrl(newPreview);
+      setPhotoDeleted(false);
+    } catch (err) {
+      console.error('Ошибка обработки изображения категории:', err);
+      alert(err.message || `Не удалось подготовить фото. Максимум ${MAX_IMAGE_SIZE_MB} МБ`);
+      setImageFile(null);
+      setPreviewUrl(null);
+    } finally {
+      e.target.value = '';
+    }
   };
 
   const handleSubmit = () => {
@@ -167,7 +213,7 @@ const CategoryModal = ({
               <div className="relative inline-block">
                 {imageFile ? (
                   <img
-                    src={URL.createObjectURL(imageFile)}
+                    src={previewUrl}
                     alt="Новое фото"
                     className="h-20 sm:h-24 object-contain border rounded"
                   />
@@ -198,13 +244,10 @@ const CategoryModal = ({
               ref={fileInputRef}
               type="file"
               accept="image/*"
-              onChange={(e) => {
-                const file = e.target.files[0] || null;
-                setImageFile(file);
-                if (file) setPhotoDeleted(false);
-              }}
+              onChange={handleFileChange}
               className="w-full text-xs"
             />
+            <p className="mt-1 text-xs text-gray-500">Загружается только 1 фото, максимум {MAX_IMAGE_SIZE_MB} МБ после сжатия.</p>
           </div>
 
           <div className="flex flex-col-reverse sm:flex-row justify-end gap-2">

@@ -29,6 +29,17 @@ const CategoryTree = ({
   const [uploadCategoryPhotos] = useUploadCategoryPhotosMutation();
   const [deleteCategory] = useDeleteCategoryMutation();
 
+  const extractApiErrorMessage = (err, fallback) => {
+    const details = err?.data?.detail;
+    if (typeof details === 'string') return details;
+    if (Array.isArray(details) && details.length > 0) {
+      const first = details[0];
+      if (typeof first === 'string') return first;
+      if (typeof first?.msg === 'string') return first.msg;
+    }
+    return fallback;
+  };
+
   const handleContextMenu = useCallback((e, category) => {
     e.preventDefault();
     setContextMenu({ x: e.clientX, y: e.clientY, category });
@@ -154,14 +165,14 @@ const CategoryTree = ({
       } else if (imageFile) {
         // Загружаем новое фото
         const formData = new FormData();
-        formData.append('files', imageFile);
+        formData.set('files', imageFile);
         await uploadCategoryPhotos({ categoryId, formData }).unwrap();
       }
 
       onCategoriesChange();
     } catch (err) {
       console.error('Ошибка:', err);
-      alert(id ? 'Не удалось обновить категорию' : 'Не удалось создать категорию');
+      alert(extractApiErrorMessage(err, id ? 'Не удалось обновить категорию' : 'Не удалось создать категорию'));
     }
   };
 

@@ -7,6 +7,7 @@ import { HelmetProvider } from 'react-helmet-async';
 import Header from './components/Header/Header';
 import Home from './pages/Home/Home';
 import WebsiteCategoryProductsPage from './pages/Home/WebsiteCategoryProductsPage/WebsiteCategoryProductsPage';
+import LandingNotFound from './pages/Home/LandingNotFound/LandingNotFound';
 import Baths from './pages/Baths/Baths';
 import Booking from './pages/Booking/Booking';
 import BathsCard from './pages/Baths/BathsCard/BathsCard';
@@ -43,6 +44,7 @@ import SupportPage from './pages/Admin/Support/SupportPage';
 import CreateTicketForm from './pages/Admin/Support/CreateTicketForm';
 import ChatPage from './pages/Admin/Support/ChatPage';
 import ReservationPrintDocument from './pages/Admin/Reservations/ReservationPrintDocument';
+import AdminNotFound from './pages/Admin/AdminNotFound/AdminNotFound';
 
 
 
@@ -127,6 +129,7 @@ function AppWithLayout() {
           <Route path="support" element={<SupportPage />} />
           <Route path="support/create" element={<CreateTicketForm />} />
           <Route path="support/ticket/:id" element={<ChatPage />} />
+          <Route path="*" element={<AdminNotFound />} />
         </Route>
 
 
@@ -134,6 +137,7 @@ function AppWithLayout() {
         <Route path="/admin/reset-password" element={<PasswordResetRequest />} />
         <Route path="/admin/reset-password/verify" element={<PasswordResetVerify />} />
         <Route path="/admin/reset-password/complete" element={<PasswordResetComplete />} />
+        <Route path="*" element={<LandingNotFound />} />
       </Routes>
     </>
   );

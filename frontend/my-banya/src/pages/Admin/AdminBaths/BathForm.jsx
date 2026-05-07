@@ -8,50 +8,9 @@ import {
   useDeleteBathPhotoMutation,
 } from '../../../redux/slices/apiSlice';
 import { useGetPromotionsQuery } from '../../../redux/slices/promotionsApiSlice';
+import { prepareImageForUpload, MAX_IMAGE_SIZE_MB } from '../../../utils/imageProcessing';
 
 const MAX_FILES = 5;
-const MAX_FILE_SIZE_MB = 5;
-const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
-
-const compressImageFile = (file, maxWidth = 1920, quality = 0.82) =>
-  new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const img = new Image();
-      img.onload = () => {
-        const ratio = Math.min(1, maxWidth / img.width);
-        const canvas = document.createElement('canvas');
-        canvas.width = Math.round(img.width * ratio);
-        canvas.height = Math.round(img.height * ratio);
-        const ctx = canvas.getContext('2d');
-        if (!ctx) {
-          reject(new Error('Canvas is not supported'));
-          return;
-        }
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-        canvas.toBlob(
-          (blob) => {
-            if (!blob) {
-              reject(new Error('Image compression failed'));
-              return;
-            }
-            const compressed = new File(
-              [blob],
-              file.name.replace(/\.[^.]+$/, '.webp'),
-              { type: 'image/webp' }
-            );
-            resolve(compressed);
-          },
-          'image/webp',
-          quality
-        );
-      };
-      img.onerror = () => reject(new Error('Image load failed'));
-      img.src = reader.result;
-    };
-    reader.onerror = () => reject(new Error('File read failed'));
-    reader.readAsDataURL(file);
-  });
 
 function BathForm() {
   const { id } = useParams();
@@ -194,13 +153,7 @@ function BathForm() {
     try {
       const processedFiles = await Promise.all(
         files.map(async (file) => {
-          const preparedFile = file.type === 'image/webp' && file.size <= MAX_FILE_SIZE_BYTES
-            ? file
-            : await compressImageFile(file);
-
-          if (preparedFile.size > MAX_FILE_SIZE_BYTES) {
-            throw new Error(`Файл "${file.name}" превышает ${MAX_FILE_SIZE_MB} МБ даже после сжатия`);
-          }
+          const preparedFile = await prepareImageForUpload(file);
 
           return {
             file: preparedFile,
@@ -401,7 +354,7 @@ function BathForm() {
           {/* Загрузка фото */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Загрузить фото (до 5 шт., макс. 10 МБ каждое)
+              Загрузить фото (до 5 шт., макс. {MAX_IMAGE_SIZE_MB} МБ каждое)
             </label>
             <input
               type="file"

@@ -1,8 +1,16 @@
-import { Link } from 'react-router-dom';
+import { useState } from 'react';
 import { useGetWebsiteCategoriesPreviewQuery } from '../../../redux/slices/apiSlice';
 
 function WebsiteCategoriesPreview() {
   const { data: categories = [] } = useGetWebsiteCategoriesPreviewQuery();
+  const [expandedCategories, setExpandedCategories] = useState({});
+
+  const toggleCategory = (categoryId) => {
+    setExpandedCategories((prev) => ({
+      ...prev,
+      [categoryId]: !prev[categoryId],
+    }));
+  };
 
   if (!Array.isArray(categories) || categories.length === 0) {
     return null;
@@ -42,15 +50,17 @@ function WebsiteCategoriesPreview() {
                 </p>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-12">
-                {category.products.slice(0, 3).map((product) => (
+              <div className="flex flex-wrap justify-center gap-6 mt-12">
+                {category.products
+                  .slice(0, expandedCategories[category.id] ? category.products.length : 3)
+                  .map((product) => (
                   <div
                     key={product.id}
-                    className={
+                    className={`w-full md:w-[calc(33.333%-1rem)] ${
                       isDark
                         ? 'bg-gray-800 rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow duration-300 border border-gray-700'
                         : 'bg-white rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow duration-300 border border-gray-100'
-                    }
+                    }`}
                   >
                     <h3
                       className={`text-xl font-medium mb-2 ${
@@ -79,14 +89,15 @@ function WebsiteCategoriesPreview() {
 
               {category.products.length > 3 && (
                 <div className="mt-8 text-center">
-                  <Link
-                    to={`/categories/${category.id}/products`}
+                  <button
+                    type="button"
+                    onClick={() => toggleCategory(category.id)}
                     className={`inline-flex items-center gap-2 px-8 py-3 bg-amber-600 hover:bg-amber-700 text-white rounded-xl font-medium transition-all duration-300 hover:shadow-lg transform hover:scale-105 ${
                       isDark ? 'shadow-md shadow-black/30' : ''
                     }`}
                   >
-                    Показать больше
-                  </Link>
+                    {expandedCategories[category.id] ? 'Скрыть' : 'Показать больше'}
+                  </button>
                 </div>
               )}
             </div>
