@@ -12,6 +12,8 @@ function DocumentEntrance() {
   const {
     data: documents = [],
     isLoading,
+    isError,
+    error,
     refetch,
   } = useGetEntranceDocumentsQuery();
 
@@ -33,6 +35,28 @@ function DocumentEntrance() {
 
   if (isLoading) {
     return <DocumentsEntranceSkeleton />;
+  }
+
+  if (isError) {
+    return (
+      <div className="min-h-screen bg-gray-50 p-4 sm:p-6">
+        <div className="max-w-3xl mx-auto">
+          <div className="bg-white rounded-xl sm:rounded-2xl shadow p-6 border border-red-100">
+            <h1 className="text-xl sm:text-2xl font-bold text-gray-800 mb-3">Поступление товаров</h1>
+            <p className="text-red-700 mb-3">Не удалось загрузить документы поступления.</p>
+            <p className="text-sm text-gray-600 mb-4">
+              {error?.data?.detail || error?.error || 'Проверьте миграции базы данных и доступность backend API.'}
+            </p>
+            <button
+              onClick={() => refetch()}
+              className="px-4 py-2 rounded-lg bg-green-600 text-white hover:bg-green-700 transition"
+            >
+              Повторить
+            </button>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   const sortedDocs = [...documents].sort((a, b) => new Date(b.date) - new Date(a.date));

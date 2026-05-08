@@ -13,6 +13,8 @@ function DocumentsRealization() {
     const {
         data: realizations = [],
         isLoading,
+        isError,
+        error,
         refetch,
     } = useGetRealizationDocumentsQuery();
 
@@ -52,6 +54,28 @@ function DocumentsRealization() {
 
     if (isLoading) {
         return <DocumentsRealizationSkeleton />;
+    }
+
+    if (isError) {
+        return (
+            <div className="min-h-screen bg-gray-50 p-4 md:p-8">
+                <div className="max-w-3xl mx-auto">
+                    <div className="bg-white rounded-xl sm:rounded-2xl shadow p-6 border border-red-100">
+                        <h1 className="text-2xl md:text-3xl font-bold text-gray-800 mb-3">Документы реализации</h1>
+                        <p className="text-red-700 mb-3">Не удалось загрузить документы реализации.</p>
+                        <p className="text-sm text-gray-600 mb-4">
+                            {error?.data?.detail || error?.error || 'Проверьте миграции базы данных и доступность backend API.'}
+                        </p>
+                        <button
+                            onClick={() => refetch()}
+                            className="px-4 py-2 rounded-lg bg-green-600 text-white hover:bg-green-700 transition"
+                        >
+                            Повторить
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
     }
 
     return (

@@ -535,10 +535,11 @@ class EntranceDocumentBase(BaseModel):
     responsible_name: str
     supplier_number: Optional[str] = None
     comment: Optional[str] = None
-    account_id: int
+    account_id: Optional[int] = None
     total_amount: float
 
 class EntranceDocumentCreate(EntranceDocumentBase):
+    account_id: int
     items: List[EntranceDocumentItemCreate]
 
 class EntranceDocumentRead(EntranceDocumentBase):

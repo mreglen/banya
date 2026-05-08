@@ -36,6 +36,8 @@ function AddDocumentEntrance() {
 
   const [isContractorModalOpen, setIsContractorModalOpen] = useState(false);
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
+  const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
+  const [pendingPayload, setPendingPayload] = useState(null);
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [productSearch, setProductSearch] = useState('');
   const [isProductDropdownOpen, setIsProductDropdownOpen] = useState(false);
@@ -235,6 +237,22 @@ function AddDocumentEntrance() {
     dispatch(updateField({ field, value }));
   };
 
+  const submitDocument = async (documentPayload) => {
+    try {
+      if (isEditing) {
+        await updateDocument({ id: parseInt(id), ...documentPayload }).unwrap();
+      } else {
+        await createDocument(documentPayload).unwrap();
+      }
+
+      dispatch(resetForm());
+      navigate('/admin/documents/entrance');
+    } catch (error) {
+      console.error('Ошибка сохранения документа:', error);
+      alert(error?.data?.detail || 'Не удалось сохранить документ');
+    }
+  };
+
   const handleSaveDocument = async () => {
     if (!accountId) {
       alert('Выберите счет списания');
@@ -245,10 +263,6 @@ function AddDocumentEntrance() {
     const accountLabel = selectedAccount
       ? `${selectedAccount.bank_name} (${selectedAccount.account_number})`
       : `Счет #${accountId}`;
-    const confirmed = window.confirm(
-      `Подтвердите создание документа поступления.\nСумма: ${total.toFixed(2)} ₽\nСчет списания: ${accountLabel}`
-    );
-    if (!confirmed) return;
     const documentPayload = {
       date,
       supplier_id: supplierId,
@@ -263,19 +277,12 @@ function AddDocumentEntrance() {
         purchase_price: Number(item.purchasePrice) || 0,
       })),
     };
-
-    try {
-      if (isEditing) {
-        await updateDocument({ id: parseInt(id), ...documentPayload }).unwrap();
-      } else {
-        await createDocument(documentPayload).unwrap();
-      }
-
-      dispatch(resetForm());
-      navigate('/admin/documents/entrance');
-    } catch (error) {
-      console.error('Ошибка сохранения документа:', error);
-    }
+    setPendingPayload({
+      payload: documentPayload,
+      total,
+      accountLabel,
+    });
+    setIsConfirmModalOpen(true);
   };
 
   const handleItemDoubleClick = (productId) => {
@@ -715,6 +722,50 @@ function AddDocumentEntrance() {
         onClose={handleCloseProductModal}
         onSelect={handleSelectProductFromModal}
       />
+
+      {isConfirmModalOpen && pendingPayload && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl">
+            <h3 className="text-lg font-bold text-gray-900 mb-3">
+              Подтверждение документа
+            </h3>
+            <div className="space-y-2 text-sm text-gray-700 mb-5">
+              <p>
+                <span className="font-medium text-gray-900">Сумма:</span>{' '}
+                {pendingPayload.total.toFixed(2)} ₽
+              </p>
+              <p>
+                <span className="font-medium text-gray-900">Счет списания:</span>{' '}
+                {pendingPayload.accountLabel}
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsConfirmModalOpen(false);
+                  setPendingPayload(null);
+                }}
+                className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100"
+              >
+                Отмена
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const payloadToSend = pendingPayload.payload;
+                  setIsConfirmModalOpen(false);
+                  setPendingPayload(null);
+                  submitDocument(payloadToSend);
+                }}
+                className="flex-1 rounded-lg bg-green-600 px-3 py-2 text-sm text-white hover:bg-green-700"
+              >
+                Подтвердить
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

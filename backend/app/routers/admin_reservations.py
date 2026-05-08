@@ -44,7 +44,11 @@ def _send_booking_confirmation_email_task(
 
 def _is_closed_status(db: Session, status_id: int) -> bool:
     status_obj = db.query(models.ReservationStatus).filter(models.ReservationStatus.id == status_id).first()
-    return bool(status_obj and status_obj.status_name == "закрыт")
+    return bool(
+        status_obj
+        and isinstance(status_obj.status_name, str)
+        and status_obj.status_name.strip().lower() == "закрыт"
+    )
 
 
 def check_overlap(db: Session, bath_id: int, start: datetime, end: datetime, exclude_id: int = None):
@@ -471,7 +475,7 @@ def update_reservation(
         new_status_id = reservation.status_id if reservation.status_id is not None else old_status_id
         
         # Если статус изменен на "закрыт" (проверяем по названию)
-        if status_obj and status_obj.status_name == "закрыт" and old_status_id != new_status_id:
+        if _is_closed_status(db, new_status_id) and old_status_id != new_status_id:
             if not db_reservation.income_account_id:
                 raise HTTPException(status_code=400, detail="Для закрытия брони выберите счет зачисления")
             # Получаем товары из брони

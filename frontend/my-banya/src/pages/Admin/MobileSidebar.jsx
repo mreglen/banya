@@ -321,7 +321,10 @@ function MobileSidebar({ isOpen, onClose }) {
               onClick={onClose}
             >
               <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h4l3 8 4-14 3 6h4" />
+                <circle cx="12" cy="12" r="9" strokeWidth={2} />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.5 7.5v9" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.5 11.5h4.5" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.2 15c0 1.2-.8 1.8-2.1 1.8H9.8" />
               </svg>
               Финансы
             </NavLink>

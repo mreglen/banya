@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { useGetBathsQuery } from '../../../redux/slices/apiSlice';
+import { useGetBathsQuery, useGetFinanceAccountsQuery } from '../../../redux/slices/apiSlice';
 import { useGetUnitsOfMeasurementQuery } from '../../../redux/slices/productsApiSlice';
 import { useGetReservationStatusesQuery, useUpdateReservationMutation, reservationApiSlice } from '../../../redux/slices/reservationSlice';
 import AddBookingModal from './AddBookingModal';
@@ -20,10 +20,14 @@ function BookingDetailsModal({ booking, onClose, onDelete }) {
   const [isEditing, setIsEditing] = useState(false);
   const [isNotesExpanded, setIsNotesExpanded] = useState(false);
   const [selectedStatusId, setSelectedStatusId] = useState(null);
+  const [selectedAccountId, setSelectedAccountId] = useState('');
   const [isSavingStatus, setIsSavingStatus] = useState(false);
+  const [isSavingAccount, setIsSavingAccount] = useState(false);
   const [statusError, setStatusError] = useState(null);
+  const [accountError, setAccountError] = useState(null);
   
   const { data: baths = [] } = useGetBathsQuery();
+  const { data: financeAccounts = [] } = useGetFinanceAccountsQuery({ active_only: true });
   const { data: units = [] } = useGetUnitsOfMeasurementQuery();
   const { data: statusOptions = [] } = useGetReservationStatusesQuery();
   const [updateReservation] = useUpdateReservationMutation();
@@ -39,6 +43,7 @@ function BookingDetailsModal({ booking, onClose, onDelete }) {
     setIsEditing(false);
     setIsNotesExpanded(false);
     setStatusError(null);
+    setAccountError(null);
   }, [booking]);
 
   // Устанавливаем текущий статус при загрузке статусов
@@ -48,6 +53,11 @@ function BookingDetailsModal({ booking, onClose, onDelete }) {
       setSelectedStatusId(currentStatus ? currentStatus.id : null);
     }
   }, [booking, statusOptions]);
+
+  useEffect(() => {
+    if (!booking) return;
+    setSelectedAccountId(booking.income_account_id ? String(booking.income_account_id) : '');
+  }, [booking]);
 
   if (!booking) return null;
 
@@ -132,6 +142,34 @@ function BookingDetailsModal({ booking, onClose, onDelete }) {
       }
     } finally {
       setIsSavingStatus(false);
+    }
+  };
+
+  const handleAccountChange = async (e) => {
+    const newAccountId = e.target.value;
+    setSelectedAccountId(newAccountId);
+    setAccountError(null);
+
+    try {
+      setIsSavingAccount(true);
+      await updateReservation({
+        id: booking.reservation_id,
+        income_account_id: newAccountId ? parseInt(newAccountId, 10) : null,
+      }).unwrap();
+
+      dispatch(reservationApiSlice.util.invalidateTags(['Reservations']));
+    } catch (error) {
+      console.error('Ошибка обновления счета зачисления:', error);
+      setSelectedAccountId(booking.income_account_id ? String(booking.income_account_id) : '');
+
+      const detail = error?.data?.detail;
+      if (typeof detail === 'string' && detail) {
+        setAccountError(detail);
+      } else {
+        setAccountError('Не удалось обновить счет зачисления. Попробуйте еще раз.');
+      }
+    } finally {
+      setIsSavingAccount(false);
     }
   };
 
@@ -269,6 +307,38 @@ function BookingDetailsModal({ booking, onClose, onDelete }) {
               {statusError && (
                 <p className="text-xs text-red-600 flex items-center gap-1">
                   <span>⚠</span> {statusError}
+                </p>
+              )}
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                <strong>Счет зачисления:</strong>
+                <select
+                  value={selectedAccountId}
+                  onChange={handleAccountChange}
+                  disabled={isSavingAccount || !canManageReservation}
+                  title={!canManageReservation ? 'Недостаточно прав для изменения счета зачисления' : undefined}
+                  className={`w-full sm:w-auto sm:min-w-[280px] px-3 py-2 rounded-lg border text-sm font-medium transition-colors ${
+                    isSavingAccount || !canManageReservation
+                      ? 'bg-gray-100 text-gray-500 cursor-not-allowed'
+                      : 'bg-white border-gray-300 hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 cursor-pointer'
+                  }`}
+                >
+                  <option value="">Без счета</option>
+                  {financeAccounts.map((account) => (
+                    <option key={account.id} value={account.id}>
+                      {account.bank_name} ({account.account_number})
+                    </option>
+                  ))}
+                </select>
+                {isSavingAccount && (
+                  <span className="ml-2 text-xs text-gray-500">Сохранение...</span>
+                )}
+              </div>
+              {accountError && (
+                <p className="text-xs text-red-600 flex items-center gap-1">
+                  <span>⚠</span> {accountError}
                 </p>
               )}
             </div>
