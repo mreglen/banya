@@ -42,6 +42,11 @@ def _send_booking_confirmation_email_task(
         print(f"Ошибка фоновой отправки email подтверждения брони: {e}")
 
 
+def _is_closed_status(db: Session, status_id: int) -> bool:
+    status_obj = db.query(models.ReservationStatus).filter(models.ReservationStatus.id == status_id).first()
+    return bool(status_obj and status_obj.status_name == "закрыт")
+
+
 def check_overlap(db: Session, bath_id: int, start: datetime, end: datetime, exclude_id: int = None):
     """
     Проверяет пересечение с существующими бронями, включая время на уборку после каждой.
@@ -201,9 +206,35 @@ def create_reservation(
         guests=reservation.guests,
         total_cost=total_cost,
         status_id=reservation.status_id,
+        income_account_id=reservation.income_account_id,
     )
     db.add(db_reservation)
     db.flush()
+
+    if _is_closed_status(db, reservation.status_id):
+        if not reservation.income_account_id:
+            raise HTTPException(status_code=400, detail="Для закрытия брони выберите счет зачисления")
+        realization_doc = models.RealizationDocument(
+            date=date.today(),
+            reservation_id=db_reservation.reservation_id,
+            bath_id=db_reservation.bath_id,
+            client_name=db_reservation.client_name,
+            client_phone=db_reservation.client_phone,
+            total_amount=db_reservation.total_cost,
+            account_id=db_reservation.income_account_id,
+        )
+        db.add(realization_doc)
+        db.flush()
+        if reservation.products:
+            for item in reservation.products:
+                product = db.query(models.Product).filter(models.Product.id == item.product_id).first()
+                if product:
+                    db.add(models.RealizationDocumentItem(
+                        document_id=realization_doc.id,
+                        product_id=item.product_id,
+                        quantity=item.quantity,
+                        price=product.price
+                    ))
 
     # 7. Сохраняем товары и списываем со склада (резервирование)
     if reservation.products:
@@ -315,6 +346,7 @@ def create_reservation(
         guests=db_reservation.guests,
         total_cost=db_reservation.total_cost,
         status=status_obj.status_name,
+        income_account_id=db_reservation.income_account_id,
         products=response_products,
         # Поле `massages` отсутствует в схеме ReservationResponse (см. schemas.py)
     )
@@ -380,6 +412,10 @@ def update_reservation(
         old_start_datetime = db_reservation.start_datetime
         old_end_datetime = db_reservation.end_datetime
         print(f"Old values: status={old_status_id}, bath={old_bath_id}")
+        old_status_obj = db.query(models.ReservationStatus).filter(
+            models.ReservationStatus.id == old_status_id
+        ).first()
+        old_status_name = old_status_obj.status_name if old_status_obj else None
 
         # Обновляем основные поля (только те, что переданы)
         update_data = reservation.model_dump(exclude_unset=True)
@@ -388,6 +424,11 @@ def update_reservation(
         for key, value in update_data.items():
             if key not in ['guests', 'status_id', 'products', 'start_datetime', 'end_datetime']:
                 if value is not None:
+                    if key == "income_account_id" and old_status_name == "закрыт" and value != db_reservation.income_account_id:
+                        raise HTTPException(
+                            status_code=400,
+                            detail="Для закрытой брони нельзя менять счет зачисления"
+                        )
                     setattr(db_reservation, key, value)
                     print(f"Updated {key} = {value}")
 
@@ -407,10 +448,6 @@ def update_reservation(
 
             # Проверяем откат из статуса "закрыт": разрешено только админам и директорам
             if reservation.status_id != old_status_id:
-                old_status_obj = db.query(models.ReservationStatus).filter(
-                    models.ReservationStatus.id == old_status_id
-                ).first()
-                old_status_name = old_status_obj.status_name if old_status_obj else None
                 if old_status_name == "закрыт":
                     if not (current_user.is_admin or current_user.is_director):
                         print(f"❌ User {current_user.user_id} cannot revert closed reservation {id}")
@@ -435,6 +472,8 @@ def update_reservation(
         
         # Если статус изменен на "закрыт" (проверяем по названию)
         if status_obj and status_obj.status_name == "закрыт" and old_status_id != new_status_id:
+            if not db_reservation.income_account_id:
+                raise HTTPException(status_code=400, detail="Для закрытия брони выберите счет зачисления")
             # Получаем товары из брони
             reservation_products = db.query(models.ReservationProduct).filter(
                 models.ReservationProduct.reservation_id == id
@@ -448,7 +487,8 @@ def update_reservation(
                 bath_id=db_reservation.bath_id,
                 client_name=db_reservation.client_name,
                 client_phone=db_reservation.client_phone,
-                total_amount=db_reservation.total_cost
+                total_amount=db_reservation.total_cost,
+                account_id=db_reservation.income_account_id,
             )
             db.add(realization_doc)
             db.flush()  # Получаем ID документа
@@ -679,6 +719,7 @@ def update_reservation(
             guests=db_reservation.guests,
             total_cost=db_reservation.total_cost,
             status=status_name,
+            income_account_id=db_reservation.income_account_id,
             products=response_products,
             # Поле `massages` отсутствует
         )

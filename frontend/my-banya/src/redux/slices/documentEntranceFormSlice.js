@@ -5,6 +5,7 @@ const initialState = {
     // Основные данные документа
     date: new Date().toISOString().split('T')[0],
     supplierId: null,
+    accountId: null,
     responsibleName: '', // Имя можно установить при инициализации или сохранении
     supplierNumber: '',
     comment: '',

@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from typing import List
 from datetime import date as dt_date
 from app.database import get_db
-from app.models import EntranceDocument, EntranceDocumentItem, Product
+from app.models import EntranceDocument, EntranceDocumentItem, Product, OrganizationAccount
 from app.schemas import EntranceDocumentCreate, EntranceDocumentRead
 from sqlalchemy.orm import joinedload
 from app.pricing import get_markup_percent, price_from_purchase
@@ -47,6 +47,12 @@ def create_document(doc: EntranceDocumentCreate, db: Session = Depends(get_db)):
         missing = set(product_ids) - existing_ids
         raise HTTPException(status_code=400, detail=f"Products not found: {missing}")
 
+    if not doc.account_id:
+        raise HTTPException(status_code=400, detail="Выберите счет списания")
+    account = db.query(OrganizationAccount).filter(OrganizationAccount.id == doc.account_id).first()
+    if not account:
+        raise HTTPException(status_code=400, detail="Выберите счет списания")
+
     # Создание документа — БЕЗ items в конструкторе
     db_doc = EntranceDocument(
         date=doc.date,
@@ -54,6 +60,7 @@ def create_document(doc: EntranceDocumentCreate, db: Session = Depends(get_db)):
         responsible_name=doc.responsible_name,
         supplier_number=doc.supplier_number,
         comment=doc.comment,
+        account_id=doc.account_id,
         total_amount=doc.total_amount,
     )
     db.add(db_doc)
@@ -90,6 +97,12 @@ def update_document(doc_id: int, doc: EntranceDocumentCreate, db: Session = Depe
     db_doc = db.query(EntranceDocument).filter(EntranceDocument.id == doc_id).first()
     if not db_doc:
         raise HTTPException(status_code=404, detail="Document not found")
+
+    if not doc.account_id:
+        raise HTTPException(status_code=400, detail="Выберите счет списания")
+    account = db.query(OrganizationAccount).filter(OrganizationAccount.id == doc.account_id).first()
+    if not account:
+        raise HTTPException(status_code=400, detail="Выберите счет списания")
 
     # Обновление полей
     for key, value in doc.model_dump(exclude={"items"}).items():

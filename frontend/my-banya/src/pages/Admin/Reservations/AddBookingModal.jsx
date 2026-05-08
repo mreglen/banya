@@ -3,6 +3,7 @@ import { useEffect, useState, useRef, useCallback } from 'react';
 import { useSelector } from 'react-redux';
 import {
   useGetBathsQuery,
+  useGetFinanceAccountsQuery,
 } from '../../../redux/slices/apiSlice';
 import {
   useGetStockProductsQuery,
@@ -137,6 +138,7 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
     notes: '',
     guests: '',
     status_id: 1,
+    income_account_id: '',
     selectedProducts: [],
   });
 
@@ -149,6 +151,7 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
   const editFormHydratedForRef = useRef(null);
 
   const { data: baths = [], isLoading: isLoadingBaths } = useGetBathsQuery();
+  const { data: financeAccounts = [] } = useGetFinanceAccountsQuery({ active_only: true });
   const { data: stockProducts = [] } = useGetStockProductsQuery();
   const { data: units = [], isLoading: isLoadingUnits } = useGetUnitsOfMeasurementQuery(); // ← ДОБАВЛЕНО
   const {
@@ -206,6 +209,7 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
       notes: '',
       guests: '',
       status_id: 1,
+      income_account_id: '',
       selectedProducts: [],
     }));
   }, [isOpen, isEditing, selectedDate]);
@@ -223,9 +227,17 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
       client_email: prefillData.client_email || prev.client_email,
       notes: prefillData.notes || prev.notes,
       guests: prefillData.guests ? String(prefillData.guests) : prev.guests,
+      income_account_id: prefillData.income_account_id ? String(prefillData.income_account_id) : prev.income_account_id,
       selectedProducts: [],
     }));
   }, [isOpen, isEditing, prefillData]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    if (!formData.income_account_id && financeAccounts.length === 1) {
+      setFormData((prev) => ({ ...prev, income_account_id: String(financeAccounts[0].id) }));
+    }
+  }, [isOpen, formData.income_account_id, financeAccounts]);
 
   // Закрытие модалки по клавише Escape
   useEffect(() => {
@@ -290,6 +302,7 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
         notes: booking.notes || '',
         guests: guestsNorm,
         status_id: parseInt(statusIdFromBooking, 10) || 1,
+        income_account_id: booking.income_account_id ? String(booking.income_account_id) : '',
         selectedProducts,
       });
     } catch (error) {
@@ -570,6 +583,11 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
         errors[`product_${product.id}`] = `Превышает доступное количество (${product.available})`;
       }
     });
+
+    const selectedStatus = statusOptions.find((status) => Number(status.id) === Number(formData.status_id));
+    if (selectedStatus?.status_name === 'закрыт' && !formData.income_account_id) {
+      errors.income_account_id = 'Для закрытия брони выберите счет зачисления';
+    }
     
     setValidationErrors(errors);
     return Object.keys(errors).length === 0;
@@ -674,6 +692,7 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
       notes: formData.notes && formData.notes.trim() !== '' ? formData.notes.trim() : null,
       guests: parseInt(formData.guests, 10) || 1,
       status_id: submitStatusId,
+      income_account_id: formData.income_account_id ? parseInt(formData.income_account_id, 10) : null,
       products: formData.selectedProducts.map((p) => ({
         product_id: Number(p.id),
         quantity: parseInt(p.quantity, 10) || 1,
@@ -681,6 +700,15 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
     };
 
     console.log('🟢 Payload:', payload);
+
+    const selectedAccount = financeAccounts.find((acc) => Number(acc.id) === Number(payload.income_account_id));
+    const accountLabel = selectedAccount
+      ? `${selectedAccount.bank_name} (${selectedAccount.account_number})`
+      : 'Без счета';
+    const confirmMessage = isEditing
+      ? `Подтвердите сохранение брони.\nСчет зачисления: ${accountLabel}`
+      : `Подтвердите создание брони.\nСчет зачисления: ${accountLabel}`;
+    if (!window.confirm(confirmMessage)) return;
 
     try {
       console.log('🚀 Sending request...');
@@ -832,6 +860,33 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
                   </p>
                 )}
               </>
+            )}
+          </div>
+
+          {/* Счет зачисления */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Счет зачисления</label>
+            <select
+              name="income_account_id"
+              value={formData.income_account_id}
+              onChange={handleChange}
+              className={`w-full px-3 py-2.5 sm:px-4 sm:py-3 border rounded-xl focus:ring-2 text-sm sm:text-base ${
+                validationErrors.income_account_id
+                  ? 'border-red-500 focus:ring-red-500 bg-red-50'
+                  : 'border-gray-300 focus:ring-blue-500'
+              }`}
+            >
+              <option value="">Выберите счет</option>
+              {financeAccounts.map((account) => (
+                <option key={account.id} value={account.id}>
+                  {account.bank_name} ({account.account_number})
+                </option>
+              ))}
+            </select>
+            {validationErrors.income_account_id && (
+              <p className="mt-1 text-xs text-red-600 flex items-center gap-1">
+                <span>⚠</span> {validationErrors.income_account_id}
+              </p>
             )}
           </div>
 

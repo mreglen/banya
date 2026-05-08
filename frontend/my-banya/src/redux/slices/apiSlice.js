@@ -4,7 +4,7 @@ import baseQuery from '../../utils/baseQuery';
 export const apiSlice = createApi({
   reducerPath: 'api',
   baseQuery,
-  tagTypes: ['Baths', 'Partners', 'Clients', 'Users', 'Roles', 'Reservations', 'Bookings', 'ReservationStatus', 'Permissions', 'Promotions', 'AuditLogs', 'Organization'],
+  tagTypes: ['Baths', 'Partners', 'Clients', 'Users', 'Roles', 'Reservations', 'Bookings', 'ReservationStatus', 'Permissions', 'Promotions', 'AuditLogs', 'Organization', 'Finance'],
 
   endpoints: (builder) => ({
     // ========================
@@ -364,6 +364,78 @@ export const apiSlice = createApi({
       },
       providesTags: [{ type: 'AuditLogs', id: 'LIST' }],
     }),
+
+    getFinanceAccounts: builder.query({
+      query: (params = {}) => {
+        const queryParams = new URLSearchParams();
+        if (params.active_only) queryParams.append('active_only', 'true');
+        const queryString = queryParams.toString();
+        return `/finance/accounts${queryString ? `?${queryString}` : ''}`;
+      },
+      providesTags: [{ type: 'Finance', id: 'ACCOUNTS' }],
+    }),
+
+    createFinanceAccount: builder.mutation({
+      query: (body) => ({
+        url: '/admin/finance/accounts',
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: [{ type: 'Finance', id: 'ACCOUNTS' }],
+    }),
+
+    updateFinanceAccount: builder.mutation({
+      query: ({ account_id, ...body }) => ({
+        url: `/admin/finance/accounts/${account_id}`,
+        method: 'PUT',
+        body,
+      }),
+      invalidatesTags: [{ type: 'Finance', id: 'ACCOUNTS' }],
+    }),
+
+    deleteFinanceAccount: builder.mutation({
+      query: (account_id) => ({
+        url: `/admin/finance/accounts/${account_id}`,
+        method: 'DELETE',
+      }),
+      invalidatesTags: [{ type: 'Finance', id: 'ACCOUNTS' }],
+    }),
+
+    getFinanceOperations: builder.query({
+      query: (params = {}) => {
+        const queryParams = new URLSearchParams();
+        if (params.operation_type) queryParams.append('operation_type', params.operation_type);
+        if (params.period) queryParams.append('period', params.period);
+        if (params.date_from) queryParams.append('date_from', params.date_from);
+        if (params.date_to) queryParams.append('date_to', params.date_to);
+        if (params.account_id !== '' && params.account_id !== null && params.account_id !== undefined) {
+          queryParams.append('account_id', params.account_id);
+        }
+        if (params.skip !== undefined) queryParams.append('skip', params.skip);
+        if (params.limit !== undefined) queryParams.append('limit', params.limit);
+        return `/finance/operations?${queryParams.toString()}`;
+      },
+      providesTags: [{ type: 'Finance', id: 'OPERATIONS' }],
+    }),
+
+    getFinanceSummary: builder.query({
+      query: (params = {}) => {
+        const queryParams = new URLSearchParams();
+        if (params.period) queryParams.append('period', params.period);
+        if (params.date_from) queryParams.append('date_from', params.date_from);
+        if (params.date_to) queryParams.append('date_to', params.date_to);
+        if (params.account_id !== '' && params.account_id !== null && params.account_id !== undefined) {
+          queryParams.append('account_id', params.account_id);
+        }
+        return `/finance/summary?${queryParams.toString()}`;
+      },
+      providesTags: [{ type: 'Finance', id: 'SUMMARY' }],
+    }),
+
+    getFinanceOperationDetail: builder.query({
+      query: ({ source, id }) => `/finance/operation/${source}/${id}`,
+      providesTags: (result, error, arg) => [{ type: 'Finance', id: `DETAIL-${arg?.source}-${arg?.id}` }],
+    }),
   }),
 });
 
@@ -415,4 +487,11 @@ export const {
   useDeleteRoleMutation,
 
   useGetAuditLogsQuery,
+  useGetFinanceAccountsQuery,
+  useCreateFinanceAccountMutation,
+  useUpdateFinanceAccountMutation,
+  useDeleteFinanceAccountMutation,
+  useGetFinanceOperationsQuery,
+  useGetFinanceSummaryQuery,
+  useGetFinanceOperationDetailQuery,
 } = apiSlice;

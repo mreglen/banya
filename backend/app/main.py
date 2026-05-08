@@ -184,6 +184,14 @@ with engine.begin() as connection:
     connection.execute(
         text(
             """
+            ALTER TABLE reservations
+            ADD COLUMN IF NOT EXISTS income_account_id INTEGER REFERENCES organization_accounts(id) ON DELETE SET NULL
+            """
+        )
+    )
+    connection.execute(
+        text(
+            """
             UPDATE realization_documents rd
             SET bath_id = r.bath_id
             FROM reservations r

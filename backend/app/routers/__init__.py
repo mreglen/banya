@@ -20,6 +20,7 @@ from app.routers.settings import router as settings_router
 from app.routers.support import router as support_router
 from app.routers.dashboard import router as dashboard_router
 from app.routers.organization import router as organization_router, admin_router as organization_admin_router
+from app.routers.finance import router as finance_router, admin_router as finance_admin_router
 
 api_router = APIRouter(prefix="/api")
 
@@ -47,5 +48,7 @@ api_router.include_router(support_router)
 api_router.include_router(dashboard_router)
 api_router.include_router(organization_router)
 api_router.include_router(organization_admin_router)
+api_router.include_router(finance_router)
+api_router.include_router(finance_admin_router)
 
 

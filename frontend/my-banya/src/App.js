@@ -48,6 +48,7 @@ import CreateTicketForm from './pages/Admin/Support/CreateTicketForm';
 import ChatPage from './pages/Admin/Support/ChatPage';
 import ReservationPrintDocument from './pages/Admin/Reservations/ReservationPrintDocument';
 import AdminNotFound from './pages/Admin/AdminNotFound/AdminNotFound';
+import Finance from './pages/Admin/Finance/Finance';
 
 
 
@@ -132,6 +133,7 @@ function AppWithLayout() {
           <Route path="deletion-requests" element={<RoleBasedRoute requiredPermission="staff:manage"><DeletionRequestsPage /></RoleBasedRoute>} />
           <Route path="add-product" element={<RoleBasedRoute requiredPermission="storage:manage"><AddProduct /></RoleBasedRoute>} />
           <Route path="settings" element={<SettingsPage />} />
+          <Route path="finance" element={<RoleBasedRoute requiredPermission="finance:view"><Finance /></RoleBasedRoute>} />
           <Route path="support" element={<SupportPage />} />
           <Route path="support/create" element={<CreateTicketForm />} />
           <Route path="support/ticket/:id" element={<ChatPage />} />

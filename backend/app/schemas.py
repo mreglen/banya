@@ -1,6 +1,6 @@
 from pydantic import BaseModel, field_validator
 from datetime import datetime
-from typing import Optional, List
+from typing import Optional, List, Literal
 from datetime import date
 
 
@@ -94,6 +94,7 @@ class ReservationCreate(BaseModel):
     notes: Optional[str] = None
     guests: int = 1
     status_id: int = 1
+    income_account_id: Optional[int] = None
     
     products: List[ReservationProductCreate] = []
 
@@ -110,6 +111,7 @@ class ReservationUpdate(BaseModel):
     notes: Optional[str] = None
     guests: Optional[int] = None
     status_id: Optional[int] = None
+    income_account_id: Optional[int] = None
     
     products: List[ReservationProductCreate] = []   
 
@@ -138,6 +140,7 @@ class ReservationResponse(BaseModel):
     guests: int
     total_cost: int
     status: str
+    income_account_id: Optional[int] = None
     applied_promotion_id: Optional[int] = None
     promotion_snapshot: Optional[dict] = None
     
@@ -223,6 +226,61 @@ class OrganizationDetailsUpdate(BaseModel):
         if len(v) != 9:
             raise ValueError("КПП должен быть длиной 9 цифр")
         return v
+
+
+class OrganizationAccountBase(BaseModel):
+    bank_name: str
+    account_number: str
+    is_active: bool = True
+
+
+class OrganizationAccountCreate(OrganizationAccountBase):
+    pass
+
+
+class OrganizationAccountUpdate(BaseModel):
+    bank_name: Optional[str] = None
+    account_number: Optional[str] = None
+    is_active: Optional[bool] = None
+
+
+class OrganizationAccountOut(OrganizationAccountBase):
+    id: int
+
+    class Config:
+        from_attributes = True
+
+
+class FinanceOperationOut(BaseModel):
+    source: Literal["entrance", "realization"]
+    operation_type: Literal["expense", "income"]
+    id: int
+    date: date
+    amount: float
+    title: str
+    subtitle: Optional[str] = None
+    account_id: Optional[int] = None
+
+
+class FinanceOperationsResponse(BaseModel):
+    items: List[FinanceOperationOut]
+    total: int
+
+
+class FinanceSummaryOut(BaseModel):
+    income: float
+    expense: float
+    result: float
+
+
+class FinanceOperationDetailOut(BaseModel):
+    source: Literal["entrance", "realization"]
+    operation_type: Literal["expense", "income"]
+    id: int
+    date: date
+    amount: float
+    account_id: Optional[int] = None
+    payload: dict
 
 
 # === Авторизация / Пользователи ===
@@ -477,6 +535,7 @@ class EntranceDocumentBase(BaseModel):
     responsible_name: str
     supplier_number: Optional[str] = None
     comment: Optional[str] = None
+    account_id: int
     total_amount: float
 
 class EntranceDocumentCreate(EntranceDocumentBase):

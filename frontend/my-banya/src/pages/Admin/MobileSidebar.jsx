@@ -314,6 +314,19 @@ function MobileSidebar({ isOpen, onClose }) {
             </NavLink>
           )}
 
+          {hasAccess('/admin/finance') && (
+            <NavLink
+              to="/admin/finance"
+              className="flex items-center px-4 py-3 text-gray-700 hover:bg-emerald-50 rounded-xl"
+              onClick={onClose}
+            >
+              <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h4l3 8 4-14 3 6h4" />
+              </svg>
+              Финансы
+            </NavLink>
+          )}
+
           {/* Настройки - только для директора и админа */}
           {(user?.is_director || user?.is_admin) && (
             <NavLink

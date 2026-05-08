@@ -21,6 +21,7 @@ import {
 } from '../../../../redux/slices/productsApiSlice';
 import {
   useGetPartnersQuery,
+  useGetFinanceAccountsQuery,
 } from '../../../../redux/slices/apiSlice';
 
 function AddDocumentEntrance() {
@@ -29,7 +30,7 @@ function AddDocumentEntrance() {
   const { id } = useParams();
   const isEditing = Boolean(id);
 
-  const { date, supplierId, responsibleName, supplierNumber, comment, items } = useSelector(
+  const { date, supplierId, accountId, responsibleName, supplierNumber, comment, items } = useSelector(
     (state) => state.documentEntranceForm
   );
 
@@ -42,6 +43,7 @@ function AddDocumentEntrance() {
 
   // --- RTK Query ---
   const { data: partnersData = [], isLoading: isLoadingPartners } = useGetPartnersQuery();
+  const { data: financeAccounts = [] } = useGetFinanceAccountsQuery({ active_only: true });
   const { data: units = [], isLoading: isLoadingUnits } = useGetUnitsOfMeasurementQuery();
   const { data: products = [] } = useGetProductsQuery();
   const {
@@ -110,6 +112,7 @@ function AddDocumentEntrance() {
         setInitialState({
           date: documentData.date,
           supplierId: documentData.supplier_id,
+          accountId: documentData.account_id ?? null,
           responsibleName: documentData.responsible_name,
           supplierNumber: documentData.supplier_number || '',
           comment: documentData.comment || '',
@@ -134,6 +137,13 @@ function AddDocumentEntrance() {
       dispatch(setInitialState({ responsibleName: loggedUsername }));
     }
   }, [isEditing, documentData, dispatch, units, isLoadingUnits]);
+
+  useEffect(() => {
+    if (isEditing) return;
+    if (!accountId && financeAccounts.length === 1) {
+      updateDocumentData('accountId', financeAccounts[0].id);
+    }
+  }, [isEditing, accountId, financeAccounts]);
 
   useEffect(() => {
     if (selectedProductWithUnit) {
@@ -226,10 +236,23 @@ function AddDocumentEntrance() {
   };
 
   const handleSaveDocument = async () => {
+    if (!accountId) {
+      alert('Выберите счет списания');
+      return;
+    }
     const total = items.reduce((sum, item) => sum + item.quantity * (Number(item.purchasePrice) || 0), 0);
+    const selectedAccount = financeAccounts.find((acc) => String(acc.id) === String(accountId));
+    const accountLabel = selectedAccount
+      ? `${selectedAccount.bank_name} (${selectedAccount.account_number})`
+      : `Счет #${accountId}`;
+    const confirmed = window.confirm(
+      `Подтвердите создание документа поступления.\nСумма: ${total.toFixed(2)} ₽\nСчет списания: ${accountLabel}`
+    );
+    if (!confirmed) return;
     const documentPayload = {
       date,
       supplier_id: supplierId,
+      account_id: Number(accountId),
       responsible_name: responsibleName,
       supplier_number: supplierNumber,
       comment: comment || null,
@@ -351,7 +374,22 @@ function AddDocumentEntrance() {
             </div>
 
             {/* Вторая строка: Ответственный | Номер документа */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">Счет списания *</label>
+                <select
+                  value={accountId ?? ''}
+                  onChange={(e) => updateDocumentData('accountId', e.target.value ? Number(e.target.value) : null)}
+                  className="w-full px-3 py-2 sm:px-4 sm:py-3 border border-gray-300 rounded-lg sm:rounded-xl text-sm"
+                >
+                  <option value="">Выберите счет</option>
+                  {financeAccounts.map((acc) => (
+                    <option key={acc.id} value={acc.id}>
+                      {acc.bank_name} ({acc.account_number})
+                    </option>
+                  ))}
+                </select>
+              </div>
               <div>
                 <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">Ответственный *</label>
                 <input

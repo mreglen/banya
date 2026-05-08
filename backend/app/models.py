@@ -87,6 +87,7 @@ class Reservation(Base):
     total_cost = Column(Integer, nullable=False, default=0)
     guests = Column(Integer, nullable=False)
     status_id = Column(Integer, ForeignKey('reservation_status.id'), nullable=False, default=1)
+    income_account_id = Column(Integer, ForeignKey("organization_accounts.id"), nullable=True)
     applied_promotion_id = Column(Integer, ForeignKey('promotions.id'), nullable=True)
     promotion_snapshot = Column(JSON, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
@@ -94,6 +95,7 @@ class Reservation(Base):
 
     bath = relationship("Bath", back_populates="reservations")
     status_rel = relationship("ReservationStatus", back_populates="reservations")
+    income_account = relationship("OrganizationAccount")
     reservation_products = relationship("ReservationProduct", back_populates="reservation", cascade="all, delete-orphan")
 
 
@@ -179,8 +181,10 @@ class EntranceDocument(Base):
     supplier_number = Column(String, nullable=True)
     comment = Column(Text, nullable=True)
     total_amount = Column(Float, nullable=False, default=0.0)
+    account_id = Column(Integer, ForeignKey("organization_accounts.id"), nullable=True)
 
     supplier = relationship("Partner", backref="entrance_documents")
+    account = relationship("OrganizationAccount")
     items = relationship("EntranceDocumentItem", back_populates="document", cascade="all, delete-orphan")
 
 
@@ -320,6 +324,17 @@ class OrganizationDetails(Base):
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
 
+class OrganizationAccount(Base):
+    __tablename__ = "organization_accounts"
+
+    id = Column(Integer, primary_key=True, index=True)
+    bank_name = Column(Text, nullable=False)
+    account_number = Column(Text, nullable=False)
+    is_active = Column(Boolean, nullable=False, default=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
 class UserSession(Base):
     __tablename__ = "user_sessions"
 
@@ -417,9 +432,11 @@ class RealizationDocument(Base):
     client_name = Column(String(100), nullable=False)
     client_phone = Column(String(20), nullable=False)
     total_amount = Column(Float, nullable=False, default=0.0)
+    account_id = Column(Integer, ForeignKey("organization_accounts.id"), nullable=True)
 
     reservation = relationship("Reservation")
     bath = relationship("Bath")
+    account = relationship("OrganizationAccount")
     items = relationship("RealizationDocumentItem", back_populates="document", cascade="all, delete-orphan")
 
 

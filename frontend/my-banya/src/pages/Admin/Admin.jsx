@@ -37,6 +37,7 @@ function Admin() {
       '/admin/bookings': 'Заявки с сайта',
       '/admin/baths': 'Бани',
       '/admin/promotions': 'Акции',
+      '/admin/finance': 'Финансы',
     };
 
     // Check for exact match first
@@ -407,6 +408,23 @@ function Admin() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
             </svg>
             Акции
+          </NavLink>
+        )}
+
+        {hasAccess('/admin/finance') && (
+          <NavLink
+            to="/admin/finance"
+            className={({ isActive }) =>
+              `flex items-center px-4 py-3 rounded-xl transition ${isActive
+                ? 'bg-emerald-100 text-emerald-800 border border-emerald-200 font-medium'
+                : 'text-gray-700 hover:bg-emerald-50 hover:text-emerald-700'
+              }`
+            }
+          >
+            <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h4l3 8 4-14 3 6h4" />
+            </svg>
+            Финансы
           </NavLink>
         )}
 

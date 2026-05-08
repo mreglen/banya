@@ -46,6 +46,15 @@ function MobileBottomNav() {
         </svg>
       ),
     },
+    hasAccess('finance:view') && {
+      path: '/admin/finance',
+      label: 'Финансы',
+      icon: (
+        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h4l3 8 4-14 3 6h4" />
+        </svg>
+      ),
+    },
   ].filter(Boolean); // Удаляем false значения
 
   // Проверяем, активен ли путь
