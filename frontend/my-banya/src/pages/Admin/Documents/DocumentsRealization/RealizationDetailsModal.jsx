@@ -17,12 +17,12 @@ function formatMoney(value) {
 }
 
 function RealizationDetailsModal({ isOpen, onClose, reservation }) {
-  if (!isOpen || !reservation) return null;
-
   const { data: bookingDetails, isLoading: isBookingLoading } = useGetReservationByIdQuery(
-    reservation.reservation_id,
-    { skip: !reservation?.reservation_id }
+    reservation?.reservation_id,
+    { skip: !isOpen || !reservation?.reservation_id }
   );
+
+  if (!isOpen || !reservation) return null;
 
   const docProducts = reservation.items || [];
   const bookingProducts = bookingDetails?.products || [];
