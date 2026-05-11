@@ -12,6 +12,13 @@ const EMPTY_FORM = {
   is_active: true,
 };
 
+const formatAccountNumber = (value) => {
+  const digits = String(value || '').replace(/\s+/g, '');
+  if (!digits) return 'Без номера';
+  if (digits.length <= 8) return digits;
+  return `${digits.slice(0, 4)} •••• ${digits.slice(-4)}`;
+};
+
 function AccountsModal({ onClose }) {
   const { data: accounts = [], isLoading } = useGetFinanceAccountsQuery();
   const [createAccount, { isLoading: isCreating }] = useCreateFinanceAccountMutation();
@@ -108,8 +115,14 @@ function AccountsModal({ onClose }) {
               <div key={account.id} className="flex flex-col gap-2 rounded-xl border border-gray-200 p-3 md:flex-row md:items-center md:justify-between">
                 <div>
                   <p className="font-semibold text-gray-900">{account.bank_name}</p>
-                  <p className="text-sm text-gray-600">{account.account_number}</p>
-                  <p className="text-xs text-gray-500">{account.is_active ? 'Активен' : 'Неактивен'}</p>
+                  <p className="text-sm text-gray-600">
+                    Счет: {formatAccountNumber(account.account_number)}
+                  </p>
+                  <p className={`mt-1 inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
+                    account.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'
+                  }`}>
+                    {account.is_active ? 'Активный (используется в бронировании)' : 'Неактивный'}
+                  </p>
                 </div>
                 <div className="flex gap-2">
                   <button

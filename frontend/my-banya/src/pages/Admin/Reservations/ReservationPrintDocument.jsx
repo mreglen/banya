@@ -1,12 +1,12 @@
 import { useMemo } from 'react';
-import { useParams } from 'react-router-dom';
+import { useLocation, useParams } from 'react-router-dom';
 import { useGetReservationByIdQuery } from '../../../redux/slices/reservationSlice';
 
 const ORG_INFO = {
   name: 'Николаевские бани',
   address: 'г. Екатеринбург, ул. Кизеловская 18',
   phone: '+7 (343) 344-87-55',
-  email: 'info@banya.local',
+  email: 'nikolaevskiebani@yandex.ru',
 };
 
 function formatDateTime(value) {
@@ -27,6 +27,9 @@ function formatMoney(value) {
 
 function ReservationPrintDocument() {
   const { id } = useParams();
+  const location = useLocation();
+  const paymentMode = new URLSearchParams(location.search).get('payment');
+  const isQrPayment = paymentMode === 'qrcode';
   const { data: reservation, isLoading, error } = useGetReservationByIdQuery(id, { skip: !id });
 
   const productTotal = useMemo(
@@ -188,6 +191,11 @@ function ReservationPrintDocument() {
               <span>ИТОГО К ОПЛАТЕ</span>
               <span>{formatMoney(totalCost)}</span>
             </div>
+            {isQrPayment && (
+              <div className="mt-4 flex flex-col items-center">
+                <div className="h-32 w-32 bg-black" />
+              </div>
+            )}
             <p className="text-center text-[11px] text-gray-600 mt-3">
               Спасибо за визит!
             </p>

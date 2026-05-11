@@ -415,6 +415,8 @@ def update_reservation(
         old_bath_id = db_reservation.bath_id
         old_start_datetime = db_reservation.start_datetime
         old_end_datetime = db_reservation.end_datetime
+        old_total_cost = float(db_reservation.total_cost or 0)
+        old_income_account_id = db_reservation.income_account_id
         print(f"Old values: status={old_status_id}, bath={old_bath_id}")
         old_status_obj = db.query(models.ReservationStatus).filter(
             models.ReservationStatus.id == old_status_id
@@ -459,14 +461,22 @@ def update_reservation(
                             status_code=403,
                             detail="Только администратор или директор может вернуть закрытую бронь в работу"
                         )
-                    # Удаляем связанные документы реализации (склад не трогаем —
-                    # товары уже были списаны при создании брони и должны остаться списанными)
-                    docs = db.query(models.RealizationDocument).filter(
-                        models.RealizationDocument.reservation_id == id
-                    ).all()
-                    for d in docs:
-                        db.delete(d)
-                    print(f"✅ Deleted {len(docs)} realization document(s) on revert from 'закрыт'")
+                    # Финансовая компенсация: при выводе из "закрыт" создаем расход
+                    # на сумму закрытия, чтобы оборот в финансах не дублировался.
+                    # Используем отрицательную сумму в realization_document; на витрине
+                    # финансов такие записи отображаются как "расход".
+                    if old_income_account_id and old_total_cost > 0:
+                        reversal_doc = models.RealizationDocument(
+                            date=date.today(),
+                            reservation_id=id,
+                            bath_id=old_bath_id,
+                            client_name=db_reservation.client_name,
+                            client_phone=db_reservation.client_phone,
+                            total_amount=-abs(old_total_cost),
+                            account_id=old_income_account_id,
+                        )
+                        db.add(reversal_doc)
+                        print("✅ Added reversal realization document for closed-status revert")
 
             db_reservation.status_id = reservation.status_id
             print(f"Updated status_id = {reservation.status_id}")

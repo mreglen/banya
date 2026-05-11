@@ -138,11 +138,11 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
     notes: '',
     guests: '',
     status_id: 1,
-    income_account_id: '',
     selectedProducts: [],
   });
 
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
+  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [validationErrors, setValidationErrors] = useState({});
   const [toast, setToast] = useState(null);
   const prevIsOpenRef = useRef(false);
@@ -152,6 +152,8 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
 
   const { data: baths = [], isLoading: isLoadingBaths } = useGetBathsQuery();
   const { data: financeAccounts = [] } = useGetFinanceAccountsQuery({ active_only: true });
+  const activeIncomeAccount = financeAccounts.find((acc) => acc.is_active) || financeAccounts[0] || null;
+  const activeIncomeAccountId = activeIncomeAccount ? Number(activeIncomeAccount.id) : null;
   const { data: stockProducts = [] } = useGetStockProductsQuery();
   const { data: units = [], isLoading: isLoadingUnits } = useGetUnitsOfMeasurementQuery(); // ← ДОБАВЛЕНО
   const {
@@ -209,7 +211,6 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
       notes: '',
       guests: '',
       status_id: 1,
-      income_account_id: '',
       selectedProducts: [],
     }));
   }, [isOpen, isEditing, selectedDate]);
@@ -227,17 +228,9 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
       client_email: prefillData.client_email || prev.client_email,
       notes: prefillData.notes || prev.notes,
       guests: prefillData.guests ? String(prefillData.guests) : prev.guests,
-      income_account_id: prefillData.income_account_id ? String(prefillData.income_account_id) : prev.income_account_id,
       selectedProducts: [],
     }));
   }, [isOpen, isEditing, prefillData]);
-
-  useEffect(() => {
-    if (!isOpen) return;
-    if (!formData.income_account_id && financeAccounts.length === 1) {
-      setFormData((prev) => ({ ...prev, income_account_id: String(financeAccounts[0].id) }));
-    }
-  }, [isOpen, formData.income_account_id, financeAccounts]);
 
   // Закрытие модалки по клавише Escape
   useEffect(() => {
@@ -302,7 +295,6 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
         notes: booking.notes || '',
         guests: guestsNorm,
         status_id: parseInt(statusIdFromBooking, 10) || 1,
-        income_account_id: booking.income_account_id ? String(booking.income_account_id) : '',
         selectedProducts,
       });
     } catch (error) {
@@ -353,12 +345,6 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
       setFormData((prev) => ({ ...prev, start_time: validSlots[0] }));
     }
   }, [formData.bath_id, formData.date, formData.start_time, reservationsForDate, isEditing, booking]);
-
-  const handleOverlayClick = (e) => {
-    if (e.target === e.currentTarget) {
-      onClose();
-    }
-  };
 
   const openDatePicker = () => {
     if (!dateInputRef.current) return;
@@ -585,8 +571,8 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
     });
 
     const selectedStatus = statusOptions.find((status) => Number(status.id) === Number(formData.status_id));
-    if (selectedStatus?.status_name === 'закрыт' && !formData.income_account_id) {
-      errors.income_account_id = 'Для закрытия брони выберите счет зачисления';
+    if (selectedStatus?.status_name === 'закрыт' && !activeIncomeAccountId) {
+      errors.income_account_id = 'Нет активного счета в разделе "Финансы"';
     }
     
     setValidationErrors(errors);
@@ -692,7 +678,7 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
       notes: formData.notes && formData.notes.trim() !== '' ? formData.notes.trim() : null,
       guests: parseInt(formData.guests, 10) || 1,
       status_id: submitStatusId,
-      income_account_id: formData.income_account_id ? parseInt(formData.income_account_id, 10) : null,
+      income_account_id: activeIncomeAccountId,
       products: formData.selectedProducts.map((p) => ({
         product_id: Number(p.id),
         quantity: parseInt(p.quantity, 10) || 1,
@@ -701,9 +687,8 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
 
     console.log('🟢 Payload:', payload);
 
-    const selectedAccount = financeAccounts.find((acc) => Number(acc.id) === Number(payload.income_account_id));
-    const accountLabel = selectedAccount
-      ? `${selectedAccount.bank_name} (${selectedAccount.account_number})`
+    const accountLabel = activeIncomeAccount
+      ? `${activeIncomeAccount.bank_name} (${activeIncomeAccount.account_number})`
       : 'Без счета';
     const confirmMessage = isEditing
       ? `Подтвердите сохранение брони.\nСчет зачисления: ${accountLabel}`
@@ -757,6 +742,23 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
     }
   };
 
+  const handleOpenPaymentModal = () => {
+    if (!isEditing || !booking?.reservation_id) return;
+    setIsPaymentModalOpen(true);
+  };
+
+  const handleCashPayment = () => {
+    if (!booking?.reservation_id) return;
+    window.open(`/admin/reservations/print/${booking.reservation_id}?payment=cash`, '_blank', 'noopener,noreferrer');
+    setIsPaymentModalOpen(false);
+  };
+
+  const handleQrPayment = () => {
+    if (!booking?.reservation_id) return;
+    window.open(`/admin/reservations/print/${booking.reservation_id}?payment=qrcode`, '_blank', 'noopener,noreferrer');
+    setIsPaymentModalOpen(false);
+  };
+
   if (!isOpen) return null;
   const isSubmitting = isCreating || isUpdating;
 
@@ -797,7 +799,6 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
   return createPortal(
     <div
       className="fixed inset-0 bg-black bg-opacity-50 flex items-start justify-center p-0 sm:p-4 z-50 overflow-y-auto"
-      onClick={handleOverlayClick}
     >
       <div
         className="bg-white rounded-none sm:rounded-2xl shadow-2xl w-full max-w-4xl h-[100dvh] sm:max-h-[95vh] sm:h-auto flex flex-col"
@@ -807,9 +808,6 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
           <h2 className="text-lg sm:text-xl font-semibold text-gray-800">
             {isEditing ? 'Редактировать бронь' : 'Добавить бронь'}
           </h2>
-          <p className="text-xs text-gray-500 mt-1">
-            Роль: {currentUser?.role_rel?.name || 'Без роли'}
-          </p>
           <button
             onClick={onClose}
             className="absolute top-3 right-3 sm:top-5 sm:right-5 w-11 h-11 sm:w-12 sm:h-12 rounded-full text-gray-500 hover:text-gray-700 hover:bg-gray-200 text-3xl sm:text-4xl leading-none flex items-center justify-center transition-colors"
@@ -819,76 +817,52 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="overflow-y-auto flex-grow">
-          <div className="p-4 sm:p-6 space-y-5 sm:space-y-6">
+        <form onSubmit={handleSubmit} className="flex flex-col flex-grow min-h-0">
+          <div className="p-4 sm:p-6 space-y-5 sm:space-y-6 overflow-y-auto flex-grow">
 
-          {/* Статус */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Статус</label>
-            {isLoadingStatuses ? (
-              <div className="w-full px-3 py-2.5 sm:px-4 sm:py-3 border border-gray-300 rounded-xl bg-gray-100 text-sm">
-                Загрузка статусов...
-              </div>
-            ) : statusesError ? (
-              <div className="w-full px-3 py-2.5 sm:px-4 sm:py-3 border border-red-300 rounded-xl bg-red-50 text-red-800 text-sm">
-                Ошибка загрузки статусов
-              </div>
-            ) : (
-              <>
-                <select
-                  value={formData.status_id}
-                  onChange={handleStatusChange}
-                  className={`w-full px-3 py-2.5 sm:px-4 sm:py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 text-sm sm:text-base ${
-                    lockStatus ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : ''
-                  }`}
-                  disabled={isLoadingStatuses || lockStatus}
-                  title={lockStatus ? 'Изменить статус закрытой брони может только администратор или директор' : undefined}
-                >
-                  {statusOptions.length === 0 ? (
-                    <option>Нет статусов</option>
-                  ) : (
-                    statusOptions.map((status) => (
-                      <option key={status.id} value={status.id}>
-                        {status.status_name}
-                      </option>
-                    ))
+          {/* Статус (только при редактировании) */}
+          {isEditing && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Статус</label>
+              {isLoadingStatuses ? (
+                <div className="w-full px-3 py-2.5 sm:px-4 sm:py-3 border border-gray-300 rounded-xl bg-gray-100 text-sm">
+                  Загрузка статусов...
+                </div>
+              ) : statusesError ? (
+                <div className="w-full px-3 py-2.5 sm:px-4 sm:py-3 border border-red-300 rounded-xl bg-red-50 text-red-800 text-sm">
+                  Ошибка загрузки статусов
+                </div>
+              ) : (
+                <>
+                  <select
+                    value={formData.status_id}
+                    onChange={handleStatusChange}
+                    className={`w-full px-3 py-2.5 sm:px-4 sm:py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 text-sm sm:text-base ${
+                      lockStatus ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : ''
+                    }`}
+                    disabled={isLoadingStatuses || lockStatus}
+                    title={lockStatus ? 'Изменить статус закрытой брони может только администратор или директор' : undefined}
+                  >
+                    {statusOptions.length === 0 ? (
+                      <option>Нет статусов</option>
+                    ) : (
+                      statusOptions.map((status) => (
+                        <option key={status.id} value={status.id}>
+                          {status.status_name}
+                        </option>
+                      ))
+                    )}
+                  </select>
+                  {lockStatus && (
+                    <p className="mt-1 text-xs text-gray-500">
+                      Бронь закрыта. Изменить статус может только администратор или директор.
+                    </p>
                   )}
-                </select>
-                {lockStatus && (
-                  <p className="mt-1 text-xs text-gray-500">
-                    Бронь закрыта. Изменить статус может только администратор или директор.
-                  </p>
-                )}
-              </>
-            )}
-          </div>
+                </>
+              )}
+            </div>
+          )}
 
-          {/* Счет зачисления */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Счет зачисления</label>
-            <select
-              name="income_account_id"
-              value={formData.income_account_id}
-              onChange={handleChange}
-              className={`w-full px-3 py-2.5 sm:px-4 sm:py-3 border rounded-xl focus:ring-2 text-sm sm:text-base ${
-                validationErrors.income_account_id
-                  ? 'border-red-500 focus:ring-red-500 bg-red-50'
-                  : 'border-gray-300 focus:ring-blue-500'
-              }`}
-            >
-              <option value="">Выберите счет</option>
-              {financeAccounts.map((account) => (
-                <option key={account.id} value={account.id}>
-                  {account.bank_name} ({account.account_number})
-                </option>
-              ))}
-            </select>
-            {validationErrors.income_account_id && (
-              <p className="mt-1 text-xs text-red-600 flex items-center gap-1">
-                <span>⚠</span> {validationErrors.income_account_id}
-              </p>
-            )}
-          </div>
 
           {/* Баня */}
           <div>
@@ -1271,6 +1245,15 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
           style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}
         >
           <div className="flex flex-col sm:flex-row gap-3">
+            {isEditing && (
+              <button
+                type="button"
+                onClick={handleOpenPaymentModal}
+                className="flex-1 bg-indigo-600 text-white py-2.5 sm:py-3 px-4 rounded-xl font-medium text-sm sm:text-base hover:bg-indigo-700 transition"
+              >
+                Оплата
+              </button>
+            )}
             <button
               type="submit"
               disabled={isSubmitting || isLoadingUnits || !canManageReservation}
@@ -1308,6 +1291,37 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
               <span className="text-xl">{toast.type === 'error' ? '❌' : '✅'}</span>
               <p className="text-sm">{toast.message}</p>
               <button onClick={() => setToast(null)} className="ml-2 text-lg">×</button>
+            </div>
+          </div>
+        )}
+
+        {isPaymentModalOpen && (
+          <div className="fixed inset-0 z-[70] bg-black/40 flex items-center justify-center p-4">
+            <div className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-2xl">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Выберите способ оплаты</h3>
+              <div className="space-y-3">
+                <button
+                  type="button"
+                  onClick={handleCashPayment}
+                  className="w-full rounded-xl bg-green-600 text-white py-2.5 px-4 font-medium hover:bg-green-700 transition"
+                >
+                  Наличные
+                </button>
+                <button
+                  type="button"
+                  onClick={handleQrPayment}
+                  className="w-full rounded-xl bg-indigo-600 text-white py-2.5 px-4 font-medium hover:bg-indigo-700 transition"
+                >
+                  QR code
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsPaymentModalOpen(false)}
+                  className="w-full rounded-xl bg-gray-200 text-gray-800 py-2.5 px-4 font-medium hover:bg-gray-300 transition"
+                >
+                  Отмена
+                </button>
+              </div>
             </div>
           </div>
         )}

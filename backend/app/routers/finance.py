@@ -138,6 +138,28 @@ def get_operations(
                     account_id=row.account_id,
                 )
             )
+        # Корректировки по броням: отрицательные realization считаем расходом
+        realization_expense_query = db.query(models.RealizationDocument).options(joinedload(models.RealizationDocument.bath))
+        if period_start:
+            realization_expense_query = realization_expense_query.filter(models.RealizationDocument.date >= period_start)
+        if period_end:
+            realization_expense_query = realization_expense_query.filter(models.RealizationDocument.date <= period_end)
+        if account_id is not None:
+            realization_expense_query = realization_expense_query.filter(models.RealizationDocument.account_id == account_id)
+        realization_expense_query = realization_expense_query.filter(models.RealizationDocument.total_amount < 0)
+        for row in realization_expense_query.all():
+            operations.append(
+                schemas.FinanceOperationOut(
+                    source="realization",
+                    operation_type="expense",
+                    id=row.id,
+                    date=row.date,
+                    amount=abs(float(row.total_amount or 0)),
+                    title=row.client_name or "Корректировка по брони",
+                    subtitle=(f"Отмена закрытия • {row.bath.name}" if row.bath else "Отмена закрытия"),
+                    account_id=row.account_id,
+                )
+            )
 
     if operation_type in ("all", "income"):
         query = db.query(models.RealizationDocument).options(joinedload(models.RealizationDocument.bath))
@@ -147,6 +169,7 @@ def get_operations(
             query = query.filter(models.RealizationDocument.date <= period_end)
         if account_id is not None:
             query = query.filter(models.RealizationDocument.account_id == account_id)
+        query = query.filter(models.RealizationDocument.total_amount >= 0)
         for row in query.all():
             operations.append(
                 schemas.FinanceOperationOut(
@@ -154,7 +177,7 @@ def get_operations(
                     operation_type="income",
                     id=row.id,
                     date=row.date,
-                    amount=float(row.total_amount or 0),
+                    amount=abs(float(row.total_amount or 0)),
                     title=row.client_name or "Реализация",
                     subtitle=row.bath.name if row.bath else None,
                     account_id=row.account_id,
@@ -178,19 +201,25 @@ def get_summary(
     period_start, period_end = _resolve_period(period, date_from, date_to)
 
     expense_query = db.query(models.EntranceDocument)
-    income_query = db.query(models.RealizationDocument)
+    income_query = db.query(models.RealizationDocument).filter(models.RealizationDocument.total_amount >= 0)
+    realization_expense_query = db.query(models.RealizationDocument).filter(models.RealizationDocument.total_amount < 0)
 
     if period_start:
         expense_query = expense_query.filter(models.EntranceDocument.date >= period_start)
         income_query = income_query.filter(models.RealizationDocument.date >= period_start)
+        realization_expense_query = realization_expense_query.filter(models.RealizationDocument.date >= period_start)
     if period_end:
         expense_query = expense_query.filter(models.EntranceDocument.date <= period_end)
         income_query = income_query.filter(models.RealizationDocument.date <= period_end)
+        realization_expense_query = realization_expense_query.filter(models.RealizationDocument.date <= period_end)
     if account_id is not None:
         expense_query = expense_query.filter(models.EntranceDocument.account_id == account_id)
         income_query = income_query.filter(models.RealizationDocument.account_id == account_id)
+        realization_expense_query = realization_expense_query.filter(models.RealizationDocument.account_id == account_id)
 
-    expense = sum(float(item.total_amount or 0) for item in expense_query.all())
+    entrance_expense = sum(float(item.total_amount or 0) for item in expense_query.all())
+    realization_expense = sum(abs(float(item.total_amount or 0)) for item in realization_expense_query.all())
+    expense = entrance_expense + realization_expense
     income = sum(float(item.total_amount or 0) for item in income_query.all())
 
     return schemas.FinanceSummaryOut(
@@ -262,6 +291,7 @@ def get_operation_detail(
             "client_phone": row.client_phone,
             "bath_name": row.bath.name if row.bath else None,
             "reservation_id": row.reservation_id,
+            "is_reversal": bool((row.total_amount or 0) < 0),
             "items": [
                 {
                     "id": item.id,
@@ -275,10 +305,10 @@ def get_operation_detail(
         }
         return schemas.FinanceOperationDetailOut(
             source="realization",
-            operation_type="income",
+            operation_type="expense" if (row.total_amount or 0) < 0 else "income",
             id=row.id,
             date=row.date,
-            amount=float(row.total_amount or 0),
+            amount=abs(float(row.total_amount or 0)),
             account_id=row.account_id,
             payload=payload,
         )

@@ -1,7 +1,6 @@
 import { useState, useMemo, useCallback } from 'react';
 import { useLocation } from 'react-router-dom';
 import ReservationsFilters from '../Reservations/ReservationsFilters';
-import BookingDetailsModal from '../Reservations/BookingDetailsModal';
 import AddBookingModal from '../Reservations/AddBookingModal';
 import ReservationsSkeleton from './ReservationsSkeleton';
 import { useGetBathsQuery } from '../../../redux/slices/apiSlice';
@@ -68,7 +67,6 @@ function AdminReservationsNew() {
   const [filters, setFilters] = useState({
     date: location.state?.selectedDate || INITIAL_FILTERS.date,
   });
-  const [selectedBooking, setSelectedBooking] = useState(null);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingBooking, setEditingBooking] = useState(null);
   const [activeBathId, setActiveBathId] = useState(null);
@@ -196,10 +194,6 @@ function AdminReservationsNew() {
     setFilters(newFilters);
   }, []);
 
-  const handleViewBooking = useCallback((booking) => {
-    setSelectedBooking(booking);
-  }, []);
-
   const handleAddBooking = useCallback(() => {
     setIsAddModalOpen(true);
     setEditingBooking(null);
@@ -207,18 +201,15 @@ function AdminReservationsNew() {
 
   const handleEditBooking = useCallback((booking) => {
     setEditingBooking(booking);
-    setSelectedBooking(null);
   }, []);
 
   const handleCloseAllModals = useCallback(() => {
-    setSelectedBooking(null);
     setEditingBooking(null);
     setIsAddModalOpen(false);
     refetchReservations();
   }, [refetchReservations]);
 
   const handleCreateBookingSuccess = useCallback((createdReservation) => {
-    setSelectedBooking(null);
     setEditingBooking(null);
     setIsAddModalOpen(false);
 
@@ -442,7 +433,7 @@ function AdminReservationsNew() {
                                       gap: '2px',
                                     }}
                                     title={tooltipText}
-                                    onClick={() => !activeItem.is_cleaning && handleViewBooking(activeItem)}
+                                    onClick={() => !activeItem.is_cleaning && handleEditBooking(activeItem)}
                                   >
                                     <div className={`w-1 rounded-full absolute left-0 top-1 bottom-1 group-hover:w-2 transition-all duration-200 ${
                                       activeItem.is_cleaning
@@ -597,16 +588,10 @@ function AdminReservationsNew() {
                             </div>
                             <div className="flex flex-col gap-1.5 mt-2.5">
                               <button
-                                onClick={() => handleViewBooking(booking)}
-                                className="w-full bg-blue-100 text-blue-800 py-2.5 rounded-lg text-sm font-medium hover:bg-blue-200 transition min-h-[40px]"
-                              >
-                                Просмотр
-                              </button>
-                              <button
                                 onClick={() => handleEditBooking(booking)}
                                 className="w-full bg-green-100 text-green-800 py-2.5 rounded-lg text-sm font-medium hover:bg-green-200 transition min-h-[40px]"
                               >
-                                Редактировать
+                                Открыть
                               </button>
                               <button
                                 onClick={() => handleDeleteBooking(booking.reservation_id)}
@@ -627,13 +612,6 @@ function AdminReservationsNew() {
       </div>
 
       {/* Modals */}
-      <BookingDetailsModal
-        booking={selectedBooking}
-        onClose={handleCloseAllModals}
-        onEdit={handleEditBooking}
-        onDelete={handleDeleteBooking}
-      />
-
       <AddBookingModal
         isOpen={isAddModalOpen || editingBooking !== null}
         onClose={handleCloseAllModals}
