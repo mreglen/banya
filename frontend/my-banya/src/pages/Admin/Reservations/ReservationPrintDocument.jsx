@@ -28,8 +28,19 @@ function formatMoney(value) {
 function ReservationPrintDocument() {
   const { id } = useParams();
   const location = useLocation();
-  const paymentMode = new URLSearchParams(location.search).get('payment');
+  const searchParams = new URLSearchParams(location.search);
+  const paymentMode = searchParams.get('payment');
+  const advanceRaw = searchParams.get('advance') || '';
+  const advanceAmount = Number.parseInt(String(advanceRaw).replace(/\D/g, ''), 10) || 0;
   const isQrPayment = paymentMode === 'qrcode';
+  const paymentLabel =
+    paymentMode === 'qrcode'
+      ? 'Оплата по QR коду'
+      : paymentMode === 'cash'
+        ? 'Наличные'
+        : paymentMode === 'advance'
+          ? 'Аванс'
+          : 'Не указан';
   const { data: reservation, isLoading, error } = useGetReservationByIdQuery(id, { skip: !id });
 
   const productTotal = useMemo(
@@ -163,6 +174,16 @@ function ReservationPrintDocument() {
               <span className="text-gray-700">Статус</span>
               <span>{reservation.status || '-'}</span>
             </div>
+            <div className="flex justify-between">
+              <span className="text-gray-700">Способ оплаты</span>
+              <span className="text-right">{paymentLabel}</span>
+            </div>
+            {paymentMode === 'advance' && (
+              <div className="flex justify-between">
+                <span className="text-gray-700">Сумма аванса</span>
+                <span>{formatMoney(advanceAmount)}</span>
+              </div>
+            )}
             <div className="flex justify-between">
               <span className="text-gray-700">Акция</span>
               <span className="text-right">{reservation.promotion_snapshot?.name || 'Нет'}</span>

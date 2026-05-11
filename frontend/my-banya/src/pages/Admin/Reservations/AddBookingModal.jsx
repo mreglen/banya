@@ -143,6 +143,8 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
 
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+  const [showAdvanceInput, setShowAdvanceInput] = useState(false);
+  const [advanceAmount, setAdvanceAmount] = useState('');
   const [validationErrors, setValidationErrors] = useState({});
   const [toast, setToast] = useState(null);
   const prevIsOpenRef = useRef(false);
@@ -745,6 +747,8 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
   const handleOpenPaymentModal = () => {
     if (!isEditing || !booking?.reservation_id) return;
     setIsPaymentModalOpen(true);
+    setShowAdvanceInput(false);
+    setAdvanceAmount('');
   };
 
   const handleCashPayment = () => {
@@ -757,6 +761,22 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
     if (!booking?.reservation_id) return;
     window.open(`/admin/reservations/print/${booking.reservation_id}?payment=qrcode`, '_blank', 'noopener,noreferrer');
     setIsPaymentModalOpen(false);
+  };
+
+  const handleAdvancePayment = () => {
+    if (!booking?.reservation_id) return;
+    if (!advanceAmount) {
+      showToast('Введите сумму аванса', 'error');
+      return;
+    }
+    window.open(
+      `/admin/reservations/print/${booking.reservation_id}?payment=advance&advance=${advanceAmount}`,
+      '_blank',
+      'noopener,noreferrer'
+    );
+    setIsPaymentModalOpen(false);
+    setShowAdvanceInput(false);
+    setAdvanceAmount('');
   };
 
   if (!isOpen) return null;
@@ -1261,14 +1281,14 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
             >
               {!canManageReservation
                 ? 'Недостаточно прав'
-                : (isSubmitting ? 'Сохранение...' : isEditing ? 'Сохранить изменения' : 'Создать бронь')}
+                : (isSubmitting ? 'Сохранение...' : isEditing ? 'Сохранить' : 'Создать бронь')}
             </button>
             <button
               type="button"
               onClick={onClose}
               className="flex-1 bg-gray-200 text-gray-800 py-2.5 sm:py-3 px-4 rounded-xl font-medium text-sm sm:text-base hover:bg-gray-300 transition"
             >
-              {isEditing ? 'Назад к просмотру' : 'Отмена'}
+              {isEditing ? 'Закрыть' : 'Отмена'}
             </button>
           </div>
         </div>
@@ -1316,7 +1336,39 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
                 </button>
                 <button
                   type="button"
-                  onClick={() => setIsPaymentModalOpen(false)}
+                  onClick={() => setShowAdvanceInput((prev) => !prev)}
+                  className="w-full rounded-xl bg-amber-600 text-white py-2.5 px-4 font-medium hover:bg-amber-700 transition"
+                >
+                  Аванс
+                </button>
+                {showAdvanceInput && (
+                  <div className="space-y-2 rounded-xl border border-gray-200 p-3">
+                    <label className="block text-sm text-gray-700">Сумма аванса</label>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      value={advanceAmount}
+                      onChange={(e) => setAdvanceAmount(e.target.value.replace(/\D/g, ''))}
+                      placeholder="Введите сумму"
+                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleAdvancePayment}
+                      className="w-full rounded-lg bg-amber-600 text-white py-2 px-4 text-sm font-medium hover:bg-amber-700 transition"
+                    >
+                      Открыть чек с авансом
+                    </button>
+                  </div>
+                )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsPaymentModalOpen(false);
+                    setShowAdvanceInput(false);
+                    setAdvanceAmount('');
+                  }}
                   className="w-full rounded-xl bg-gray-200 text-gray-800 py-2.5 px-4 font-medium hover:bg-gray-300 transition"
                 >
                   Отмена
