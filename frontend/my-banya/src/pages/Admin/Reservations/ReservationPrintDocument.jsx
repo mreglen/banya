@@ -1,6 +1,10 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useLocation, useParams } from 'react-router-dom';
-import { useGetReservationByIdQuery } from '../../../redux/slices/reservationSlice';
+import {
+  useGetReservationByIdQuery,
+  useGetReservationStatusesQuery,
+  useUpdateReservationMutation,
+} from '../../../redux/slices/reservationSlice';
 
 const ORG_INFO = {
   name: 'Николаевские бани',
@@ -27,6 +31,8 @@ function formatMoney(value) {
 
 function ReservationPrintDocument() {
   const { id } = useParams();
+  const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
+  const [confirmError, setConfirmError] = useState('');
   const location = useLocation();
   const searchParams = new URLSearchParams(location.search);
   const paymentMode = searchParams.get('payment');
@@ -41,7 +47,9 @@ function ReservationPrintDocument() {
         : paymentMode === 'advance'
           ? 'Аванс'
           : 'Не указан';
-  const { data: reservation, isLoading, error } = useGetReservationByIdQuery(id, { skip: !id });
+  const { data: reservation, isLoading, error, refetch } = useGetReservationByIdQuery(id, { skip: !id });
+  const { data: statusOptions = [] } = useGetReservationStatusesQuery();
+  const [updateReservation, { isLoading: isConfirmingPayment }] = useUpdateReservationMutation();
 
   const productTotal = useMemo(
     () => (reservation?.products || []).reduce((sum, p) => sum + (p.price ?? p.purchase_price ?? 0) * (p.quantity || 0), 0),
@@ -56,6 +64,29 @@ function ReservationPrintDocument() {
   const bathServiceCost = Math.max(0, totalCost - extraTotal);
   const hasBonusMinutes = Boolean(reservation?.promotion_snapshot?.bonus_minutes);
   const hasGiftProducts = (reservation?.promotion_snapshot?.gift_products || []).length > 0;
+  const closedStatus = statusOptions.find(
+    (status) => String(status.status_name || '').trim().toLowerCase() === 'закрыт'
+  );
+  const isAlreadyClosed = String(reservation?.status || '').trim().toLowerCase() === 'закрыт';
+
+  const handleConfirmPayment = async () => {
+    if (!reservation?.reservation_id) return;
+    if (!closedStatus?.id) {
+      setConfirmError('Не найден статус "закрыт".');
+      return;
+    }
+    setConfirmError('');
+    try {
+      await updateReservation({
+        id: reservation.reservation_id,
+        status_id: Number(closedStatus.id),
+      }).unwrap();
+      setIsConfirmModalOpen(false);
+      await refetch();
+    } catch (e) {
+      setConfirmError(e?.data?.detail || 'Не удалось подтвердить оплату.');
+    }
+  };
 
   if (isLoading) return <div className="p-6">Загрузка документа...</div>;
   if (error || !reservation) return <div className="p-6 text-red-600">Не удалось загрузить данные брони.</div>;
@@ -80,6 +111,14 @@ function ReservationPrintDocument() {
 
       <div className="max-w-xl mx-auto">
         <div className="no-print mb-4 flex items-center gap-3">
+          <button
+            onClick={() => setIsConfirmModalOpen(true)}
+            disabled={isAlreadyClosed}
+            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+            title={isAlreadyClosed ? 'Бронь уже закрыта' : 'Подтвердить оплату'}
+          >
+            Подтвердить оплату
+          </button>
           <button
             onClick={() => window.print()}
             className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
@@ -226,6 +265,39 @@ function ReservationPrintDocument() {
           </section>
         </article>
       </div>
+      {isConfirmModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
+          <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-2xl">
+            <h3 className="text-lg font-semibold text-gray-900">Подтвердить оплату</h3>
+            <p className="mt-2 text-sm text-gray-700">
+              После подтверждения оплаты статус брони изменится на <strong>закрыт</strong>.
+            </p>
+            {confirmError && (
+              <p className="mt-2 text-sm text-red-600">{confirmError}</p>
+            )}
+            <div className="mt-4 flex gap-3">
+              <button
+                type="button"
+                onClick={handleConfirmPayment}
+                disabled={isConfirmingPayment}
+                className="flex-1 rounded-lg bg-green-600 px-4 py-2 text-white hover:bg-green-700 disabled:opacity-50"
+              >
+                {isConfirmingPayment ? 'Подтверждение...' : 'Подтвердить'}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsConfirmModalOpen(false);
+                  setConfirmError('');
+                }}
+                className="flex-1 rounded-lg bg-gray-200 px-4 py-2 text-gray-800 hover:bg-gray-300"
+              >
+                Отмена
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
