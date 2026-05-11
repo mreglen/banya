@@ -15,13 +15,12 @@ const toAbsoluteImageUrl = (imageUrl) => {
 
 function WebsiteCategoriesPreview() {
   const { data: categories = [] } = useGetWebsiteCategoriesPreviewQuery();
-  const [expandedCategories, setExpandedCategories] = useState({});
+  const [productSlides, setProductSlides] = useState({});
 
-  const toggleCategory = (categoryId) => {
-    setExpandedCategories((prev) => ({
-      ...prev,
-      [categoryId]: !prev[categoryId],
-    }));
+  const slideKey = (categoryId, productId) => `${categoryId}-${productId}`;
+  const setSlide = (categoryId, productId, value) => {
+    const key = slideKey(categoryId, productId);
+    setProductSlides((prev) => ({ ...prev, [key]: value }));
   };
 
   if (!Array.isArray(categories) || categories.length === 0) {
@@ -71,67 +70,83 @@ function WebsiteCategoriesPreview() {
                 </p>
               </div>
 
-              <div className="flex flex-wrap justify-center gap-6 mt-12">
-                {category.products
-                  .slice(0, expandedCategories[category.id] ? category.products.length : 3)
-                  .map((product) => {
+              <div className="mt-12 overflow-x-auto pb-2">
+                <div className="flex gap-6 w-max snap-x snap-mandatory">
+                  {category.products.map((product) => {
                     const productPhoto = toAbsoluteImageUrl(product.photos?.[0]?.image_url);
+                    const currentSlide = productSlides[slideKey(category.id, product.id)] || 0;
 
                     return (
                       <div
                         key={product.id}
-                        className={`w-full md:w-[calc(33.333%-1rem)] ${
+                        className={`snap-start w-[280px] sm:w-[320px] ${
                           isDark
-                            ? 'bg-gray-800 rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow duration-300 border border-gray-700'
-                            : 'bg-white rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow duration-300 border border-gray-100'
-                        }`}
+                            ? 'bg-gray-800 rounded-xl shadow-sm border border-gray-700'
+                            : 'bg-white rounded-xl shadow-sm border border-gray-100'
+                        } overflow-hidden`}
                       >
-                        {productPhoto && (
-                          <img
-                            src={productPhoto}
-                            alt={product.name}
-                            className="w-full h-44 object-cover rounded-lg mb-4"
-                          />
-                        )}
-                        <h3
-                          className={`text-xl font-medium mb-2 ${
-                            isDark ? 'text-white' : 'text-gray-900'
-                          }`}
-                        >
-                          {product.name}
-                        </h3>
-                        <p
-                          className={`text-sm mb-4 ${
-                            isDark ? 'text-gray-300' : 'text-gray-600'
-                          }`}
-                        >
-                          {product.description || 'Без описания'}
-                        </p>
-                        <p
-                          className={`text-lg font-semibold ${
-                            isDark ? 'text-amber-400' : 'text-amber-600'
-                          }`}
-                        >
-                          {(product.price ?? 0).toFixed(2)} ₽
-                        </p>
+                        <div className="relative h-[360px] overflow-hidden">
+                          <div
+                            className="flex h-full transition-transform duration-300"
+                            style={{ transform: `translateX(-${currentSlide * 100}%)` }}
+                          >
+                            <div className="w-full h-full shrink-0 p-5 flex flex-col">
+                              {productPhoto ? (
+                                <img
+                                  src={productPhoto}
+                                  alt={product.name}
+                                  className="w-full h-56 object-cover rounded-lg mb-4"
+                                />
+                              ) : (
+                                <div className="w-full h-56 rounded-lg mb-4 bg-gray-200 flex items-center justify-center text-sm text-gray-500">
+                                  Нет фото
+                                </div>
+                              )}
+                              <h3 className={`text-xl font-medium ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                                {product.name}
+                              </h3>
+                            </div>
+
+                            <div className="w-full h-full shrink-0 p-5 flex flex-col justify-between">
+                              <div>
+                                <p className={`text-sm ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>
+                                  {product.description || 'Без описания'}
+                                </p>
+                              </div>
+                              <p className={`text-2xl font-semibold ${isDark ? 'text-amber-400' : 'text-amber-600'}`}>
+                                {(product.price ?? 0).toFixed(2)} ₽
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className={`px-5 pb-5 pt-2 flex items-center justify-between ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                          <button
+                            type="button"
+                            onClick={() => setSlide(category.id, product.id, 0)}
+                            disabled={currentSlide === 0}
+                            className="px-3 py-1.5 rounded-lg text-sm bg-gray-200 text-gray-800 disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            Фото
+                          </button>
+                          <div className="flex gap-2">
+                            <span className={`h-2.5 w-2.5 rounded-full ${currentSlide === 0 ? 'bg-amber-500' : 'bg-gray-300'}`} />
+                            <span className={`h-2.5 w-2.5 rounded-full ${currentSlide === 1 ? 'bg-amber-500' : 'bg-gray-300'}`} />
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setSlide(category.id, product.id, 1)}
+                            disabled={currentSlide === 1}
+                            className="px-3 py-1.5 rounded-lg text-sm bg-amber-600 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            Детали
+                          </button>
+                        </div>
                       </div>
                     );
                   })}
-              </div>
-
-              {category.products.length > 3 && (
-                <div className="mt-8 text-center">
-                  <button
-                    type="button"
-                    onClick={() => toggleCategory(category.id)}
-                    className={`inline-flex items-center gap-2 px-8 py-3 bg-amber-600 hover:bg-amber-700 text-white rounded-xl font-medium transition-all duration-300 hover:shadow-lg transform hover:scale-105 ${
-                      isDark ? 'shadow-md shadow-black/30' : ''
-                    }`}
-                  >
-                    {expandedCategories[category.id] ? 'Скрыть' : 'Показать больше'}
-                  </button>
                 </div>
-              )}
+              </div>
             </div>
           </section>
         );
