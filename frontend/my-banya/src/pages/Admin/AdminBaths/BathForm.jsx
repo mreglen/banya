@@ -9,6 +9,7 @@ import {
 } from '../../../redux/slices/apiSlice';
 import { useGetPromotionsQuery } from '../../../redux/slices/promotionsApiSlice';
 import { prepareImageForUpload } from '../../../utils/imageProcessing';
+import { toast } from 'react-hot-toast';
 
 const MAX_FILES = 5;
 
@@ -72,12 +73,24 @@ function BathForm() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    if (!formData.name || !formData.title || !formData.cost_weekday || !formData.cost_weekend) {
-      alert('Пожалуйста, заполните все обязательные поля');
+    if (!formData.name) {
+      toast.error('Введите название бани');
+      return;
+    }
+    if (!formData.title) {
+      toast.error('Введите заголовок');
+      return;
+    }
+    if (!formData.cost_weekday || Number(formData.cost_weekday) <= 0) {
+      toast.error('Введите корректную цену за будни');
+      return;
+    }
+    if (!formData.cost_weekend || Number(formData.cost_weekend) <= 0) {
+      toast.error('Введите корректную цену за выходные');
       return;
     }
     if (!formData.min_booking_hours || Number(formData.min_booking_hours) < 1) {
-      alert('Минимальное количество часов должно быть не меньше 1');
+      toast.error('Минимальное количество часов должно быть не меньше 1');
       return;
     }
 
@@ -126,25 +139,25 @@ function BathForm() {
         try {
           await uploadPhotos({ bath_id: resultBathId, files: filesToUpload }).unwrap();
           setUploadProgress(100);
+          toast.success('Фотографии успешно загружены');
         } catch (uploadErr) {
           console.error('Ошибка загрузки фото:', uploadErr);
           setUploadProgress(null);
           
-          // Check if it's a 413 error
           if (uploadErr.status === 413) {
-            alert('Ошибка: Файлы слишком большие. Максимальный размер: 10 МБ на файл');
+            toast.error('Файлы слишком большие (макс. 10 МБ)');
           } else {
-            alert('Произошла ошибка при загрузке фото');
+            toast.error('Ошибка при загрузке фото');
           }
-          return; // Don't navigate away if upload fails
+          return;
         }
       }
 
-      // Возвращаемся к списку
+      toast.success(isEditing ? 'Баня обновлена' : 'Баня создана');
       navigate('/admin/baths');
     } catch (err) {
       console.error('Ошибка сохранения:', err);
-      alert('Произошла ошибка при сохранении бани');
+      toast.error(err.data?.detail || 'Ошибка при сохранении бани');
     } finally {
       setIsSaving(false);
       setUploadProgress(null);
@@ -154,7 +167,7 @@ function BathForm() {
   const handleFileChange = async (e) => {
     const files = Array.from(e.target.files);
     if (files.length + selectedFiles.length > MAX_FILES) {
-      alert(`Можно загрузить не более ${MAX_FILES} фото`);
+      toast.error(`Можно загрузить не более ${MAX_FILES} фото`);
       return;
     }
 
@@ -173,7 +186,7 @@ function BathForm() {
       setSelectedFiles(prev => [...prev, ...processedFiles]);
     } catch (err) {
       console.error('Ошибка обработки изображений:', err);
-      alert(err.message || 'Не удалось подготовить изображения к загрузке');
+      toast.error(err.message || 'Не удалось подготовить изображения');
     } finally {
       e.target.value = '';
     }
@@ -195,10 +208,11 @@ function BathForm() {
 
     try {
       await deletePhoto({ bath_id: bathId, photo_id: photoId }).unwrap();
+      toast.success('Фото удалено');
       await refetchBath();
     } catch (err) {
       console.error('Ошибка удаления фото:', err);
-      alert('Произошла ошибка при удалении фото');
+      toast.error('Не удалось удалить фото');
     }
   };
 

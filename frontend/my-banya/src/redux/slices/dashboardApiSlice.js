@@ -16,10 +16,10 @@ export const dashboardApiSlice = apiSlice.injectEndpoints({
 
     // Получить данные для графика дохода
     getRevenueChartData: builder.query({
-      query: (days = 30) => ({
+      query: (period = 'month') => ({
         url: `${DASHBOARD_URL}/revenue-chart`,
         method: 'GET',
-        params: { days },
+        params: { period },
       }),
       providesTags: (result) => 
         result ? [{ type: 'Dashboard', id: 'revenue-chart' }] : [],
@@ -34,6 +34,17 @@ export const dashboardApiSlice = apiSlice.injectEndpoints({
       }),
       providesTags: (result) => 
         result ? [{ type: 'Dashboard', id: 'reservations-chart' }] : [],
+    }),
+
+    // Получить данные для графика заявок с сайта
+    getBookingsChartData: builder.query({
+      query: (days = 30) => ({
+        url: `${DASHBOARD_URL}/bookings-chart`,
+        method: 'GET',
+        params: { days },
+      }),
+      providesTags: (result) => 
+        result ? [{ type: 'Dashboard', id: 'bookings-chart' }] : [],
     }),
 
     // Получить популярные бани
@@ -63,6 +74,7 @@ export const {
   useGetDashboardStatisticsQuery,
   useGetRevenueChartDataQuery,
   useGetReservationsChartDataQuery,
+  useGetBookingsChartDataQuery,
   useGetPopularBathsQuery,
   useGetRecentActivityQuery,
 } = dashboardApiSlice;

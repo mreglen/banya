@@ -9,6 +9,7 @@ import {
 } from '../../../redux/slices/productsApiSlice';
 import CategorySelectModal from './CategorySelectModal';
 import UnitCreateModal from './UnitCreateModal';
+import { toast } from 'react-hot-toast';
 
 const findCategoryById = (cats, id) => {
   for (const cat of cats) {
@@ -88,7 +89,10 @@ const AddStorageProduct = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!formData.name.trim()) return alert('Укажите наименование');
+    if (!formData.name.trim()) {
+      toast.error('Укажите наименование товара');
+      return;
+    }
 
     try {
       const productData = {
@@ -126,11 +130,11 @@ const AddStorageProduct = () => {
         await uploadProductPhotos({ productId, formData: formDataUpload }).unwrap();
       }
 
-      alert('Товар успешно создан');
+      toast.success('Товар успешно создан');
       navigate('/admin/storage/nomenclature');
     } catch (err) {
       console.error('Ошибка:', err);
-      alert('Не удалось создать товар: ' + (err.data?.detail || 'Проверьте данные'));
+      toast.error('Не удалось создать товар: ' + (err.data?.detail || 'Проверьте данные'));
     }
   };
 

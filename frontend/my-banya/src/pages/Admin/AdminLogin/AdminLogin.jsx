@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
 import { setCredentials } from '../../../redux/slices/authSlice';
 import { login, getProfile } from '../../../redux/slices/adminApi'; // ← getProfile
+import { toast } from 'react-hot-toast';
 
 function AdminLogin() {
   const navigate = useNavigate();
@@ -55,12 +56,12 @@ function AdminLogin() {
       localStorage.setItem('remember_me', 'true'); // Always persistent
       
       console.log('\n✅ Navigation to admin panel...\n');
-
+      toast.success(`Добро пожаловать, ${user.first_name || 'Администратор'}!`);
       navigate('/admin');
     } catch (err) {
       console.error('❌ Login error:', err);
       console.error('Response:', err.response?.data);
-      setError('Неверный логин или пароль');
+      toast.error(err.response?.data?.detail || 'Неверный логин или пароль');
       // Очищаем токены при ошибке
       localStorage.removeItem('access_token');
       localStorage.removeItem('refresh_token');
@@ -83,11 +84,6 @@ function AdminLogin() {
           <p className="text-gray-600 mt-2">Введите данные для входа</p>
         </div>
 
-        {error && (
-          <div className="mb-6 p-3 bg-red-50 text-red-600 text-sm rounded-lg">
-            {error}
-          </div>
-        )}
 
         <form onSubmit={handleSubmit}>
           <div className="space-y-6">

@@ -6,6 +6,7 @@ import {
   useCreatePartnerMutation,
   useUpdatePartnerMutation,
 } from '../../../../redux/slices/apiSlice';
+import { toast } from 'react-hot-toast';
 
 function PartnerForm() {
   const { id } = useParams();
@@ -104,13 +105,17 @@ function PartnerForm() {
     e.preventDefault();
     const { name, contactPerson, phone, email, inn } = form;
 
-    if (!name || !contactPerson) {
-      alert('Пожалуйста, заполните обязательные поля: Наименование и ФИО.');
+    if (!name) {
+      toast.error('Введите наименование партнёра');
+      return;
+    }
+    if (!contactPerson) {
+      toast.error('Введите ФИО контактного лица');
       return;
     }
 
     if (inn && !/^\d{10,12}$/.test(inn)) {
-      alert('ИНН должен содержать 10 или 12 цифр.');
+      toast.error('ИНН должен содержать 10 или 12 цифр');
       return;
     }
 
@@ -140,10 +145,10 @@ function PartnerForm() {
       let newPartner = null;
 
       if (isEditing) {
-        await updatePartner({ id, ...payload }).unwrap();
-      } else {
         newPartner = await createPartner(payload).unwrap();
       }
+
+      toast.success(isEditing ? 'Партнёр обновлен' : 'Партнёр добавлен');
 
       // Возврат, если пришли из документа
       if (fromDocument?.returnTo && newPartner) {
@@ -156,7 +161,7 @@ function PartnerForm() {
       }
     } catch (err) {
       console.error('Ошибка сохранения:', err);
-      alert('Не удалось сохранить партнёра. Проверьте данные и попробуйте снова.');
+      toast.error(err.data?.detail || 'Не удалось сохранить партнёра');
     }
   };
 

@@ -45,13 +45,13 @@ function KitchenPreview() {
         {/* Превью блюд */}
         <div id="kitchen-menu" className="grid grid-cols-1 md:grid-cols-3 gap-8 md:gap-10 mt-12">
           {kitchenItems.map((item, index) => (
-            <div 
-              key={index} 
+            <div
+              key={index}
               className={`group relative p-8 rounded-3xl border border-zinc-100 bg-white shadow-sm hover:shadow-2xl hover:-translate-y-2 transition-all duration-500 overflow-hidden`}
             >
               {/* Animated background gradient on hover */}
               <div className={`absolute inset-0 bg-gradient-to-br ${item.color} opacity-0 group-hover:opacity-100 transition-opacity duration-500`} />
-              
+
               <div className="relative z-10">
                 <div className="mb-6 flex justify-between items-start">
                   <h3 className="text-2xl font-bold text-zinc-900 group-hover:text-black transition-colors">{item.name}</h3>
@@ -77,4 +77,4 @@ function KitchenPreview() {
   );
 }
 
-export default KitchenPreview;
+export default KitchenPreview;

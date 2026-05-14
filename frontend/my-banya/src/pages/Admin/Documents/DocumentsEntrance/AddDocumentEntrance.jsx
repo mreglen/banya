@@ -23,6 +23,7 @@ import {
   useGetPartnersQuery,
   useGetFinanceAccountsQuery,
 } from '../../../../redux/slices/apiSlice';
+import { toast } from 'react-hot-toast';
 
 function AddDocumentEntrance() {
   const navigate = useNavigate();
@@ -249,13 +250,21 @@ function AddDocumentEntrance() {
       navigate('/admin/documents/entrance');
     } catch (error) {
       console.error('Ошибка сохранения документа:', error);
-      alert(error?.data?.detail || 'Не удалось сохранить документ');
+      toast.error(error?.data?.detail || 'Не удалось сохранить документ');
     }
   };
 
   const handleSaveDocument = async () => {
     if (!accountId) {
-      alert('Выберите счет списания');
+      toast.error('Выберите счет списания');
+      return;
+    }
+    if (!supplierId) {
+      toast.error('Выберите поставщика');
+      return;
+    }
+    if (items.length === 0) {
+      toast.error('Добавьте хотя бы один товар');
       return;
     }
     const total = items.reduce((sum, item) => sum + item.quantity * (Number(item.purchasePrice) || 0), 0);
@@ -757,6 +766,7 @@ function AddDocumentEntrance() {
                   setIsConfirmModalOpen(false);
                   setPendingPayload(null);
                   submitDocument(payloadToSend);
+                  toast.success(isEditing ? 'Документ обновлен' : 'Документ создан');
                 }}
                 className="flex-1 rounded-lg bg-green-600 px-3 py-2 text-sm text-white hover:bg-green-700"
               >

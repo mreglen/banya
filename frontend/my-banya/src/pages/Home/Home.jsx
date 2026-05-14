@@ -1,18 +1,36 @@
 import { Helmet } from 'react-helmet-async';
+import { useState, useEffect } from 'react';
 import ListBaths from "./ListBaths/ListBaths";
 import WebsiteCategoriesPreview from "./WebsiteCategoriesPreview/WebsiteCategoriesPreview";
 import Booking from "../Booking/Booking";
 import ContactSection from "./ContactSection/ContactSection";
-
+import { useReveal } from '../../hooks/useReveal';
+import { Calendar } from 'lucide-react';
 
 function Home() {
+    useReveal();
+    const [showSticky, setShowSticky] = useState(false);
+
+    useEffect(() => {
+        const handleScroll = () => {
+            setShowSticky(window.scrollY > 600);
+        };
+        window.addEventListener('scroll', handleScroll);
+        return () => window.removeEventListener('scroll', handleScroll);
+    }, []);
+
+    const scrollToBooking = (e) => {
+        e?.preventDefault();
+        document.getElementById('booking')?.scrollIntoView({ behavior: 'smooth' });
+    };
+
     return (
-        <div>
+        <div className="overflow-x-hidden">
             <Helmet>
                 <title>Николаевские бани - Русские бани на дровах в Екатеринбурге</title>
                 <meta name="description" content="Николаевские бани в Екатеринбурге - настоящие русские бани на дровах с вековыми традициями. Бронирование онлайн, парение с вениками, отдых для души и тела." />
                 <meta name="keywords" content="бани Екатеринбург, русская баня, баня на дровах, парение, веники, отдых, Николаевские бани, бронирование бани" />
-                
+
                 {/* Open Graph */}
                 <meta property="og:title" content="Николаевские бани - Русские бани на дровах в Екатеринбурге" />
                 <meta property="og:description" content="Настоящие русские бани на дровах с вековыми традициями. Восстанавливаем силы и душевное тепло." />
@@ -20,12 +38,12 @@ function Home() {
                 <meta property="og:url" content="https://nikolaevskie-bani.ru/" />
                 <meta property="og:image" content="%PUBLIC_URL%/img/Logo.png" />
                 <meta property="og:locale" content="ru_RU" />
-                
+
                 {/* Twitter */}
                 <meta name="twitter:card" content="summary_large_image" />
                 <meta name="twitter:title" content="Николаевские бани - Русские бани на дровах в Екатеринбурге" />
                 <meta name="twitter:description" content="Настоящие русские бани на дровах с вековыми традициями." />
-                
+
                 {/* Schema.org structured data */}
                 <script type="application/ld+json">
                     {JSON.stringify({
@@ -52,24 +70,21 @@ function Home() {
                     backgroundImage: "url('/img/bg-home.png')",
                 }}
             >
-                <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/40 to-black/70"></div>
+                <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/40 to-black/80"></div>
 
                 <div className="relative z-10 w-full px-6 py-24 sm:py-32 md:py-0">
                     <div className="max-w-5xl mx-auto text-center text-white">
-                        <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-light mb-6 md:mb-8 leading-tight">
+                        <h1 className="text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-light mb-6 md:mb-8 leading-tight drop-shadow-2xl">
                             Николаевские бани
                         </h1>
-                        <p className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-extralight mb-8 md:mb-12 leading-relaxed max-w-3xl mx-auto">
-                            Это атмосфера настоящей русской бани на дровах с вековыми традициями. Мы восстанавливаем силы и душевное тепло.
+                        <p className="text-xl sm:text-2xl md:text-3xl font-light mb-10 md:mb-14 leading-relaxed max-w-3xl mx-auto text-white/90">
+                            Атмосфера настоящей русской бани на дровах с вековыми традициями. Мы восстанавливаем силы и душевное тепло.
                         </p>
-                        <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                        <div className="flex flex-col sm:flex-row gap-5 justify-center">
                             <a
                                 href="#booking"
-                                onClick={(e) => {
-                                    e.preventDefault();
-                                    document.getElementById('booking')?.scrollIntoView({ behavior: 'smooth' });
-                                }}
-                                className="px-8 py-4 bg-green-600 hover:bg-green-700 text-white rounded-xl font-medium text-lg transition-all duration-300 hover:shadow-2xl hover:shadow-green-500/30 transform hover:scale-105"
+                                onClick={scrollToBooking}
+                                className="px-10 py-5 bg-green-600 hover:bg-green-700 text-white rounded-2xl font-semibold text-xl transition-all duration-300 hover:shadow-[0_0_30px_rgba(22,163,74,0.4)] transform hover:scale-105"
                             >
                                 Забронировать
                             </a>
@@ -79,7 +94,7 @@ function Home() {
                                     e.preventDefault();
                                     document.getElementById('baths')?.scrollIntoView({ behavior: 'smooth' });
                                 }}
-                                className="px-8 py-4 bg-white/10 hover:bg-white/20 backdrop-blur-sm text-white rounded-xl font-medium text-lg border border-white/30 transition-all duration-300"
+                                className="px-10 py-5 bg-white/10 hover:bg-white/20 backdrop-blur-md text-white rounded-2xl font-semibold text-xl border border-white/20 transition-all duration-300"
                             >
                                 Наши бани
                             </a>
@@ -91,7 +106,7 @@ function Home() {
                 <div className="absolute bottom-8 left-0 right-0 flex justify-center">
                     <button
                         type="button"
-                        onClick={() => document.getElementById('baths-slider')?.scrollIntoView({ behavior: 'smooth' })}
+                        onClick={() => document.getElementById('baths')?.scrollIntoView({ behavior: 'smooth' })}
                         className="animate-bounce p-2 rounded-full hover:bg-white/10 transition group"
                         aria-label="Перейти к слайдеру бань"
                     >
@@ -102,10 +117,21 @@ function Home() {
                 </div>
             </div>
 
-            <ListBaths />
-            <WebsiteCategoriesPreview />
-            <Booking />
-            <ContactSection />
+            <div className="reveal"><ListBaths /></div>
+            <div className="reveal"><WebsiteCategoriesPreview /></div>
+            <div className="reveal"><Booking /></div>
+            <div className="reveal"><ContactSection /></div>
+
+            {/* Sticky Booking Button for Mobile */}
+            <div className={`fixed bottom-6 right-6 z-[100] transition-all duration-500 transform ${showSticky ? 'translate-y-0 opacity-100' : 'translate-y-20 opacity-0'}`}>
+                <button
+                    onClick={scrollToBooking}
+                    className="flex items-center gap-3 px-6 py-4 bg-green-600 text-white rounded-full shadow-2xl hover:bg-green-700 transition-all transform hover:scale-110 active:scale-95"
+                >
+                    <Calendar size={24} />
+                    <span className="font-bold text-lg hidden sm:inline">Забронировать</span>
+                </button>
+            </div>
         </div>
     );
 }

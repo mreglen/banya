@@ -6,6 +6,7 @@ import {
   useCreateClientsMutation,
   useUpdateClientsMutation,
 } from '../../../../redux/slices/apiSlice';
+import { toast } from 'react-hot-toast';
 
 function ClientForm() {
   const { id } = useParams();
@@ -101,12 +102,12 @@ function ClientForm() {
     const { fullName, phone, email, birthDate } = form;
 
     if (!fullName) {
-      alert('Пожалуйста, заполните обязательное поле: ФИО.');
+      toast.error('Пожалуйста, заполните ФИО');
       return;
     }
 
     if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      alert('Некорректный email.');
+      toast.error('Некорректный email');
       return;
     }
 
@@ -117,11 +118,11 @@ function ClientForm() {
       minDate.setFullYear(today.getFullYear() - 120);
 
       if (birth > today) {
-        alert('Дата рождения не может быть в будущем.');
+        toast.error('Дата рождения не может быть в будущем');
         return;
       }
       if (birth < minDate) {
-        alert('Некорректная дата рождения.');
+        toast.error('Некорректная дата рождения');
         return;
       }
     }
@@ -151,10 +152,10 @@ function ClientForm() {
       let newClient = null;
 
       if (isEditing) {
-        await updateClient({ id, ...payload }).unwrap();
-      } else {
         newClient = await createClient(payload).unwrap();
       }
+
+      toast.success(isEditing ? 'Клиент обновлен' : 'Клиент добавлен');
 
       // Возврат, если пришли из документа
       if (fromDocument?.returnTo && newClient) {
@@ -167,7 +168,7 @@ function ClientForm() {
       }
     } catch (err) {
       console.error('Ошибка сохранения клиента:', err);
-      alert('Не удалось сохранить клиента. Проверьте данные и попробуйте снова.');
+      toast.error(err.data?.detail || 'Не удалось сохранить клиента');
     }
   };
 

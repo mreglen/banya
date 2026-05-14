@@ -1,49 +1,78 @@
 // src/pages/Admin/AdminDashboard.jsx
+import { useMemo, useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import { 
   useGetDashboardStatisticsQuery,
   useGetRevenueChartDataQuery,
   useGetReservationsChartDataQuery,
+  useGetBookingsChartDataQuery,
   useGetPopularBathsQuery,
   useGetRecentActivityQuery
 } from '../../redux/slices/dashboardApiSlice';
 import {
-  LineChart,
-  Line,
+  AreaChart,
+  Area,
   BarChart,
   Bar,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
-  Legend,
   ResponsiveContainer,
   PieChart,
   Pie,
-  Cell
+  Cell,
+  Legend
 } from 'recharts';
+import { 
+  TrendingUp, 
+  Users, 
+  Calendar, 
+  DollarSign, 
+  MousePointer2, 
+  Home as HomeIcon, 
+  Package, 
+  ClipboardList, 
+  History,
+  ArrowUpRight,
+  Plus,
+  RefreshCw,
+  Trash2,
+  Info
+} from 'lucide-react';
 import AdminDashboardSkeleton from './AdminDashboardSkeleton';
+
+const COLORS = ['#10b981', '#3b82f6', '#8b5cf6', '#f59e0b', '#ef4444'];
 
 function AdminDashboard() {
   const currentDate = new Date();
-  const greeting = currentDate.getHours() < 12 ? 'Доброе утро' : currentDate.getHours() < 18 ? 'Добрый день' : 'Добрый вечер';
+  const hours = currentDate.getHours();
+  const greeting = hours < 6 ? 'Доброй ночи' : hours < 12 ? 'Доброе утро' : hours < 18 ? 'Добрый день' : 'Добрый вечер';
+
+  const [revenuePeriod, setRevenuePeriod] = useState('month');
 
   // Загрузка данных
   const { data: stats, isLoading: statsLoading } = useGetDashboardStatisticsQuery();
-  const { data: revenueData, isLoading: revenueLoading } = useGetRevenueChartDataQuery(30);
-  const { data: reservationsData, isLoading: reservationsLoading } = useGetReservationsChartDataQuery(30);
+  const { data: revenueData, isLoading: revenueLoading } = useGetRevenueChartDataQuery(revenuePeriod);
+  const { data: reservationsData, isLoading: reservationsLoading } = useGetReservationsChartDataQuery(14);
+  const { data: bookingsData, isLoading: bookingsLoading } = useGetBookingsChartDataQuery(14);
   const { data: popularBaths, isLoading: bathsLoading } = useGetPopularBathsQuery();
-  const { data: recentActivity, isLoading: activityLoading } = useGetRecentActivityQuery(10);
+  const { data: recentActivity, isLoading: activityLoading } = useGetRecentActivityQuery(8);
 
-  // Показываем скелетон при загрузке
-  if (statsLoading || revenueLoading || reservationsLoading) {
-    return <AdminDashboardSkeleton />;
-  }
+  // Объединение данных для графика активности (Бронирования vs Заявки)
+  const activityChartData = useMemo(() => {
+    if (!reservationsData || !bookingsData) return [];
+    
+    return reservationsData.map((res) => {
+        const book = bookingsData.find(b => b.full_date === res.full_date) || { count: 0 };
+        return {
+            date: res.date,
+            reservations: res.count,
+            bookings: book.count
+        };
+    });
+  }, [reservationsData, bookingsData]);
 
-  // Цвета для графиков
-  const COLORS = ['#10b981', '#3b82f6', '#8b5cf6', '#f59e0b', '#ef4444'];
-
-  // Форматирование валюты
   const formatCurrency = (value) => {
     return new Intl.NumberFormat('ru-RU', {
       style: 'currency',
@@ -52,394 +81,351 @@ function AdminDashboard() {
     }).format(value);
   };
 
-  // Форматирование даты
   const formatDateTime = (dateString) => {
+    if (!dateString) return '';
     const date = new Date(dateString);
     return date.toLocaleString('ru-RU', {
       day: '2-digit',
       month: '2-digit',
-      year: 'numeric',
       hour: '2-digit',
       minute: '2-digit'
     });
   };
 
-  // Иконка действия
   const getActionIcon = (action) => {
     switch (action) {
-      case 'CREATE':
-        return (
-          <div className="p-2 bg-green-100 rounded-lg">
-            <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-            </svg>
-          </div>
-        );
-      case 'UPDATE':
-        return (
-          <div className="p-2 bg-blue-100 rounded-lg">
-            <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-            </svg>
-          </div>
-        );
-      case 'DELETE':
-        return (
-          <div className="p-2 bg-red-100 rounded-lg">
-            <svg className="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-            </svg>
-          </div>
-        );
-      default:
-        return (
-          <div className="p-2 bg-gray-100 rounded-lg">
-            <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-          </div>
-        );
+      case 'CREATE': return <Plus className="w-4 h-4 text-green-500" />;
+      case 'UPDATE': return <RefreshCw className="w-4 h-4 text-blue-500" />;
+      case 'DELETE': return <Trash2 className="w-4 h-4 text-red-500" />;
+      default: return <Info className="w-4 h-4 text-gray-400" />;
     }
   };
 
+  if (statsLoading) {
+    return <AdminDashboardSkeleton />;
+  }
+
   return (
-    <div className="p-6">
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-800 mb-2">
-          {greeting}!
-        </h1>
-        <p className="text-gray-600">
-          Добро пожаловать в панель управления Николаевские бани
-        </p>
+    <div className="p-4 sm:p-8 space-y-8 bg-gray-50/50 min-h-screen">
+      {/* Welcome Header */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-600 bg-clip-text text-transparent">
+            {greeting}, Администратор!
+          </h1>
+          <p className="text-gray-500 mt-1 flex items-center gap-2">
+            <Calendar className="w-4 h-4" />
+            {currentDate.toLocaleDateString('ru-RU', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+          </p>
+        </div>
+        <div className="flex items-center gap-3">
+          <NavLink 
+            to="/admin/reservations" 
+            className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-xl shadow-lg shadow-green-200 transition-all transform hover:scale-105 flex items-center gap-2 font-medium"
+          >
+            <Plus className="w-4 h-4" />
+            Новая бронь
+          </NavLink>
+        </div>
       </div>
 
-      {/* Quick Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <div className="bg-white p-6 rounded-xl shadow hover:shadow-lg transition border-l-4 border-green-500">
-          <div className="flex items-center justify-between mb-4">
-            <div className="p-3 bg-green-100 rounded-lg">
-              <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-              </svg>
+      {/* Stats Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        {/* Revenue Card */}
+        <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100 hover:shadow-md transition-shadow relative overflow-hidden group">
+          <div className="absolute -right-4 -top-4 w-24 h-24 bg-green-50 rounded-full group-hover:scale-110 transition-transform duration-500"></div>
+          <div className="relative z-10">
+            <div className="p-3 bg-green-50 w-fit rounded-2xl mb-4">
+              <DollarSign className="w-6 h-6 text-green-600" />
             </div>
-          </div>
-          <h3 className="text-3xl font-bold text-gray-800 mb-1">
-            {stats?.reservations?.today || 0}
-          </h3>
-          <p className="text-gray-600 text-sm">Бронирований сегодня</p>
-          <div className="mt-2 text-xs text-gray-500">
-            {stats?.reservations?.this_week || 0} за неделю
+            <p className="text-gray-500 text-sm font-medium">Выручка сегодня</p>
+            <h3 className="text-2xl font-bold text-gray-900 mt-1">
+              {formatCurrency(stats?.revenue?.today || 0)}
+            </h3>
+            <div className="mt-4 flex items-center gap-2 text-xs font-semibold text-green-600 bg-green-50 w-fit px-2 py-1 rounded-lg">
+              <ArrowUpRight className="w-3 h-3" />
+              {formatCurrency(stats?.revenue?.this_week || 0)} за неделю
+            </div>
           </div>
         </div>
 
-        <div className="bg-white p-6 rounded-xl shadow hover:shadow-lg transition border-l-4 border-blue-500">
-          <div className="flex items-center justify-between mb-4">
-            <div className="p-3 bg-blue-100 rounded-lg">
-              <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
+        {/* Reservations Card */}
+        <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100 hover:shadow-md transition-shadow relative overflow-hidden group">
+          <div className="absolute -right-4 -top-4 w-24 h-24 bg-blue-50 rounded-full group-hover:scale-110 transition-transform duration-500"></div>
+          <div className="relative z-10">
+            <div className="p-3 bg-blue-50 w-fit rounded-2xl mb-4">
+              <Calendar className="w-6 h-6 text-blue-600" />
             </div>
-          </div>
-          <h3 className="text-2xl font-bold text-gray-800 mb-1">
-            {formatCurrency(stats?.revenue?.today || 0)}
-          </h3>
-          <p className="text-gray-600 text-sm">Доход сегодня</p>
-          <div className="mt-2 text-xs text-gray-500">
-            {formatCurrency(stats?.revenue?.this_week || 0)} за неделю
+            <p className="text-gray-500 text-sm font-medium">Бронирований сегодня</p>
+            <h3 className="text-2xl font-bold text-gray-900 mt-1">
+              {stats?.reservations?.today || 0}
+            </h3>
+            <div className="mt-4 flex items-center gap-2 text-xs font-semibold text-blue-600 bg-blue-50 w-fit px-2 py-1 rounded-lg">
+              <TrendingUp className="w-3 h-3" />
+              {stats?.reservations?.this_week || 0} за неделю
+            </div>
           </div>
         </div>
 
-        <div className="bg-white p-6 rounded-xl shadow hover:shadow-lg transition border-l-4 border-purple-500">
-          <div className="flex items-center justify-between mb-4">
-            <div className="p-3 bg-purple-100 rounded-lg">
-              <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
-              </svg>
+        {/* New Bookings Card */}
+        <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100 hover:shadow-md transition-shadow relative overflow-hidden group">
+          <div className="absolute -right-4 -top-4 w-24 h-24 bg-orange-50 rounded-full group-hover:scale-110 transition-transform duration-500"></div>
+          <div className="relative z-10">
+            <div className="p-3 bg-orange-50 w-fit rounded-2xl mb-4">
+              <MousePointer2 className="w-6 h-6 text-orange-600" />
             </div>
-          </div>
-          <h3 className="text-3xl font-bold text-gray-800 mb-1">
-            {stats?.clients?.total || 0}
-          </h3>
-          <p className="text-gray-600 text-sm">Клиентов всего</p>
-          <div className="mt-2 text-xs text-gray-500">
-            {stats?.baths?.total || 0} бань доступно
+            <p className="text-gray-500 text-sm font-medium">Заявок с сайта</p>
+            <div className="flex items-end gap-2 mt-1">
+              <h3 className="text-2xl font-bold text-gray-900">
+                {stats?.bookings?.unread || 0}
+              </h3>
+              <span className="text-sm text-gray-400 pb-1">новых</span>
+            </div>
+            <div className="mt-4 flex items-center gap-2 text-xs font-semibold text-orange-600 bg-orange-50 w-fit px-2 py-1 rounded-lg">
+              {stats?.bookings?.total || 0} всего за месяц
+            </div>
           </div>
         </div>
 
-        <div className="bg-white p-6 rounded-xl shadow hover:shadow-lg transition border-l-4 border-yellow-500">
-          <div className="flex items-center justify-between mb-4">
-            <div className="p-3 bg-yellow-100 rounded-lg">
-              <svg className="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
+        {/* Clients Card */}
+        <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100 hover:shadow-md transition-shadow relative overflow-hidden group">
+          <div className="absolute -right-4 -top-4 w-24 h-24 bg-purple-50 rounded-full group-hover:scale-110 transition-transform duration-500"></div>
+          <div className="relative z-10">
+            <div className="p-3 bg-purple-50 w-fit rounded-2xl mb-4">
+              <Users className="w-6 h-6 text-purple-600" />
             </div>
-            {stats?.bookings?.unread > 0 && (
-              <span className="bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full">
-                {stats?.bookings?.unread}
-              </span>
-            )}
-          </div>
-          <h3 className="text-3xl font-bold text-gray-800 mb-1">
-            {stats?.bookings?.total || 0}
-          </h3>
-          <p className="text-gray-600 text-sm">Заявок с сайта</p>
-          <div className="mt-2 text-xs text-gray-500">
-            {stats?.bookings?.unread || 0} непрочитанных
+            <p className="text-gray-500 text-sm font-medium">База клиентов</p>
+            <h3 className="text-2xl font-bold text-gray-900 mt-1">
+              {stats?.clients?.total || 0}
+            </h3>
+            <div className="mt-4 flex items-center gap-2 text-xs font-semibold text-purple-600 bg-purple-50 w-fit px-2 py-1 rounded-lg">
+              {stats?.baths?.total || 0} бань в системе
+            </div>
           </div>
         </div>
       </div>
 
       {/* Charts Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-        {/* Revenue Chart */}
-        <div className="bg-white p-6 rounded-xl shadow">
-          <h2 className="text-xl font-bold text-gray-800 mb-4">Доход за 30 дней</h2>
-          <ResponsiveContainer width="100%" height={300}>
-            <LineChart data={revenueData}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="date" />
-              <YAxis />
-              <Tooltip formatter={(value) => formatCurrency(value)} />
-              <Legend />
-              <Line 
-                type="monotone" 
-                dataKey="revenue" 
-                stroke="#10b981" 
-                strokeWidth={2}
-                dot={false}
-                activeDot={{ r: 8 }}
-                name="Доход"
-              />
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
-
-        {/* Reservations Chart */}
-        <div className="bg-white p-6 rounded-xl shadow">
-          <h2 className="text-xl font-bold text-gray-800 mb-4">Бронирования за 30 дней</h2>
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={reservationsData}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="date" />
-              <YAxis />
-              <Tooltip />
-              <Legend />
-              <Bar 
-                dataKey="count" 
-                fill="#3b82f6"
-                name="Бронирования"
-              />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
-
-      {/* Popular Baths */}
-      {popularBaths && popularBaths.length > 0 && (
-        <div className="bg-white p-6 rounded-xl shadow mb-8">
-          <h2 className="text-xl font-bold text-gray-800 mb-4">Популярность бань (этот месяц)</h2>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Pie Chart */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        {/* Revenue Dynamics Chart */}
+        <div className="lg:col-span-2 bg-white rounded-3xl p-6 sm:p-8 shadow-sm border border-gray-100">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-8 gap-4">
             <div>
-              <ResponsiveContainer width="100%" height={300}>
-                <PieChart>
-                  <Pie
-                    data={popularBaths}
-                    cx="50%"
-                    cy="50%"
-                    labelLine={true}
-                    label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                    outerRadius={100}
-                    fill="#8884d8"
-                    dataKey="reservation_count"
-                  >
-                    {popularBaths.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip />
-                </PieChart>
-              </ResponsiveContainer>
+              <h2 className="text-xl font-bold text-gray-900">Динамика выручки</h2>
+              <p className="text-gray-500 text-sm">Объем продаж за выбранный период</p>
             </div>
-            
-            {/* Stats Table */}
-            <div className="overflow-x-auto">
-              <table className="min-w-full">
-                <thead>
-                  <tr className="border-b">
-                    <th className="text-left py-2 px-4 text-gray-600">Баня</th>
-                    <th className="text-center py-2 px-4 text-gray-600">Бронирований</th>
-                    <th className="text-right py-2 px-4 text-gray-600">Доход</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {popularBaths.map((bath, index) => (
-                    <tr key={bath.bath_id} className="border-b hover:bg-gray-50">
-                      <td className="py-3 px-4">
-                        <div className="flex items-center">
-                          <div 
-                            className="w-3 h-3 rounded-full mr-2" 
-                            style={{ backgroundColor: COLORS[index % COLORS.length] }}
-                          />
-                          <span className="font-medium">{bath.name}</span>
-                        </div>
-                      </td>
-                      <td className="py-3 px-4 text-center">{bath.reservation_count}</td>
-                      <td className="py-3 px-4 text-right font-semibold">
-                        {formatCurrency(bath.total_revenue)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div className="flex bg-gray-100 p-1 rounded-xl w-fit">
+              {[
+                { id: 'day', label: 'День' },
+                { id: 'week', label: 'Неделя' },
+                { id: 'month', label: 'Месяц' },
+                { id: 'year', label: 'Год' },
+              ].map((p) => (
+                <button
+                  key={p.id}
+                  onClick={() => setRevenuePeriod(p.id)}
+                  className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${
+                    revenuePeriod === p.id
+                      ? 'bg-white text-green-600 shadow-sm'
+                      : 'text-gray-500 hover:text-gray-700'
+                  }`}
+                >
+                  {p.label}
+                </button>
+              ))}
             </div>
           </div>
+          <div className="h-[350px] w-full">
+            {revenueLoading ? (
+              <div className="w-full h-full bg-gray-50 rounded-2xl animate-pulse flex items-center justify-center">
+                <span className="text-gray-400 text-sm">Загрузка данных...</span>
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={revenueData}>
+                  <defs>
+                    <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.1}/>
+                      <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                  <XAxis 
+                    dataKey="date" 
+                    axisLine={false} 
+                    tickLine={false} 
+                    tick={{ fill: '#94a3b8', fontSize: 12 }} 
+                  />
+                  <YAxis 
+                    axisLine={false} 
+                    tickLine={false} 
+                    tick={{ fill: '#94a3b8', fontSize: 12 }}
+                    tickFormatter={(val) => `${val/1000}k`}
+                  />
+                  <Tooltip 
+                    contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+                    formatter={(value) => [formatCurrency(value), 'Выручка']}
+                  />
+                  <Area 
+                    type="monotone" 
+                    dataKey="revenue" 
+                    stroke="#10b981" 
+                    strokeWidth={3}
+                    fillOpacity={1} 
+                    fill="url(#colorRevenue)" 
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            )}
+          </div>
         </div>
-      )}
 
-      {/* Quick Navigation */}
-      <div className="mb-8">
-        <h2 className="text-xl font-bold text-gray-800 mb-4">Быстрая навигация</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          <NavLink
-            to="/admin/reservations"
-            className="bg-white p-6 rounded-xl shadow hover:shadow-lg hover:bg-green-50 transition group"
-          >
-            <div className="flex items-start gap-4">
-              <div className="p-3 bg-green-100 rounded-lg group-hover:bg-green-200 transition">
-                <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                </svg>
+        {/* Activity Chart (Reservations vs Bookings) */}
+        <div className="bg-white rounded-3xl p-6 sm:p-8 shadow-sm border border-gray-100">
+          <div className="mb-8">
+            <h2 className="text-xl font-bold text-gray-900">Активность</h2>
+            <p className="text-gray-500 text-sm">Сравнение броней и заявок</p>
+          </div>
+          <div className="h-[350px] w-full">
+            {reservationsLoading || bookingsLoading ? (
+              <div className="w-full h-full bg-gray-50 rounded-2xl animate-pulse flex items-center justify-center">
+                <span className="text-gray-400 text-sm">Загрузка данных...</span>
               </div>
-              <div>
-                <h3 className="font-semibold text-gray-800 mb-1">Бронирование</h3>
-                <p className="text-gray-600 text-sm">Управление бронированиями и записями</p>
-              </div>
-            </div>
-          </NavLink>
-
-          <NavLink
-            to="/admin/baths"
-            className="bg-white p-6 rounded-xl shadow hover:shadow-lg hover:bg-purple-50 transition group"
-          >
-            <div className="flex items-start gap-4">
-              <div className="p-3 bg-purple-100 rounded-lg group-hover:bg-purple-200 transition">
-                <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-                </svg>
-              </div>
-              <div>
-                <h3 className="font-semibold text-gray-800 mb-1">Бани</h3>
-                <p className="text-gray-600 text-sm">Настройка бань и услуг</p>
-              </div>
-            </div>
-          </NavLink>
-
-          <NavLink
-            to="/admin/documents/entrance"
-            className="bg-white p-6 rounded-xl shadow hover:shadow-lg hover:bg-orange-50 transition group"
-          >
-            <div className="flex items-start gap-4">
-              <div className="p-3 bg-orange-100 rounded-lg group-hover:bg-orange-200 transition">
-                <svg className="w-6 h-6 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-              </div>
-              <div>
-                <h3 className="font-semibold text-gray-800 mb-1">Документы</h3>
-                <p className="text-gray-600 text-sm">Поступление и реализация</p>
-              </div>
-            </div>
-          </NavLink>
-
-          <NavLink
-            to="/admin/storage/nomenclature"
-            className="bg-white p-6 rounded-xl shadow hover:shadow-lg hover:bg-teal-50 transition group"
-          >
-            <div className="flex items-start gap-4">
-              <div className="p-3 bg-teal-100 rounded-lg group-hover:bg-teal-200 transition">
-                <svg className="w-6 h-6 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-                </svg>
-              </div>
-              <div>
-                <h3 className="font-semibold text-gray-800 mb-1">Склад</h3>
-                <p className="text-gray-600 text-sm">Управление товарами и остатками</p>
-              </div>
-            </div>
-          </NavLink>
-
-          <NavLink
-            to="/admin/bookings"
-            className="bg-white p-6 rounded-xl shadow hover:shadow-lg hover:bg-pink-50 transition group"
-          >
-            <div className="flex items-start gap-4">
-              <div className="p-3 bg-pink-100 rounded-lg group-hover:bg-pink-200 transition">
-                <svg className="w-6 h-6 text-pink-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-              </div>
-              <div>
-                <h3 className="font-semibold text-gray-800 mb-1">Заявки с сайта</h3>
-                <p className="text-gray-600 text-sm">Обработка онлайн-заявок</p>
-              </div>
-            </div>
-          </NavLink>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={activityChartData} margin={{ left: -20 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                  <XAxis 
+                    dataKey="date" 
+                    axisLine={false} 
+                    tickLine={false} 
+                    tick={{ fill: '#94a3b8', fontSize: 12 }} 
+                  />
+                  <YAxis axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 12 }} />
+                  <Tooltip 
+                     contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+                  />
+                  <Legend />
+                  <Bar dataKey="reservations" name="Брони" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="bookings" name="Заявки" fill="#f59e0b" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
+          </div>
         </div>
       </div>
 
-      {/* Recent Activity */}
-      <div className="bg-white p-6 rounded-xl shadow">
-        <h2 className="text-xl font-bold text-gray-800 mb-4">Последняя активность</h2>
-        {activityLoading ? (
-          <div className="text-center py-8 text-gray-500">
-            <p>Загрузка...</p>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        {/* Popular Baths */}
+        <div className="bg-white rounded-3xl p-6 sm:p-8 shadow-sm border border-gray-100">
+          <div className="flex items-center justify-between mb-8">
+            <div>
+              <h2 className="text-xl font-bold text-gray-900">Популярные бани</h2>
+              <p className="text-gray-500 text-sm">Доля в общей выручке за месяц</p>
+            </div>
           </div>
-        ) : recentActivity && recentActivity.length > 0 ? (
-          <div className="space-y-4">
-            {recentActivity.map((activity) => (
-              <div 
-                key={activity.id} 
-                className="flex items-start gap-4 p-4 hover:bg-gray-50 rounded-lg transition border border-gray-100"
-              >
-                {getActionIcon(activity.action)}
-                <div className="flex-1">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <p className="font-semibold text-gray-800">
-                        {activity.summary || `${activity.action} ${activity.entity_type}`}
-                      </p>
-                      {activity.client_name && (
-                        <p className="text-sm text-gray-600 mt-1">
-                          Клиент: {activity.client_name}
-                        </p>
-                      )}
-                      {activity.bath_name && (
-                        <p className="text-sm text-gray-600">
-                          Баня: {activity.bath_name}
-                        </p>
-                      )}
+          {bathsLoading ? (
+            <div className="h-[250px] w-full bg-gray-50 rounded-2xl animate-pulse flex items-center justify-center">
+              <span className="text-gray-400 text-sm">Загрузка данных...</span>
+            </div>
+          ) : (
+            <div className="flex flex-col md:flex-row items-center gap-8">
+              <div className="h-[250px] w-full md:w-1/2">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={popularBaths}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={60}
+                      outerRadius={80}
+                      paddingAngle={5}
+                      dataKey="reservation_count"
+                    >
+                      {popularBaths?.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+              <div className="w-full md:w-1/2 space-y-4">
+                {popularBaths?.slice(0, 5).map((bath, index) => (
+                  <div key={bath.bath_id} className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-2 h-2 rounded-full" style={{ backgroundColor: COLORS[index % COLORS.length] }}></div>
+                      <span className="text-sm font-medium text-gray-700">{bath.name}</span>
                     </div>
-                    <span className="text-xs text-gray-500 whitespace-nowrap ml-4">
-                      {formatDateTime(activity.created_at)}
-                    </span>
+                    <span className="text-sm font-bold text-gray-900">{bath.reservation_count} виз.</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Recent Activity */}
+        <div className="bg-white rounded-3xl p-6 sm:p-8 shadow-sm border border-gray-100">
+          <div className="flex items-center justify-between mb-8">
+            <h2 className="text-xl font-bold text-gray-900">Последние действия</h2>
+            <NavLink to="/admin/administrator/audit" className="text-sm text-blue-600 hover:underline font-medium">
+              Все логи
+            </NavLink>
+          </div>
+          <div className="space-y-6">
+            {recentActivity?.map((activity) => (
+              <div key={activity.id} className="flex items-start gap-4">
+                <div className="mt-1 p-2 bg-gray-50 rounded-xl">
+                  {getActionIcon(activity.action)}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm text-gray-900 font-medium truncate">
+                    {activity.summary || `${activity.action} ${activity.entity_type}`}
+                  </p>
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className="text-xs text-gray-400">{formatDateTime(activity.created_at)}</span>
+                    {activity.client_name && (
+                      <>
+                        <span className="w-1 h-1 bg-gray-300 rounded-full"></span>
+                        <span className="text-xs text-gray-500">{activity.client_name}</span>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>
             ))}
           </div>
-        ) : (
-          <div className="text-center py-8 text-gray-500">
-            <svg className="w-16 h-16 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <p>Пока нет активности</p>
-          </div>
-        )}
+        </div>
+      </div>
+
+      {/* Navigation Shortcuts */}
+      <div>
+        <h2 className="text-xl font-bold text-gray-900 mb-6">Быстрый доступ</h2>
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+          {[
+            { to: "/admin/reservations", icon: Calendar, label: "Брони", color: "bg-green-50 text-green-600" },
+            { to: "/admin/bookings", icon: MousePointer2, label: "Заявки", color: "bg-orange-50 text-orange-600" },
+            { to: "/admin/baths", icon: HomeIcon, label: "Бани", color: "bg-blue-50 text-blue-600" },
+            { to: "/admin/storage/nomenclature", icon: Package, label: "Склад", color: "bg-teal-50 text-teal-600" },
+            { to: "/admin/documents/entrance", icon: ClipboardList, label: "Документы", color: "bg-purple-50 text-purple-600" },
+            { to: "/admin/administrator/audit", icon: History, label: "Логи", color: "bg-gray-50 text-gray-600" },
+          ].map((item, idx) => (
+            <NavLink
+              key={idx}
+              to={item.to}
+              className="bg-white p-4 rounded-3xl border border-gray-100 shadow-sm hover:shadow-md transition-all flex flex-col items-center gap-3 group"
+            >
+              <div className={`p-3 rounded-2xl ${item.color} group-hover:scale-110 transition-transform`}>
+                <item.icon className="w-6 h-6" />
+              </div>
+              <span className="text-sm font-semibold text-gray-700">{item.label}</span>
+            </NavLink>
+          ))}
+        </div>
       </div>
     </div>
   );
 }
 
-export default AdminDashboard;
+export default AdminDashboard;

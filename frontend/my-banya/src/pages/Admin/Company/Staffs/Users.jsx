@@ -14,6 +14,27 @@ function Users() {
   const [deleteUser] = useDeleteUserMutation();
 
   const [deletingId, setDeletingId] = useState(null);
+  const [searchFilters, setSearchFilters] = useState({
+    full_name: '',
+    email: '',
+    phone: '',
+  });
+
+  const handleFilterChange = (e) => {
+    const { name, value } = e.target;
+    setSearchFilters(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const filteredUsers = users.filter(user => {
+    return (
+      user.full_name.toLowerCase().includes(searchFilters.full_name.toLowerCase()) &&
+      (user.email || '').toLowerCase().includes(searchFilters.email.toLowerCase()) &&
+      (user.phone || '').includes(searchFilters.phone)
+    );
+  });
 
   // === Пользователи ===
   const handleDeleteClick = (id) => setDeletingId(id);
@@ -52,16 +73,14 @@ function Users() {
   return (
     <div className="min-h-screen bg-gray-50 p-4 md:p-8">
       <div className="max-w-7xl mx-auto">
-        <div className="mb-6 md:mb-8">
-          <h1 className="text-2xl md:text-3xl font-bold text-gray-800">Пользователи</h1>
-          <p className="text-gray-600 mt-1 md:mt-2">Управление аккаунтами сотрудников</p>
-        </div>
-
-        {/* Кнопки */}
-        <div className="mb-6 md:mb-8 flex flex-col sm:flex-row sm:justify-end space-y-3 sm:space-y-0 sm:space-x-4">
+        <div className="mb-6 md:mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <h1 className="text-2xl md:text-3xl font-bold text-gray-800">Пользователи</h1>
+            <p className="text-gray-600 mt-1 md:mt-2">Управление аккаунтами сотрудников</p>
+          </div>
           <button
             onClick={handleAddClick}
-            className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 md:px-6 md:py-3 rounded-xl font-medium shadow-md transition flex items-center justify-center space-x-1 md:space-x-2"
+            className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 md:px-6 md:py-3 rounded-xl font-medium shadow-md transition flex items-center justify-center space-x-1 md:space-x-2 w-fit"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -71,22 +90,58 @@ function Users() {
         </div>
 
         {/* Desktop Table */}
-        <div className="hidden md:block bg-white rounded-2xl shadow-lg">
+        <div className="hidden md:block bg-white rounded-2xl shadow-lg overflow-hidden">
           <table className="w-full">
-            <thead className="bg-gray-50">
+            <thead className="bg-gray-50 border-b">
               <tr>
-                <th className="px-6 py-4 text-left text-sm font-medium text-gray-700 uppercase tracking-wider">ФИО</th>
-                <th className="px-6 py-4 text-left text-sm font-medium text-gray-700 uppercase tracking-wider">Email</th>
-                <th className="px-6 py-4 text-left text-sm font-medium text-gray-700 uppercase tracking-wider">Телефон</th>
-                <th className="px-6 py-4 text-left text-sm font-medium text-gray-700 uppercase tracking-wider">Роль</th>
-                <th className="px-6 py-4 text-left text-sm font-medium text-gray-700 uppercase tracking-wider">Статус</th>
-                <th className="px-6 py-4 text-left text-sm font-medium text-gray-700 uppercase tracking-wider">Дата рождения</th>
-                <th className="px-6 py-4 text-right text-sm font-medium text-gray-700 uppercase tracking-wider">Действия</th>
+                <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">ФИО</th>
+                <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Email</th>
+                <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Телефон</th>
+                <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Роль</th>
+                <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Статус</th>
+                <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Дата рождения</th>
+                <th className="px-6 py-4 text-right text-xs font-bold text-gray-500 uppercase tracking-wider">Действия</th>
+              </tr>
+              <tr className="bg-white border-b">
+                <th className="px-4 py-2">
+                  <input
+                    type="text"
+                    name="full_name"
+                    value={searchFilters.full_name}
+                    onChange={handleFilterChange}
+                    placeholder="Поиск..."
+                    className="w-full px-2 py-1.5 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all font-normal"
+                  />
+                </th>
+                <th className="px-4 py-2">
+                  <input
+                    type="text"
+                    name="email"
+                    value={searchFilters.email}
+                    onChange={handleFilterChange}
+                    placeholder="Email..."
+                    className="w-full px-2 py-1.5 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all font-normal"
+                  />
+                </th>
+                <th className="px-4 py-2">
+                  <input
+                    type="text"
+                    name="phone"
+                    value={searchFilters.phone}
+                    onChange={handleFilterChange}
+                    placeholder="Телефон..."
+                    className="w-full px-2 py-1.5 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all font-normal"
+                  />
+                </th>
+                <th className="px-4 py-2"></th>
+                <th className="px-4 py-2"></th>
+                <th className="px-4 py-2"></th>
+                <th className="px-4 py-2"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
-              {users.length > 0 ? (
-                users.map((user) => (
+              {filteredUsers.length > 0 ? (
+                filteredUsers.map((user) => (
                   <tr
                     key={user.user_id}
                     className="hover:bg-gray-50 cursor-pointer"
@@ -161,7 +216,7 @@ function Users() {
               ) : (
                 <tr>
                   <td colSpan="7" className="px-6 py-12 text-center text-gray-500 text-lg">
-                    Пользователи не найдены. Добавьте первого!
+                    {users.length > 0 ? 'Пользователи по вашему запросу не найдены.' : 'Пользователи не найдены. Добавьте первого!'}
                   </td>
                 </tr>
               )}
@@ -171,8 +226,8 @@ function Users() {
 
         {/* Mobile Cards */}
         <div className="md:hidden space-y-4">
-          {users.length > 0 ? (
-            users.map((user) => (
+          {filteredUsers.length > 0 ? (
+            filteredUsers.map((user) => (
               <div
                 key={user.user_id}
                 className="bg-white rounded-xl shadow p-4 border border-gray-100"
@@ -244,7 +299,7 @@ function Users() {
             ))
           ) : (
             <div className="bg-white rounded-xl shadow p-8 text-center text-gray-500">
-              Пользователи не найдены. Добавьте первого!
+              {users.length > 0 ? 'Пользователи по вашему запросу не найдены.' : 'Пользователи не найдены. Добавьте первого!'}
             </div>
           )}
         </div>

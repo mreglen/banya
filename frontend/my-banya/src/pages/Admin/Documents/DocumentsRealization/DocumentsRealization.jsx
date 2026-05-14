@@ -22,6 +22,19 @@ function DocumentsRealization() {
 
     const [selectedDocument, setSelectedDocument] = useState(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [searchFilters, setSearchFilters] = useState({
+        id: '',
+        client_name: '',
+        bath_name: '',
+    });
+
+    const handleFilterChange = (e) => {
+        const { name, value } = e.target;
+        setSearchFilters(prev => ({
+            ...prev,
+            [name]: value
+        }));
+    };
 
     const handleView = (doc) => {
         setSelectedDocument(doc);
@@ -40,7 +53,15 @@ function DocumentsRealization() {
         }
     };
 
-    const sortedDocs = [...realizations].sort((a, b) => new Date(b.date) - new Date(a.date));
+    const filteredRealizations = realizations.filter(doc => {
+        return (
+            String(doc.id).includes(searchFilters.id) &&
+            (doc.client_name || '').toLowerCase().includes(searchFilters.client_name.toLowerCase()) &&
+            (doc.bath_name || '').toLowerCase().includes(searchFilters.bath_name.toLowerCase())
+        );
+    });
+
+    const sortedDocs = [...filteredRealizations].sort((a, b) => new Date(b.date) - new Date(a.date));
 
     const formatDate = (dateString) => {
         if (!dateString) return '—';
@@ -87,22 +108,58 @@ function DocumentsRealization() {
                 </div>
 
                 {/* Desktop Table */}
-                <div className="hidden md:block bg-white rounded-2xl shadow-lg mb-6">
+                <div className="hidden md:block bg-white rounded-2xl shadow-lg mb-6 overflow-hidden">
                     <table className="w-full">
-                        <thead className="bg-gray-50">
+                        <thead className="bg-gray-50 border-b">
                             <tr>
-                                <th className="px-6 py-4 text-left text-sm font-medium text-gray-700 uppercase">№</th>
-                                <th className="px-6 py-4 text-left text-sm font-medium text-gray-700 uppercase">ФИО клиента</th>
-                                <th className="px-6 py-4 text-left text-sm font-medium text-gray-700 uppercase">Баня</th>
-                                <th className="px-6 py-4 text-left text-sm font-medium text-gray-700 uppercase">Дата</th>
-                                <th className="px-6 py-4 text-left text-sm font-medium text-gray-700 uppercase">Цена</th>
-                                <th className="px-6 py-4 text-left text-sm font-medium text-gray-700 uppercase">Статус</th>
-                                <th className="px-6 py-4 text-right text-sm font-medium text-gray-700 uppercase">Действия</th>
+                                <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase">№</th>
+                                <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase">ФИО клиента</th>
+                                <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase">Баня</th>
+                                <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase">Дата</th>
+                                <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase">Цена</th>
+                                <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase">Статус</th>
+                                <th className="px-6 py-4 text-right text-xs font-bold text-gray-500 uppercase">Действия</th>
+                            </tr>
+                            <tr className="bg-white border-b">
+                                <th className="px-4 py-2">
+                                    <input
+                                        type="text"
+                                        name="id"
+                                        value={searchFilters.id}
+                                        onChange={handleFilterChange}
+                                        placeholder="№..."
+                                        className="w-full px-2 py-1.5 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all font-normal"
+                                    />
+                                </th>
+                                <th className="px-4 py-2">
+                                    <input
+                                        type="text"
+                                        name="client_name"
+                                        value={searchFilters.client_name}
+                                        onChange={handleFilterChange}
+                                        placeholder="Клиент..."
+                                        className="w-full px-2 py-1.5 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all font-normal"
+                                    />
+                                </th>
+                                <th className="px-4 py-2">
+                                    <input
+                                        type="text"
+                                        name="bath_name"
+                                        value={searchFilters.bath_name}
+                                        onChange={handleFilterChange}
+                                        placeholder="Баня..."
+                                        className="w-full px-2 py-1.5 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all font-normal"
+                                    />
+                                </th>
+                                <th className="px-4 py-2"></th>
+                                <th className="px-4 py-2"></th>
+                                <th className="px-4 py-2"></th>
+                                <th className="px-4 py-2"></th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-200">
                             {sortedDocs.length > 0 ? (
-                                sortedDocs.map((doc, index) => (
+                                sortedDocs.map((doc) => (
                                     <tr
                                         key={doc.id}
                                         className="hover:bg-gray-50 cursor-pointer"

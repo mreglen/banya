@@ -137,7 +137,7 @@ def update_product(
 @router.post("/{product_id}/upload", response_model=list[str])
 async def upload_product_photos(
     product_id: int,
-    files: List[UploadFile] = File(...),
+    files: List[UploadFile] = File(default=[]),
     db: Session = Depends(get_db)
 ):
     product = db.query(ProductModel).filter(ProductModel.id == product_id).first()

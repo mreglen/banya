@@ -86,40 +86,83 @@ def get_dashboard_statistics(db: Session = Depends(database.get_db)) -> Dict[str
 
 
 @router.get("/revenue-chart")
-def get_revenue_chart_data(days: int = 30, db: Session = Depends(database.get_db)) -> List[Dict[str, Any]]:
-    """Получить данные для графика дохода за последние N дней"""
+def get_revenue_chart_data(period: str = "month", db: Session = Depends(database.get_db)) -> List[Dict[str, Any]]:
+    """Получить данные для графика дохода за выбранный период"""
     
     end_date = date.today()
-    start_date = end_date - timedelta(days=days - 1)
-    
-    # Получаем доход по дням
-    revenue_by_day = db.query(
-        func.date(models.Reservation.start_datetime).label('date'),
-        func.coalesce(func.sum(models.Reservation.total_cost), 0).label('revenue')
-    ).filter(
-        func.date(models.Reservation.start_datetime) >= start_date,
-        func.date(models.Reservation.start_datetime) <= end_date
-    ).group_by(
-        func.date(models.Reservation.start_datetime)
-    ).order_by(
-        func.date(models.Reservation.start_datetime)
-    ).all()
-    
-    # Преобразуем в dict для быстрого доступа
-    revenue_dict = {str(row.date): row.revenue for row in revenue_by_day}
-    
-    # Создаем полный список дат (включая дни без дохода)
     chart_data = []
-    current_date = start_date
-    while current_date <= end_date:
-        date_str = str(current_date)
-        chart_data.append({
-            "date": current_date.strftime("%d.%m"),
-            "revenue": revenue_dict.get(date_str, 0),
-            "full_date": date_str
-        })
-        current_date += timedelta(days=1)
     
+    if period == "day":
+        # Доход по часам за сегодня
+        start_date = end_date
+        revenue_by_hour = db.query(
+            extract('hour', models.Reservation.start_datetime).label('hour'),
+            func.coalesce(func.sum(models.Reservation.total_cost), 0).label('revenue')
+        ).filter(
+            func.date(models.Reservation.start_datetime) == end_date
+        ).group_by(
+            extract('hour', models.Reservation.start_datetime)
+        ).all()
+        
+        rev_dict = {int(row.hour): row.revenue for row in revenue_by_hour}
+        for h in range(24):
+            chart_data.append({
+                "date": f"{h:02d}:00",
+                "revenue": rev_dict.get(h, 0)
+            })
+            
+    elif period == "year":
+        # Доход по месяцам за последние 12 месяцев
+        start_date = (end_date.replace(day=1) - timedelta(days=335)).replace(day=1)
+        revenue_by_month = db.query(
+            extract('year', models.Reservation.start_datetime).label('year'),
+            extract('month', models.Reservation.start_datetime).label('month'),
+            func.coalesce(func.sum(models.Reservation.total_cost), 0).label('revenue')
+        ).filter(
+            func.date(models.Reservation.start_datetime) >= start_date
+        ).group_by(
+            'year', 'month'
+        ).all()
+        
+        rev_dict = {(int(row.year), int(row.month)): row.revenue for row in revenue_by_month}
+        
+        curr = start_date
+        month_names = ["Янв", "Фев", "Мар", "Апр", "Май", "Июн", "Июл", "Авг", "Сен", "Окт", "Ноя", "Дек"]
+        for _ in range(12):
+            chart_data.append({
+                "date": month_names[curr.month - 1],
+                "revenue": rev_dict.get((curr.year, curr.month), 0)
+            })
+            # Переход к следующему месяцу
+            if curr.month == 12:
+                curr = curr.replace(year=curr.year + 1, month=1)
+            else:
+                curr = curr.replace(month=curr.month + 1)
+                
+    else:
+        # По умолчанию - по дням (week или month)
+        days = 7 if period == "week" else 30
+        start_date = end_date - timedelta(days=days - 1)
+        
+        revenue_by_day = db.query(
+            func.date(models.Reservation.start_datetime).label('date'),
+            func.coalesce(func.sum(models.Reservation.total_cost), 0).label('revenue')
+        ).filter(
+            func.date(models.Reservation.start_datetime) >= start_date
+        ).group_by(
+            func.date(models.Reservation.start_datetime)
+        ).all()
+        
+        rev_dict = {str(row.date): row.revenue for row in revenue_by_day}
+        curr = start_date
+        while curr <= end_date:
+            date_str = str(curr)
+            chart_data.append({
+                "date": curr.strftime("%d.%m"),
+                "revenue": rev_dict.get(date_str, 0)
+            })
+            curr += timedelta(days=1)
+            
     return chart_data
 
 
@@ -154,6 +197,44 @@ def get_reservations_chart_data(days: int = 30, db: Session = Depends(database.g
         chart_data.append({
             "date": current_date.strftime("%d.%m"),
             "count": reservations_dict.get(date_str, 0),
+            "full_date": date_str
+        })
+        current_date += timedelta(days=1)
+    
+    return chart_data
+
+
+@router.get("/bookings-chart")
+def get_bookings_chart_data(days: int = 30, db: Session = Depends(database.get_db)) -> List[Dict[str, Any]]:
+    """Получить данные для графика заявок с сайта за последние N дней"""
+    
+    end_date = date.today()
+    start_date = end_date - timedelta(days=days - 1)
+    
+    # Получаем количество заявок по дням
+    bookings_by_day = db.query(
+        func.date(models.Booking.created_at).label('date'),
+        func.count(models.Booking.booking_id).label('count')
+    ).filter(
+        func.date(models.Booking.created_at) >= start_date,
+        func.date(models.Booking.created_at) <= end_date
+    ).group_by(
+        func.date(models.Booking.created_at)
+    ).order_by(
+        func.date(models.Booking.created_at)
+    ).all()
+    
+    # Преобразуем в dict для быстрого доступа
+    bookings_dict = {str(row.date): row.count for row in bookings_by_day}
+    
+    # Создаем полный список дат
+    chart_data = []
+    current_date = start_date
+    while current_date <= end_date:
+        date_str = str(current_date)
+        chart_data.append({
+            "date": current_date.strftime("%d.%m"),
+            "count": bookings_dict.get(date_str, 0),
             "full_date": date_str
         })
         current_date += timedelta(days=1)

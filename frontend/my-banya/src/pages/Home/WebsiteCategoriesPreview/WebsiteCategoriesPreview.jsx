@@ -98,13 +98,12 @@ function WebsiteCategoriesPreview() {
           <section
             key={category.id}
             id={sectionId}
-            className={`relative py-24 md:py-32 overflow-hidden ${
-              isDark ? 'bg-zinc-950' : 'bg-white'
-            }`}
+            className={`relative py-24 md:py-32 overflow-hidden ${isDark ? 'bg-zinc-950' : 'bg-white'
+              }`}
           >
             {/* Background Image with Parallax-like feel */}
             {categoryBackground && (
-              <div 
+              <div
                 className="absolute inset-0 z-0 opacity-40 mix-blend-overlay"
                 style={{
                   backgroundImage: `url("${categoryBackground}")`,
@@ -114,7 +113,7 @@ function WebsiteCategoriesPreview() {
                 }}
               />
             )}
-            
+
             {/* Overlay for better contrast */}
             <div className={`absolute inset-0 z-0 ${isDark ? 'bg-zinc-950/80' : 'bg-white/90'}`} />
 
@@ -124,14 +123,12 @@ function WebsiteCategoriesPreview() {
                 <div className="inline-block mb-4">
                   <div className={`h-1 w-12 mx-auto rounded-full ${isDark ? 'bg-amber-500' : 'bg-amber-600'}`} />
                 </div>
-                <h2 className={`text-4xl sm:text-5xl md:text-6xl font-light tracking-tight mb-6 ${
-                  isDark ? 'text-white' : 'text-zinc-900'
-                }`}>
+                <h2 className={`text-4xl sm:text-5xl md:text-6xl font-light tracking-tight mb-6 ${isDark ? 'text-white' : 'text-zinc-900'
+                  }`}>
                   {category.name}
                 </h2>
-                <div className={`max-w-2xl mx-auto text-lg md:text-xl font-light leading-relaxed ${
-                  isDark ? 'text-zinc-400' : 'text-zinc-600'
-                }`}>
+                <div className={`max-w-2xl mx-auto text-lg md:text-xl font-light leading-relaxed ${isDark ? 'text-zinc-400' : 'text-zinc-600'
+                  }`}>
                   {category.description || 'Откройте для себя лучшее из нашей коллекции'}
                 </div>
               </div>
@@ -139,9 +136,9 @@ function WebsiteCategoriesPreview() {
               {/* Products Grid */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 md:gap-10">
                 {visibleProducts.map((product) => (
-                  <CategoryProductCard 
-                    key={product.id} 
-                    product={product} 
+                  <CategoryProductCard
+                    key={product.id}
+                    product={product}
                   />
                 ))}
               </div>
@@ -152,11 +149,10 @@ function WebsiteCategoriesPreview() {
                   <button
                     type="button"
                     onClick={() => toggleCategoryExpand(category.id)}
-                    className={`group flex items-center gap-3 px-10 py-4 rounded-full text-base font-medium transition-all duration-300 ${
-                      isDark 
-                        ? 'bg-zinc-900 text-white border border-zinc-800 hover:bg-zinc-800 hover:border-amber-500/50' 
+                    className={`group flex items-center gap-3 px-10 py-4 rounded-full text-base font-medium transition-all duration-300 ${isDark
+                        ? 'bg-zinc-900 text-white border border-zinc-800 hover:bg-zinc-800 hover:border-amber-500/50'
                         : 'bg-zinc-100 text-zinc-900 border border-zinc-200 hover:bg-white hover:shadow-xl hover:border-amber-600/50'
-                    }`}
+                      }`}
                   >
                     <span>{expanded ? 'Свернуть коллекцию' : 'Показать всю категорию'}</span>
                     <div className="transition-transform duration-300 group-hover:scale-125">

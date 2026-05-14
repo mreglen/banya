@@ -8,6 +8,7 @@ import {
   useUpdateUserMutation,
   useGetRolesQuery,
 } from '../../../../redux/slices/apiSlice'; 
+import { toast } from 'react-hot-toast';
 
 function UserForm() {
   const { id } = useParams();
@@ -110,22 +111,30 @@ function UserForm() {
     e.preventDefault();
     const { password, full_name, phone, email, birth_date } = form;
 
-    if (!full_name || !email || !phone) {
-      alert('Пожалуйста, заполните обязательные поля: ФИО, email и телефон.');
+    if (!full_name) {
+      toast.error('Введите ФИО');
+      return;
+    }
+    if (!email) {
+      toast.error('Введите email');
+      return;
+    }
+    if (!phone) {
+      toast.error('Введите телефон');
       return;
     }
     if (roleRequired && !form.role_id) {
-      alert('Для сотрудника без супердоступа обязательно выберите роль.');
+      toast.error('Выберите роль сотрудника');
       return;
     }
 
     if (!isEditing && !password) {
-      alert('Пароль обязателен при создании нового пользователя.');
+      toast.error('Введите пароль');
       return;
     }
 
     if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      alert('Некорректный email.');
+      toast.error('Некорректный email');
       return;
     }
 
@@ -136,11 +145,11 @@ function UserForm() {
       minDate.setFullYear(today.getFullYear() - 120);
 
       if (birth > today) {
-        alert('Дата рождения не может быть в будущем.');
+        toast.error('Дата рождения не может быть в будущем');
         return;
       }
       if (birth < minDate) {
-        alert('Некорректная дата рождения.');
+        toast.error('Некорректная дата рождения');
         return;
       }
     }
@@ -183,12 +192,12 @@ function UserForm() {
           return;
         }
       }
+      toast.success(isEditing ? 'Пользователь обновлен' : 'Пользователь создан');
       navigate('/admin/company/user');
     } catch (err) {
       console.error('❌ Ошибка сохранения:', err);
-      console.error('📥 Error details:', err.data || err.error || err.message);
-      const errorMessage = err.data?.detail || err.error || 'Не удалось сохранить пользователя. Проверьте данные и повторите попытку.';
-      alert(errorMessage);
+      const errorMessage = err.data?.detail || err.error || 'Не удалось сохранить пользователя';
+      toast.error(errorMessage);
     }
   };
 

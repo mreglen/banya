@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
 import { addItem } from '../../../redux/slices/documentEntranceFormSlice';
+import { toast } from 'react-hot-toast';
 
 function AddProduct() {
   const navigate = useNavigate();
@@ -65,15 +66,23 @@ function AddProduct() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!name.trim() || !cost) {
-      alert('Пожалуйста, заполните название и цену');
+    if (!name.trim()) {
+      toast.error('Пожалуйста, введите название товара');
+      return;
+    }
+    if (!cost) {
+      toast.error('Пожалуйста, укажите цену');
+      return;
+    }
+    if (!selectedCategoryId) {
+      toast.error('Пожалуйста, выберите категорию');
       return;
     }
 
     try {
       const numCost = parseFloat(cost);
       if (isNaN(numCost) || numCost < 0) {
-        alert('Укажите корректную цену');
+        toast.error('Укажите корректную цену');
         return;
       }
 
@@ -89,7 +98,7 @@ function AddProduct() {
       const savedProduct = saveProductToStorage(newProductData);
       const productId = savedProduct.product_id;
 
-      alert('Товар успешно добавлен!');
+      toast.success('Товар успешно добавлен!');
 
       if (fromDocument && fromDocument.returnTo) {
         const itemToAdd = {
@@ -107,7 +116,7 @@ function AddProduct() {
       }
     } catch (err) {
       console.error('Ошибка при добавлении товара:', err);
-      alert('Ошибка при сохранении товара. Пожалуйста, попробуйте снова.');
+      toast.error('Ошибка при сохранении товара');
     }
   };
 

@@ -53,6 +53,8 @@ import Finance from './pages/Admin/Finance/Finance';
 
 
 
+import { Toaster } from 'react-hot-toast';
+
 function AppWithLayout() {
   const dispatch = useDispatch();
   const token = localStorage.getItem('access_token');
@@ -86,6 +88,30 @@ function AppWithLayout() {
 
   return (
     <>
+      <Toaster 
+        position="top-center"
+        reverseOrder={false}
+        gutter={8}
+        toastOptions={{
+          duration: 4000,
+          style: {
+            background: '#333',
+            color: '#fff',
+            borderRadius: '12px',
+            fontSize: '14px',
+          },
+          success: {
+            style: {
+              background: '#059669',
+            },
+          },
+          error: {
+            style: {
+              background: '#dc2626',
+            },
+          },
+        }}
+      />
       {!hideHeader && <Header />}
       <Routes>
         <Route path="/" element={<Home />} />
