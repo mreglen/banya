@@ -88,16 +88,18 @@ function Home() {
                 </div>
 
                 {/* Индикатор скролла */}
-                <button
-                    type="button"
-                    onClick={() => document.getElementById('baths-slider')?.scrollIntoView({ behavior: 'smooth' })}
-                    className="absolute bottom-8 left-1/2 -translate-x-1/2 animate-bounce p-2 rounded-full hover:bg-white/10 transition"
-                    aria-label="Перейти к слайдеру бань"
-                >
-                    <svg className="w-6 h-6 text-white/70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
-                    </svg>
-                </button>
+                <div className="absolute bottom-8 left-0 right-0 flex justify-center">
+                    <button
+                        type="button"
+                        onClick={() => document.getElementById('baths-slider')?.scrollIntoView({ behavior: 'smooth' })}
+                        className="animate-bounce p-2 rounded-full hover:bg-white/10 transition group"
+                        aria-label="Перейти к слайдеру бань"
+                    >
+                        <svg className="w-8 h-8 text-white/50 group-hover:text-white transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+                        </svg>
+                    </button>
+                </div>
             </div>
 
             <ListBaths />

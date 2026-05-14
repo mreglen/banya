@@ -2,6 +2,14 @@ import { NavLink, useLocation } from 'react-router-dom';
 import { useState } from 'react';
 import MobileSidebar from '../../pages/Admin/MobileSidebar';
 import { useHasAccess } from '../../hooks/useHasAccess';
+import { 
+  CalendarDays, 
+  Package, 
+  FileText, 
+  ClipboardList, 
+  Wallet, 
+  Menu 
+} from 'lucide-react';
 
 function MobileBottomNav() {
   const location = useLocation();
@@ -13,50 +21,27 @@ function MobileBottomNav() {
     hasAccess('reservations:view') && {
       path: '/admin/reservations',
       label: 'Бронирование',
-      icon: (
-        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-        </svg>
-      ),
+      icon: <CalendarDays className="w-6 h-6" />,
     },
     hasAccess('storage:view') && {
       path: '/admin/storage/nomenclature',
       label: 'Склад',
-      icon: (
-        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-        </svg>
-      ),
+      icon: <Package className="w-6 h-6" />,
     },
     hasAccess('documents:view') && {
       path: '/admin/documents/entrance',
       label: 'Документы',
-      icon: (
-        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-        </svg>
-      ),
+      icon: <FileText className="w-6 h-6" />,
     },
     hasAccess('bookings:view') && {
       path: '/admin/bookings',
       label: 'Заявки',
-      icon: (
-        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-        </svg>
-      ),
+      icon: <ClipboardList className="w-6 h-6" />,
     },
     hasAccess('finance:view') && {
       path: '/admin/finance',
       label: 'Финансы',
-      icon: (
-        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <circle cx="12" cy="12" r="9" strokeWidth={2} />
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.5 7.5v9" />
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.5 11.5h4.5" />
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.2 15c0 1.2-.8 1.8-2.1 1.8H9.8" />
-        </svg>
-      ),
+      icon: <Wallet className="w-6 h-6" />,
     },
   ].filter(Boolean); // Удаляем false значения
 
@@ -95,9 +80,7 @@ function MobileBottomNav() {
             className="flex flex-col items-center justify-center flex-1 h-full text-gray-600 hover:text-green-600 hover:bg-gray-50 transition-colors"
             aria-label="Ещё"
           >
-            <svg className="w-6 h-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-            </svg>
+            <Menu className="w-6 h-6 mb-1" />
             <span className="text-xs font-medium">Ещё</span>
           </button>
         </div>

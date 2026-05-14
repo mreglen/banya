@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useGetWebsiteCategoriesPreviewQuery } from '../../../redux/slices/apiSlice';
+import { ChevronDown, ChevronUp, ShoppingBag, Info } from 'lucide-react';
 
 const SERVER_BASE_URL = process.env.REACT_APP_API_URL
   ? process.env.REACT_APP_API_URL.replace('/api', '')
@@ -15,124 +16,54 @@ const toAbsoluteImageUrl = (imageUrl) => {
   return imageUrl.startsWith('/') ? `${SERVER_BASE_URL}${imageUrl}` : `${SERVER_BASE_URL}/${imageUrl}`;
 };
 
-function useIsDesktopMd() {
-  const [isDesktop, setIsDesktop] = useState(() =>
-    typeof window !== 'undefined' ? window.matchMedia('(min-width: 768px)').matches : false
-  );
-
-  useEffect(() => {
-    const mq = window.matchMedia('(min-width: 768px)');
-    const onChange = () => setIsDesktop(mq.matches);
-    mq.addEventListener('change', onChange);
-    return () => mq.removeEventListener('change', onChange);
-  }, []);
-
-  return isDesktop;
-}
-
-function CategoryProductCard({ product, isDark }) {
-  const [slide, setSlide] = useState(0);
-  const isDesktop = useIsDesktopMd();
-
+function CategoryProductCard({ product }) {
   const productPhoto = toAbsoluteImageUrl(product.photos?.[0]?.image_url);
-  const goPrev = useCallback(() => setSlide((s) => (s === 0 ? 1 : 0)), []);
-  const goNext = useCallback(() => setSlide((s) => (s === 0 ? 1 : 0)), []);
-
-  const nameCls = 'text-white drop-shadow-md';
-  const detailText = isDark ? 'text-gray-100' : 'text-gray-100';
 
   return (
-    <div
-      className={`group relative rounded-xl overflow-hidden shadow-md border ${
-        isDark ? 'border-gray-700' : 'border-gray-200'
-      } h-[200px] sm:h-[220px] md:h-[240px] select-none`}
-    >
-      {/* Mobile: horizontal scroll between «фото» и «детали» */}
-      <div
-        className={`h-full w-full ${
-          isDesktop ? 'overflow-hidden' : 'overflow-x-auto overflow-y-hidden snap-x snap-mandatory flex no-scrollbar'
-        }`}
-      >
-        <div
-          className="flex h-full w-[200%]"
-          style={
-            isDesktop
-              ? { transform: `translateX(-${slide * 50}%)`, transition: 'transform 0.35s ease' }
-              : undefined
-          }
-        >
-          <div className="relative h-full w-1/2 shrink-0 snap-center snap-always">
-            {productPhoto ? (
-              <img
-                src={productPhoto}
-                alt=""
-                className="absolute inset-0 w-full h-full object-cover"
-                draggable={false}
-              />
-            ) : (
-              <div className="absolute inset-0 bg-gray-700 flex items-center justify-center text-gray-400 text-sm">
-                Нет фото
-              </div>
-            )}
-            <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-transparent" />
-            <div className="absolute inset-x-0 bottom-0 p-4 pt-12">
-              <h3 className={`${nameCls} text-2xl sm:text-3xl font-semibold leading-tight`}>{product.name}</h3>
-            </div>
-          </div>
+    <div className="group relative h-[320px] rounded-2xl overflow-hidden shadow-lg transition-all duration-500 hover:shadow-2xl hover:-translate-y-2">
+      {/* Background Image */}
+      {productPhoto ? (
+        <img
+          src={productPhoto}
+          alt={product.name}
+          className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+        />
+      ) : (
+        <div className="absolute inset-0 bg-gray-800 flex items-center justify-center text-gray-500">
+          Нет фото
+        </div>
+      )}
 
-          <div className="relative h-full w-1/2 shrink-0 snap-center snap-always">
-            {productPhoto ? (
-              <img
-                src={productPhoto}
-                alt=""
-                className="absolute inset-0 w-full h-full object-cover"
-                draggable={false}
-              />
-            ) : (
-              <div className="absolute inset-0 bg-gray-800" />
-            )}
-            <div className="absolute inset-0 bg-black/72" />
-            <div className="absolute inset-0 p-4 flex flex-col justify-between">
-              <p className={`text-base sm:text-lg font-medium leading-snug ${detailText}`}>
-                {product.description || 'Без описания'}
-              </p>
-              <p className="text-2xl sm:text-3xl font-bold text-amber-400 shrink-0">
-                {(product.price ?? 0).toFixed(2)} ₽
-              </p>
-            </div>
+      {/* Overlays */}
+      <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent opacity-80 transition-opacity duration-500 group-hover:opacity-95" />
+
+      {/* Content Container */}
+      <div className="absolute inset-0 p-6 flex flex-col justify-end transition-all duration-500 group-hover:pb-8">
+        {/* Title & Price (Always visible) */}
+        <div className="flex justify-between items-end mb-2">
+          <h3 className="text-xl sm:text-2xl font-bold text-white leading-tight drop-shadow-lg">
+            {product.name}
+          </h3>
+          <div className="bg-amber-500 text-black px-3 py-1 rounded-lg font-bold text-sm sm:text-base transform transition-transform group-hover:scale-110">
+            {(product.price ?? 0).toLocaleString()} ₽
           </div>
         </div>
-      </div>
 
-      {/* Desktop: большие стрелки по краям при наведении */}
-      {isDesktop && (
-        <>
-          <button
-            type="button"
-            aria-label="Предыдущий экран"
-            onClick={goPrev}
-            className="absolute left-0 top-0 z-10 h-full w-[28%] max-w-[120px] flex items-center justify-start pl-2 bg-gradient-to-r from-black/45 to-transparent opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-opacity duration-200"
-          >
-            <span className="text-white/95 drop-shadow-lg scale-150 md:scale-[1.75]">
-              <svg className="w-10 h-10 md:w-12 md:h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M15 19l-7-7 7-7" />
-              </svg>
-            </span>
-          </button>
-          <button
-            type="button"
-            aria-label="Следующий экран"
-            onClick={goNext}
-            className="absolute right-0 top-0 z-10 h-full w-[28%] max-w-[120px] flex items-center justify-end pr-2 bg-gradient-to-l from-black/45 to-transparent opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-opacity duration-200"
-          >
-            <span className="text-white/95 drop-shadow-lg scale-150 md:scale-[1.75]">
-              <svg className="w-10 h-10 md:w-12 md:h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M9 5l7 7-7 7" />
-              </svg>
-            </span>
-          </button>
-        </>
-      )}
+        {/* Hidden Details (Visible on hover or simplified for mobile) */}
+        <div className="max-h-0 overflow-hidden opacity-0 transition-all duration-500 group-hover:max-h-32 group-hover:opacity-100">
+          <div className="pt-3 border-t border-white/20 mt-2">
+            <p className="text-gray-200 text-sm sm:text-base leading-relaxed line-clamp-3 italic">
+              {product.description || 'Изысканный вкус и традиционное качество'}
+            </p>
+          </div>
+        </div>
+
+        {/* Action Button (Optional style) */}
+        <div className="mt-4 flex items-center gap-2 text-amber-400 text-sm font-semibold opacity-0 -translate-y-4 transition-all duration-500 delay-100 group-hover:opacity-100 group-hover:translate-y-0">
+          <Info size={16} />
+          <span>Подробнее</span>
+        </div>
+      </div>
     </div>
   );
 }
@@ -153,11 +84,7 @@ function WebsiteCategoriesPreview() {
   }
 
   return (
-    <>
-      <style>{`
-        .no-scrollbar::-webkit-scrollbar { display: none; }
-        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-      `}</style>
+    <div className="space-y-0">
       {categories.map((category, idx) => {
         const sectionId = `site-category-${category.id}`;
         const isDark = idx % 2 === 1;
@@ -165,72 +92,84 @@ function WebsiteCategoriesPreview() {
         const expanded = Boolean(expandedByCategory[category.id]);
         const products = category.products || [];
         const hasMore = products.length > MAX_CARDS;
-        const visibleProducts = expanded || !hasMore ? products : products.slice(0, MAX_CARDS);
+        const visibleProducts = expanded ? products : products.slice(0, MAX_CARDS);
 
         return (
           <section
             key={category.id}
             id={sectionId}
-            className={`relative overflow-hidden py-20 md:py-28 ${
-              isDark ? 'bg-gray-900 border-t border-gray-800' : 'bg-gray-50'
+            className={`relative py-24 md:py-32 overflow-hidden ${
+              isDark ? 'bg-zinc-950' : 'bg-white'
             }`}
-            style={
-              categoryBackground
-                ? {
-                    backgroundImage: `url("${categoryBackground}")`,
-                    backgroundSize: 'cover',
-                    backgroundPosition: 'center',
-                  }
-                : undefined
-            }
           >
-            {categoryBackground && <div className="absolute inset-0 bg-black/55" />}
-            <div className="relative max-w-6xl mx-auto px-6">
-              <div className="text-center mb-16">
-                <h2
-                  className={`text-3xl sm:text-4xl md:text-5xl font-light mb-4 ${
-                    categoryBackground || isDark ? 'text-white' : 'text-gray-900'
-                  }`}
-                >
+            {/* Background Image with Parallax-like feel */}
+            {categoryBackground && (
+              <div 
+                className="absolute inset-0 z-0 opacity-40 mix-blend-overlay"
+                style={{
+                  backgroundImage: `url("${categoryBackground}")`,
+                  backgroundSize: 'cover',
+                  backgroundPosition: 'center',
+                  backgroundAttachment: 'fixed'
+                }}
+              />
+            )}
+            
+            {/* Overlay for better contrast */}
+            <div className={`absolute inset-0 z-0 ${isDark ? 'bg-zinc-950/80' : 'bg-white/90'}`} />
+
+            <div className="relative z-10 max-w-7xl mx-auto px-6 lg:px-8">
+              {/* Category Header */}
+              <div className="text-center mb-20">
+                <div className="inline-block mb-4">
+                  <div className={`h-1 w-12 mx-auto rounded-full ${isDark ? 'bg-amber-500' : 'bg-amber-600'}`} />
+                </div>
+                <h2 className={`text-4xl sm:text-5xl md:text-6xl font-light tracking-tight mb-6 ${
+                  isDark ? 'text-white' : 'text-zinc-900'
+                }`}>
                   {category.name}
                 </h2>
-                <p
-                  className={`text-lg font-extralight max-w-2xl mx-auto ${
-                    categoryBackground || isDark ? 'text-gray-200' : 'text-gray-600'
-                  }`}
-                >
-                  Раздел категории на сайте. Отображаются только отмеченные товары.
-                </p>
-              </div>
-
-              <div className="mt-12 w-full">
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-5">
-                  {visibleProducts.map((product) => (
-                    <CategoryProductCard key={product.id} product={product} isDark={isDark} />
-                  ))}
+                <div className={`max-w-2xl mx-auto text-lg md:text-xl font-light leading-relaxed ${
+                  isDark ? 'text-zinc-400' : 'text-zinc-600'
+                }`}>
+                  {category.description || 'Откройте для себя лучшее из нашей коллекции'}
                 </div>
-
-                {hasMore && (
-                  <div className="flex justify-center mt-10">
-                    <button
-                      type="button"
-                      onClick={() => toggleCategoryExpand(category.id)}
-                      className={`px-8 py-3 rounded-full text-sm font-medium tracking-wide transition-colors ${
-                        categoryBackground || isDark
-                          ? 'bg-white/15 text-white border border-white/30 hover:bg-white/25'
-                          : 'bg-gray-900 text-white hover:bg-gray-800'
-                      }`}
-                    >
-                      {expanded ? 'Скрыть' : 'Показать больше'}
-                    </button>
-                  </div>
-                )}
               </div>
+
+              {/* Products Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 md:gap-10">
+                {visibleProducts.map((product) => (
+                  <CategoryProductCard 
+                    key={product.id} 
+                    product={product} 
+                  />
+                ))}
+              </div>
+
+              {/* View More Button */}
+              {hasMore && (
+                <div className="flex justify-center mt-16">
+                  <button
+                    type="button"
+                    onClick={() => toggleCategoryExpand(category.id)}
+                    className={`group flex items-center gap-3 px-10 py-4 rounded-full text-base font-medium transition-all duration-300 ${
+                      isDark 
+                        ? 'bg-zinc-900 text-white border border-zinc-800 hover:bg-zinc-800 hover:border-amber-500/50' 
+                        : 'bg-zinc-100 text-zinc-900 border border-zinc-200 hover:bg-white hover:shadow-xl hover:border-amber-600/50'
+                    }`}
+                  >
+                    <span>{expanded ? 'Свернуть коллекцию' : 'Показать всю категорию'}</span>
+                    <div className="transition-transform duration-300 group-hover:scale-125">
+                      {expanded ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+                    </div>
+                  </button>
+                </div>
+              )}
             </div>
           </section>
         );
       })}
-    </>
+    </div>
   );
 }
 

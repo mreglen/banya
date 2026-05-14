@@ -1,3 +1,5 @@
+import { Sparkles, Clock, ArrowRight } from 'lucide-react';
+
 function MassagesPreview() {
     const handleClick = (e) => {
         e.preventDefault();
@@ -7,72 +9,94 @@ function MassagesPreview() {
         }
     };
 
+    const massageItems = [
+        { 
+            name: 'Классический массаж', 
+            desc: 'Расслабляющий массаж всего тела для снятия мышечного напряжения и улучшения кровообращения', 
+            price: 'от 1500 ₽',
+            duration: '60 мин',
+            icon: 'bg-purple-500/10 text-purple-400'
+        },
+        { 
+            name: 'Банные процедуры', 
+            desc: 'Профессиональное парение с дубовыми вениками, солевым пилингом и ароматерапией', 
+            price: 'от 2000 ₽',
+            duration: '45 мин',
+            icon: 'bg-emerald-500/10 text-emerald-400'
+        },
+        { 
+            name: 'Массаж головы', 
+            desc: 'Антистресс-массаж головы и шейно-воротниковой зоны для снятия усталости', 
+            price: 'от 900 ₽',
+            duration: '30 мин',
+            icon: 'bg-blue-500/10 text-blue-400'
+        },
+    ];
+
     return (
-        <div id="massages" className="bg-gray-900 py-20 md:py-28">
-            <div className="max-w-6xl mx-auto px-6">
-                <div className="text-center mb-16">
-                    <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-purple-900/30 mb-6">
-                        <svg className="w-8 h-8 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
+        <section id="massages" className="relative py-24 md:py-32 bg-zinc-950 overflow-hidden">
+            {/* Background decorations */}
+            <div className="absolute top-1/4 left-0 w-80 h-80 bg-purple-600/10 rounded-full blur-3xl" />
+            <div className="absolute bottom-1/4 right-0 w-80 h-80 bg-blue-600/10 rounded-full blur-3xl" />
+
+            <div className="relative max-w-7xl mx-auto px-6 lg:px-8">
+                <div className="text-center mb-20">
+                    <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-zinc-900 border border-zinc-800 text-purple-400 mb-8 shadow-2xl">
+                        <Sparkles size={32} strokeWidth={1.5} />
                     </div>
-                    <h2 className="text-3xl sm:text-4xl md:text-5xl font-light text-white mb-4">
+                    <h2 className="text-4xl sm:text-5xl md:text-6xl font-light text-white mb-6 tracking-tight">
                         Процедуры и массаж
                     </h2>
-                    <p className="text-lg text-gray-300 font-extralight max-w-2xl mx-auto mb-8">
-                        Профессиональный массаж и банные процедуры для полного расслабления. Разные техники парения для детей и взрослых.
+                    <p className="text-lg md:text-xl text-zinc-400 font-light max-w-2xl mx-auto mb-10 leading-relaxed">
+                        Профессиональный массаж и банные ритуалы для восстановления сил. Позвольте себе момент истинного блаженства.
                     </p>
                     <a
                         href="#massages"
                         onClick={handleClick}
-                        className="inline-flex items-center gap-2 px-8 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-medium transition-all duration-300 hover:shadow-lg transform hover:scale-105"
+                        className="group inline-flex items-center gap-3 px-10 py-4 bg-purple-600 hover:bg-purple-700 text-white rounded-full font-medium transition-all duration-300 hover:shadow-[0_0_30px_rgba(147,51,234,0.3)] hover:-translate-y-1"
                     >
                         <span>Все услуги</span>
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m5-4H3" />
-                        </svg>
+                        <ArrowRight size={20} className="transition-transform duration-300 group-hover:translate-x-1" />
                     </a>
                 </div>
 
                 {/* Превью услуг */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-12">
-                    {[
-                        { 
-                            name: 'Классический массаж', 
-                            desc: 'Расслабляющий массаж всего тела для снятия напряжения', 
-                            price: 'от 1500 ₽',
-                            duration: '60 мин'
-                        },
-                        { 
-                            name: 'Банные процедуры', 
-                            desc: 'Профессиональное парение с вениками и ароматерапией', 
-                            price: 'от 2000 ₽',
-                            duration: '45 мин'
-                        },
-                        { 
-                            name: 'Массаж головы', 
-                            desc: 'Антистресс-массаж головы и шейно-воротниковой зоны', 
-                            price: 'от 900 ₽',
-                            duration: '30 мин'
-                        },
-                    ].map((item, index) => (
-                        <div key={index} className="bg-gray-800 rounded-xl p-6 hover:shadow-md transition-all duration-300 border border-gray-700 group">
-                            <div className="flex items-center justify-between mb-3">
-                                <h3 className="text-xl font-medium text-white">{item.name}</h3>
-                                <span className="text-xs px-3 py-1 bg-purple-900/50 text-purple-300 rounded-full font-medium">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-8 md:gap-10 mt-12">
+                    {massageItems.map((item, index) => (
+                        <div 
+                            key={index} 
+                            className="group relative bg-zinc-900/50 backdrop-blur-sm rounded-3xl p-8 border border-zinc-800 hover:border-purple-500/30 transition-all duration-500 hover:shadow-2xl hover:bg-zinc-900"
+                        >
+                            <div className="flex items-start justify-between mb-8">
+                                <div className={`p-3 rounded-xl ${item.icon} transition-transform duration-500 group-hover:scale-110`}>
+                                    <Clock size={24} />
+                                </div>
+                                <span className="text-xs px-4 py-1.5 bg-zinc-800 text-zinc-300 rounded-full font-medium tracking-wider uppercase">
                                     {item.duration}
                                 </span>
                             </div>
-                            <p className="text-gray-300 text-sm mb-4">{item.desc}</p>
-                            <p className="text-lg font-semibold text-purple-400 group-hover:text-purple-300 transition-colors">
-                                {item.price}
+                            
+                            <h3 className="text-2xl font-bold text-white mb-4 group-hover:text-purple-400 transition-colors">
+                                {item.name}
+                            </h3>
+                            <p className="text-zinc-400 text-base leading-relaxed mb-8 font-light">
+                                {item.desc}
                             </p>
+                            
+                            <div className="pt-6 border-t border-zinc-800 flex items-center justify-between">
+                                <span className="text-2xl font-black text-white">
+                                    {item.price}
+                                </span>
+                                <div className="text-purple-500 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                                    <ArrowRight size={24} />
+                                </div>
+                            </div>
                         </div>
                     ))}
                 </div>
             </div>
-        </div>
+        </section>
     );
 }
 
-export default MassagesPreview;
+export default MassagesPreview;
