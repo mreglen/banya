@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
+  useGetBathsQuery,
   useGetBathByIdQuery,
   useCreateBathMutation,
   useUpdateBathMutation,
@@ -30,7 +31,18 @@ function BathForm() {
   // Для фото используем базовый URL сервера (без /api)
   const SERVER_BASE_URL = process.env.REACT_APP_API_URL ? process.env.REACT_APP_API_URL.replace('/api', '') : (window.location.origin || 'http://127.0.0.1:8000');
 
-  const { data: bath, isLoading: isLoadingBath, isError: isBathError, refetch: refetchBath } = useGetBathByIdQuery(slug, { skip: !isEditing });
+  const { data: bathsList = [], isLoading: isLoadingList } = useGetBathsQuery(undefined, { skip: !isEditing });
+  const {
+    data: bathFromApi,
+    isLoading: isLoadingBath,
+    isError: isBathError,
+    refetch: refetchBath,
+  } = useGetBathByIdQuery(slug, { skip: !isEditing });
+
+  const bathFromList = bathsList.find(
+    (b) => b.slug === slug || String(b.bath_id) === String(slug)
+  );
+  const bath = bathFromApi || bathFromList;
   const bathId = bath?.bath_id ?? null;
   const [createBath] = useCreateBathMutation();
   const [updateBath] = useUpdateBathMutation();
@@ -56,20 +68,26 @@ function BathForm() {
 
   // Заполняем форму данными при редактировании
   useEffect(() => {
-    if (bath) {
-      setFormData({
-        name: bath.name,
-        title: bath.title,
-        cost_weekday: bath.cost_weekday,
-        cost_weekend: bath.cost_weekend,
-        min_booking_hours: bath.min_booking_hours || 1,
-        description: bath.description || '',
-        base_guests: bath.base_guests || 4,
-        extra_guest_price: bath.extra_guest_price || 500,
-      });
-      setSelectedPromotionIds(bath.promotions?.map(p => p.id) || []);
-    }
+    if (!bath) return;
+    setFormData({
+      name: bath.name || '',
+      title: bath.title || '',
+      cost_weekday: bath.cost_weekday ?? '',
+      cost_weekend: bath.cost_weekend ?? '',
+      min_booking_hours: bath.min_booking_hours || 1,
+      description: bath.description || '',
+      base_guests: bath.base_guests ?? 4,
+      extra_guest_price: bath.extra_guest_price ?? 500,
+    });
+    setSelectedPromotionIds(bath.promotions?.map((p) => p.id) || []);
   }, [bath]);
+
+  // Старые ссылки /edit/1 → /edit/slug
+  useEffect(() => {
+    if (bath?.slug && slug && String(slug) !== bath.slug) {
+      navigate(`/admin/baths/edit/${bath.slug}`, { replace: true });
+    }
+  }, [bath, slug, navigate]);
 
   // Очистка URL превью при размонтировании
   useEffect(() => {
@@ -229,7 +247,7 @@ function BathForm() {
     }
   };
 
-  if (isLoadingBath) {
+  if (isLoadingBath || isLoadingList) {
     return (
       <div className="min-h-screen bg-gray-50 p-8 flex items-center justify-center">
         <div className="text-gray-600 text-lg">Загрузка...</div>
@@ -237,7 +255,7 @@ function BathForm() {
     );
   }
 
-  if (isEditing && (isBathError || !bath)) {
+  if (isEditing && !isLoadingBath && !isLoadingList && (isBathError || !bath)) {
     return (
       <div className="min-h-screen bg-gray-50 p-8 flex items-center justify-center">
         <div className="text-center">

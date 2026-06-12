@@ -27,12 +27,19 @@ def get_baths(db: Session = Depends(get_db)):
     return baths
 
 
-@router.get("/{slug}")
-def get_bath(slug: str, db: Session = Depends(get_db)):
+@router.get("/{slug_or_id}")
+def get_bath(slug_or_id: str, db: Session = Depends(get_db)):
     bath = db.query(Bath)\
         .options(joinedload(Bath.photos))\
-        .filter(Bath.slug == slug)\
+        .filter(Bath.slug == slug_or_id)\
         .first()
+
+    # Поддержка /baths/1 для админки (по bath_id)
+    if not bath and slug_or_id.isdigit():
+        bath = db.query(Bath)\
+            .options(joinedload(Bath.photos))\
+            .filter(Bath.bath_id == int(slug_or_id))\
+            .first()
 
     if not bath:
         raise HTTPException(status_code=404, detail="Баня не найдена")
