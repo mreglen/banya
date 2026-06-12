@@ -17,8 +17,8 @@ function AdminBathsList() {
     navigate('/admin/baths/add');
   };
 
-  const handleEditClick = (bathId) => {
-    navigate(`/admin/baths/edit/${bathId}`);
+  const handleEditClick = (slug) => {
+    navigate(`/admin/baths/edit/${slug}`);
   };
 
   return (
@@ -39,7 +39,7 @@ function AdminBathsList() {
           <div
             key={bath.bath_id}
             className="bg-white rounded-xl shadow-md overflow-hidden cursor-pointer hover:shadow-lg transition transform hover:-translate-y-1 border border-gray-100"
-            onClick={() => handleEditClick(bath.bath_id)}
+            onClick={() => handleEditClick(bath.slug)}
           >
             <img
               src={bath.photos?.[0] ? `${SERVER_BASE_URL}${bath.photos[0].image_url}` : '/img/placeholder.svg'}

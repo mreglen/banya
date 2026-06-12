@@ -41,7 +41,15 @@ class BathBase(BaseModel):
     base_guests: int
     extra_guest_price: int
 
-class BathCreate(BathBase):
+class BathCreate(BaseModel):
+    name: str
+    title: str
+    cost_weekday: int
+    cost_weekend: int
+    min_booking_hours: int = 1
+    description: Optional[str] = None
+    base_guests: int
+    extra_guest_price: int
     photo_urls: List[str] = []
     promotion_ids: List[int] = []
 

@@ -1,0 +1,58 @@
+#!/bin/bash
+# Обновление сайта одной командой: ./update
+# Запускать из корня репозитория на сервере: /root/banya
+
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+BACKEND="$ROOT/backend"
+FRONTEND="$ROOT/frontend/my-banya"
+WWW="/var/www/banya"
+SERVICE="banya-backend"
+
+green() { printf '\033[0;32m%s\033[0m\n' "$*"; }
+yellow() { printf '\033[0;33m%s\033[0m\n' "$*"; }
+red() { printf '\033[0;31m%s\033[0m\n' "$*"; }
+
+yellow "==> 1/5 git pull"
+cd "$ROOT"
+git pull
+
+yellow "==> 2/5 backend (зависимости + перезапуск)"
+cd "$BACKEND"
+if [[ ! -d venv ]]; then
+  red "venv не найден. Сначала: bash deploy/install-backend.sh"
+  exit 1
+fi
+# shellcheck disable=SC1091
+source venv/bin/activate
+pip install -q -r requirements.txt
+mkdir -p uploads public/img
+if [[ -d "$FRONTEND/public/img" ]]; then
+  rsync -a "$FRONTEND/public/img/" public/img/
+fi
+
+yellow "==> 3/5 frontend (npm install + build)"
+cd "$FRONTEND"
+if [[ ! -f .env ]]; then
+  echo 'REACT_APP_API_URL=/api' > .env
+fi
+npm install
+npm run build
+
+yellow "==> 4/5 публикация в $WWW"
+mkdir -p "$WWW"
+rsync -a --delete build/ "$WWW/"
+
+yellow "==> 5/5 перезапуск сервисов"
+if [[ -f "$ROOT/deploy/banya-backend.service" ]]; then
+  cp "$ROOT/deploy/banya-backend.service" /etc/systemd/system/
+fi
+systemctl daemon-reload
+systemctl restart "$SERVICE"
+systemctl reload nginx
+
+green "Готово!"
+echo "  Backend:  $(systemctl is-active "$SERVICE")"
+echo "  Nginx:    $(systemctl is-active nginx)"
+echo "  Сайт:     http://$(hostname -I | awk '{print $1}')"

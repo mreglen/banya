@@ -13,16 +13,25 @@ import { toast } from 'react-hot-toast';
 
 const MAX_FILES = 5;
 
+const formatApiError = (detail, fallback = 'Ошибка при сохранении бани') => {
+  if (!detail) return fallback;
+  if (typeof detail === 'string') return detail;
+  if (Array.isArray(detail)) {
+    return detail.map((e) => e.msg || JSON.stringify(e)).join('; ');
+  }
+  return String(detail);
+};
+
 function BathForm() {
-  const { id } = useParams();
+  const { id: slug } = useParams();
   const navigate = useNavigate();
-  const isEditing = !!id;
-  const bathId = isEditing ? parseInt(id) : null;
+  const isEditing = !!slug;
 
   // Для фото используем базовый URL сервера (без /api)
   const SERVER_BASE_URL = process.env.REACT_APP_API_URL ? process.env.REACT_APP_API_URL.replace('/api', '') : (window.location.origin || 'http://127.0.0.1:8000');
 
-  const { data: bath, isLoading: isLoadingBath, refetch: refetchBath } = useGetBathByIdQuery(bathId, { skip: !isEditing });
+  const { data: bath, isLoading: isLoadingBath, isError: isBathError, refetch: refetchBath } = useGetBathByIdQuery(slug, { skip: !isEditing });
+  const bathId = bath?.bath_id ?? null;
   const [createBath] = useCreateBathMutation();
   const [updateBath] = useUpdateBathMutation();
   const [uploadPhotos] = useUploadBathPhotosMutation();
@@ -101,6 +110,10 @@ function BathForm() {
       let resultBathId = bathId;
 
       if (isEditing) {
+        if (!bathId) {
+          toast.error('Не удалось определить баню для сохранения');
+          return;
+        }
         // Обновляем существующую баню
         await updateBath({
           bath_id: bathId,
@@ -157,7 +170,7 @@ function BathForm() {
       navigate('/admin/baths');
     } catch (err) {
       console.error('Ошибка сохранения:', err);
-      toast.error(err.data?.detail || 'Ошибка при сохранении бани');
+      toast.error(formatApiError(err.data?.detail));
     } finally {
       setIsSaving(false);
       setUploadProgress(null);
@@ -220,6 +233,23 @@ function BathForm() {
     return (
       <div className="min-h-screen bg-gray-50 p-8 flex items-center justify-center">
         <div className="text-gray-600 text-lg">Загрузка...</div>
+      </div>
+    );
+  }
+
+  if (isEditing && (isBathError || !bath)) {
+    return (
+      <div className="min-h-screen bg-gray-50 p-8 flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-red-600 text-lg mb-4">Баня не найдена</p>
+          <button
+            type="button"
+            onClick={() => navigate('/admin/baths')}
+            className="text-green-600 hover:text-green-700 font-medium"
+          >
+            ← Назад к списку
+          </button>
+        </div>
       </div>
     );
   }
