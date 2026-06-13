@@ -37,7 +37,7 @@ cd "$FRONTEND"
 if [[ ! -f .env ]]; then
   echo 'REACT_APP_API_URL=/api' > .env
 fi
-npm install
+
 npm run build
 
 yellow "==> 4/5 публикация в $WWW"
