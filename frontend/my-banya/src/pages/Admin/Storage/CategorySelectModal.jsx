@@ -1,21 +1,43 @@
 // src/components/CategorySelectModal.jsx
 import React, { useState, useEffect } from 'react';
+import { useCreateCategoryMutation } from '../../../redux/slices/productsApiSlice';
+
+const findCategoryById = (cats, id) => {
+  for (const cat of cats) {
+    if (cat.id === id) return cat;
+    if (cat.children?.length) {
+      const found = findCategoryById(cat.children, id);
+      if (found) return found;
+    }
+  }
+  return null;
+};
 
 const CategorySelectModal = ({
   isOpen,
   onClose,
   onSelect,
   categoriesTree,
-  currentCategoryId = null, // Добавляем текущую категорию товара
+  currentCategoryId = null,
 }) => {
   const [selectedId, setSelectedId] = useState(null);
   const [expanded, setExpanded] = useState(new Set());
   const [searchText, setSearchText] = useState('');
+  const [mode, setMode] = useState('select');
+  const [createParentId, setCreateParentId] = useState(null);
+  const [createParentName, setCreateParentName] = useState('Номенклатура');
+  const [newCategoryName, setNewCategoryName] = useState('');
 
-  // При открытии модалки устанавливаем текущую категорию товара
+  const [createCategory, { isLoading: isCreating }] = useCreateCategoryMutation();
+
   useEffect(() => {
     if (isOpen) {
       setSelectedId(currentCategoryId);
+      setMode('select');
+      setCreateParentId(null);
+      setCreateParentName('Номенклатура');
+      setNewCategoryName('');
+      setSearchText('');
     }
   }, [isOpen, currentCategoryId]);
 
@@ -31,14 +53,65 @@ const CategorySelectModal = ({
     });
   };
 
-  // Функция для проверки, содержит ли категория поисковый запрос
+  const openCreateMode = (parentId, parentName) => {
+    setCreateParentId(parentId);
+    setCreateParentName(parentName);
+    setNewCategoryName('');
+    setMode('create');
+  };
+
+  const handleAddClick = () => {
+    if (selectedId === null) {
+      openCreateMode(null, 'Номенклатура');
+    } else {
+      const category = findCategoryById(categoriesTree, selectedId);
+      openCreateMode(selectedId, category?.name || 'Номенклатура');
+    }
+  };
+
+  const handleCategoryContextMenu = (e, category) => {
+    e.preventDefault();
+    setSelectedId(category.id);
+    openCreateMode(category.id, category.name);
+  };
+
+  const handleRootContextMenu = (e) => {
+    e.preventDefault();
+    setSelectedId(null);
+    openCreateMode(null, 'Номенклатура');
+  };
+
+  const handleCreateCategory = async () => {
+    if (!newCategoryName.trim()) {
+      alert('Имя категории не может быть пустым');
+      return;
+    }
+
+    try {
+      const created = await createCategory({
+        name: newCategoryName.trim(),
+        parent_id: createParentId,
+      }).unwrap();
+
+      if (createParentId !== null) {
+        setExpanded(prev => new Set([...prev, createParentId]));
+      }
+
+      setSelectedId(created.id);
+      setMode('select');
+      setNewCategoryName('');
+    } catch (err) {
+      console.error('Ошибка создания категории:', err);
+      alert('Не удалось создать категорию');
+    }
+  };
+
   const categoryMatchesSearch = (category, search) => {
     if (!search) return true;
     const searchLower = search.toLowerCase();
     return category.name.toLowerCase().includes(searchLower);
   };
 
-  // Функция для проверки, содержит ли категория или её дети поисковый запрос
   const categoryOrChildrenMatch = (category, search) => {
     if (!search) return true;
     if (categoryMatchesSearch(category, search)) return true;
@@ -48,20 +121,20 @@ const CategorySelectModal = ({
 
   const renderCategoryTree = (categories) => {
     return categories.map(cat => {
-      // Если есть поиск, проверяем совпадение
       if (searchText && !categoryOrChildrenMatch(cat, searchText)) {
         return null;
       }
 
       const hasChildren = cat.children?.length > 0;
       const isExpanded = expanded.has(cat.id);
-      
-      // Автоматически раскрываем при поиске, если есть совпадения в детях
       const shouldExpand = searchText && cat.children?.some(child => categoryOrChildrenMatch(child, searchText));
 
       return (
         <div key={cat.id} className="ml-3">
-          <div className="flex items-center py-1 px-1">
+          <div
+            className="flex items-center py-1 px-1"
+            onContextMenu={(e) => handleCategoryContextMenu(e, cat)}
+          >
             {hasChildren ? (
               <span
                 className="mr-1 cursor-pointer select-none"
@@ -90,16 +163,12 @@ const CategorySelectModal = ({
           )}
         </div>
       );
-    }).filter(Boolean); // Убираем null (несовпадающие категории)
+    }).filter(Boolean);
   };
 
   const handleSelect = () => {
-    if (selectedId !== null) {
-      onSelect(selectedId);
-      onClose();
-    } else {
-      alert('Выберите категорию');
-    }
+    onSelect(selectedId);
+    onClose();
   };
 
   if (!isOpen) return null;
@@ -107,55 +176,124 @@ const CategorySelectModal = ({
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div className="bg-white p-6 rounded-lg shadow-lg w-1/3 max-h-[80vh] flex flex-col">
-        <h3 className="text-lg font-semibold mb-4">Выберите категорию</h3>
+        {mode === 'select' ? (
+          <>
+            <h3 className="text-lg font-semibold mb-4">Выберите категорию</h3>
 
-        {/* Поле поиска */}
-        <div className="mb-3">
-          <input
-            type="text"
-            placeholder="Введите название категории..."
-            value={searchText}
-            onChange={(e) => setSearchText(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-          />
-          {searchText && (
-            <button
-              onClick={() => setSearchText('')}
-              className="mt-1 text-sm text-gray-500 hover:text-gray-700"
-            >
-              Очистить поиск
-            </button>
-          )}
-        </div>
+            <div className="mb-3">
+              <input
+                type="text"
+                placeholder="Введите название категории..."
+                value={searchText}
+                onChange={(e) => setSearchText(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+              />
+              {searchText && (
+                <button
+                  onClick={() => setSearchText('')}
+                  className="mt-1 text-sm text-gray-500 hover:text-gray-700"
+                >
+                  Очистить поиск
+                </button>
+              )}
+            </div>
 
-        <div className="border rounded p-2 max-h-60 overflow-y-auto mb-4">
-          <label className="flex items-center cursor-pointer mb-2 px-1">
-            <input
-              type="radio"
-              name="select-category"
-              checked={selectedId === null}
-              onChange={() => setSelectedId(null)}
-              className="mr-2"
-            />
-            <span>Номенклатура (без категории)</span>
-          </label>
-          {renderCategoryTree(categoriesTree)}
-        </div>
+            <div className="border rounded p-2 max-h-60 overflow-y-auto mb-4">
+              <div
+                className="flex items-center cursor-pointer mb-2 px-1"
+                onContextMenu={handleRootContextMenu}
+              >
+                <label className="flex items-center cursor-pointer">
+                  <input
+                    type="radio"
+                    name="select-category"
+                    checked={selectedId === null}
+                    onChange={() => setSelectedId(null)}
+                    className="mr-2"
+                  />
+                  <span>Номенклатура (без категории)</span>
+                </label>
+              </div>
+              {renderCategoryTree(categoriesTree)}
+            </div>
 
-        <div className="flex justify-end space-x-2">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400"
-          >
-            Отмена
-          </button>
-          <button
-            onClick={handleSelect}
-            className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
-          >
-            Выбрать
-          </button>
-        </div>
+            <p className="text-xs text-gray-500 mb-4">
+              ПКМ по категории — добавить подкатегорию
+            </p>
+
+            <div className="flex justify-between space-x-2">
+              <button
+                onClick={handleAddClick}
+                className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600"
+              >
+                Добавить
+              </button>
+              <div className="flex space-x-2">
+                <button
+                  onClick={onClose}
+                  className="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400"
+                >
+                  Отмена
+                </button>
+                <button
+                  onClick={handleSelect}
+                  className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+                >
+                  Выбрать
+                </button>
+              </div>
+            </div>
+          </>
+        ) : (
+          <>
+            <h3 className="text-lg font-semibold mb-4">Добавить категорию</h3>
+
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Родительская категория
+              </label>
+              <div className="p-2 bg-gray-100 rounded text-sm">
+                {createParentName}
+              </div>
+            </div>
+
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Имя категории
+              </label>
+              <input
+                type="text"
+                value={newCategoryName}
+                onChange={(e) => setNewCategoryName(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                placeholder="Введите название категории"
+                autoFocus
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleCreateCategory();
+                }}
+              />
+            </div>
+
+            <div className="flex justify-between space-x-2">
+              <button
+                onClick={() => {
+                  setMode('select');
+                  setNewCategoryName('');
+                }}
+                className="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400"
+              >
+                Назад
+              </button>
+              <button
+                onClick={handleCreateCategory}
+                disabled={isCreating}
+                className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 disabled:opacity-50"
+              >
+                {isCreating ? 'Создание...' : 'Создать'}
+              </button>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
