@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks, Request
 from sqlalchemy.orm import Session, joinedload
-from typing import List
+from typing import List, Optional
 from app.database import get_db, SessionLocal
 from app.models import User, Role
 from app.schemas import UserCreate, UserUpdate, UserResponse
@@ -10,6 +10,14 @@ from app.audit_logger import log_action, get_client_ip
 from app.auth import get_current_user
 
 router = APIRouter(prefix="/admin/company/users", tags=["Users"])
+
+
+def _user_contact_label(email: Optional[str], phone: Optional[str] = None) -> str:
+    if email:
+        return email
+    if phone:
+        return phone
+    return "без email"
 
 
 @router.get("/", response_model=List[UserResponse])
@@ -43,8 +51,8 @@ def create_user(
     if not normalized_phone:
         raise HTTPException(status_code=400, detail="Неверный формат телефона")
     
-    # Проверка уникальности email
-    if db.query(User).filter(User.email == user_data.email).first():
+    # Проверка уникальности email (если указан)
+    if user_data.email and db.query(User).filter(User.email == user_data.email).first():
         raise HTTPException(status_code=400, detail="Пользователь с таким email уже существует")
     
     # Проверка уникальности телефона (используем нормализованный)
@@ -82,7 +90,7 @@ def create_user(
     db.refresh(db_user)
 
     # Асинхронное логирование создания пользователя с детальной информацией
-    summary = f"Создал сотрудника: {user_data.full_name} ({user_data.email})"
+    summary = f"Создал сотрудника: {user_data.full_name} ({_user_contact_label(user_data.email, normalized_phone)})"
     
     from app.audit_logger import log_detailed_action
     background_tasks.add_task(
@@ -124,6 +132,15 @@ def update_user(
 
     # Обновление полей
     update_data = user_data.dict(exclude_unset=True)
+
+    if "email" in update_data:
+        new_email = update_data["email"]
+        if new_email and db.query(User).filter(
+            User.email == new_email,
+            User.user_id != user_id,
+        ).first():
+            raise HTTPException(status_code=400, detail="Пользователь с таким email уже существует")
+
     for key, value in update_data.items():
         if key == "password" and value is not None:
             # Хешировать новый пароль
@@ -147,7 +164,7 @@ def update_user(
     db.refresh(db_user)
 
     # Асинхронное логирование обновления пользователя с детальной информацией
-    summary = f"Изменил сотрудника: {db_user.full_name} ({db_user.email})"
+    summary = f"Изменил сотрудника: {db_user.full_name} ({_user_contact_label(db_user.email, db_user.phone)})"
     
     from app.audit_logger import log_detailed_action
     background_tasks.add_task(
@@ -182,12 +199,13 @@ def delete_user(
     # Сохраняем информацию перед удалением для логирования
     user_email = db_user.email
     user_full_name = db_user.full_name
+    user_phone = db_user.phone
     
     db.delete(db_user)
     db.commit()
 
     # Асинхронное логирование удаления пользователя с детальной информацией
-    summary = f"Удалил сотрудника: {user_full_name} ({user_email})"
+    summary = f"Удалил сотрудника: {user_full_name} ({_user_contact_label(user_email, user_phone)})"
     
     from app.audit_logger import log_detailed_action
     background_tasks.add_task(

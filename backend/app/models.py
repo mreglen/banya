@@ -270,7 +270,7 @@ class User(Base):
 
     user_id = Column(Integer, primary_key=True, index=True)
     password_hash = Column(String(128), nullable=False)
-    email = Column(String(100), nullable=False, unique=True, index=True)
+    email = Column(String(100), nullable=True, unique=True, index=True)
     phone = Column(String(20), nullable=False, unique=True, index=True)
     is_admin = Column(Boolean, default=False, nullable=False)
     is_director = Column(Boolean, default=False, nullable=False)

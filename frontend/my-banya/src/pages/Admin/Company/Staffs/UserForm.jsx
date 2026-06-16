@@ -115,10 +115,6 @@ function UserForm() {
       toast.error('Введите ФИО');
       return;
     }
-    if (!email) {
-      toast.error('Введите email');
-      return;
-    }
     if (!phone) {
       toast.error('Введите телефон');
       return;
@@ -172,6 +168,7 @@ function UserForm() {
         // Не отправляем пароль, если он пустой
         const payload = { 
           ...form,
+          email: email.trim() || null,
           phone: normalizedPhone,
           role_id: form.role_id ? Number(form.role_id) : null,
         };
@@ -181,6 +178,7 @@ function UserForm() {
       } else {
         const payload = {
           ...form,
+          email: email.trim() || null,
           phone: normalizedPhone,
           role_id: form.role_id ? Number(form.role_id) : null,
         };
@@ -221,7 +219,7 @@ function UserForm() {
         <form onSubmit={handleSubmit} className="space-y-6">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Email *
+              Email
             </label>
             <input
               type="email"
@@ -229,7 +227,7 @@ function UserForm() {
               value={form.email}
               onChange={handleChange}
               className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500"
-              required
+              placeholder="Необязательно"
             />
           </div>
 

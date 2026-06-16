@@ -293,7 +293,7 @@ class FinanceOperationDetailOut(BaseModel):
 
 # === Авторизация / Пользователи ===
 class UserCreate(BaseModel):
-    email: str
+    email: Optional[str] = None
     phone: str
     password: str
     full_name: str
@@ -301,6 +301,14 @@ class UserCreate(BaseModel):
     is_admin: bool = False
     is_director: bool = False
     role_id: Optional[int] = None
+
+    @field_validator("email")
+    @classmethod
+    def normalize_email(cls, value: Optional[str]) -> Optional[str]:
+        if value is None:
+            return None
+        normalized = value.strip()
+        return normalized or None
 
 
 class UserUpdate(BaseModel):
@@ -312,6 +320,14 @@ class UserUpdate(BaseModel):
     is_admin: Optional[bool] = None
     is_director: Optional[bool] = None
     role_id: Optional[int] = None
+
+    @field_validator("email")
+    @classmethod
+    def normalize_email(cls, value: Optional[str]) -> Optional[str]:
+        if value is None:
+            return None
+        normalized = value.strip()
+        return normalized or None
 
     class Config:
         extra = "forbid"  # или используй exclude_unset в вызове
@@ -337,7 +353,7 @@ class RoleBrief(BaseModel):
 
 class UserResponse(BaseModel):
     user_id: int
-    email: str
+    email: Optional[str] = None
     phone: str
     full_name: str
     birth_date: Optional[date]

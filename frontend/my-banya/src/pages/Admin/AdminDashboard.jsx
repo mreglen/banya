@@ -1,5 +1,6 @@
 // src/pages/Admin/AdminDashboard.jsx
 import { useMemo, useState } from 'react';
+import { useSelector } from 'react-redux';
 import { NavLink } from 'react-router-dom';
 import { 
   useGetDashboardStatisticsQuery,
@@ -45,9 +46,11 @@ import AdminDashboardSkeleton from './AdminDashboardSkeleton';
 const COLORS = ['#10b981', '#3b82f6', '#8b5cf6', '#f59e0b', '#ef4444'];
 
 function AdminDashboard() {
+  const { user } = useSelector((state) => state.auth);
   const currentDate = new Date();
   const hours = currentDate.getHours();
   const greeting = hours < 6 ? 'Доброй ночи' : hours < 12 ? 'Доброе утро' : hours < 18 ? 'Добрый день' : 'Добрый вечер';
+  const userName = user?.full_name?.trim().split(/\s+/)[0] || 'Администратор';
 
   const [revenuePeriod, setRevenuePeriod] = useState('month');
 
@@ -111,7 +114,7 @@ function AdminDashboard() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-600 bg-clip-text text-transparent">
-            {greeting}, Администратор!
+            {greeting}, {userName}!
           </h1>
           <p className="text-gray-500 mt-1 flex items-center gap-2">
             <Calendar className="w-4 h-4" />
@@ -428,4 +431,4 @@ function AdminDashboard() {
   );
 }
 
-export default AdminDashboard;
+export default AdminDashboard;

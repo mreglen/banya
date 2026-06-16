@@ -216,6 +216,14 @@ with engine.begin() as connection:
             """
         )
     )
+    connection.execute(
+        text(
+            """
+            ALTER TABLE users
+            ALTER COLUMN email DROP NOT NULL
+            """
+        )
+    )
 
 app = FastAPI(title='Бани')
 
