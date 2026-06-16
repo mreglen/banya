@@ -47,11 +47,10 @@ def create_document(doc: EntranceDocumentCreate, db: Session = Depends(get_db)):
         missing = set(product_ids) - existing_ids
         raise HTTPException(status_code=400, detail=f"Products not found: {missing}")
 
-    if not doc.account_id:
-        raise HTTPException(status_code=400, detail="Выберите счет списания")
-    account = db.query(OrganizationAccount).filter(OrganizationAccount.id == doc.account_id).first()
-    if not account:
-        raise HTTPException(status_code=400, detail="Выберите счет списания")
+    if doc.account_id:
+        account = db.query(OrganizationAccount).filter(OrganizationAccount.id == doc.account_id).first()
+        if not account:
+            raise HTTPException(status_code=400, detail="Счет списания не найден")
 
     # Создание документа — БЕЗ items в конструкторе
     db_doc = EntranceDocument(
@@ -98,11 +97,10 @@ def update_document(doc_id: int, doc: EntranceDocumentCreate, db: Session = Depe
     if not db_doc:
         raise HTTPException(status_code=404, detail="Document not found")
 
-    if not doc.account_id:
-        raise HTTPException(status_code=400, detail="Выберите счет списания")
-    account = db.query(OrganizationAccount).filter(OrganizationAccount.id == doc.account_id).first()
-    if not account:
-        raise HTTPException(status_code=400, detail="Выберите счет списания")
+    if doc.account_id:
+        account = db.query(OrganizationAccount).filter(OrganizationAccount.id == doc.account_id).first()
+        if not account:
+            raise HTTPException(status_code=400, detail="Счет списания не найден")
 
     # Обновление полей
     for key, value in doc.model_dump(exclude={"items"}).items():

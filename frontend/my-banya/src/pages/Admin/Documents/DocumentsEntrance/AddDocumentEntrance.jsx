@@ -21,7 +21,6 @@ import {
 } from '../../../../redux/slices/productsApiSlice';
 import {
   useGetPartnersQuery,
-  useGetFinanceAccountsQuery,
 } from '../../../../redux/slices/apiSlice';
 import { toast } from 'react-hot-toast';
 
@@ -46,7 +45,6 @@ function AddDocumentEntrance() {
 
   // --- RTK Query ---
   const { data: partnersData = [], isLoading: isLoadingPartners } = useGetPartnersQuery();
-  const { data: financeAccounts = [] } = useGetFinanceAccountsQuery({ active_only: true });
   const { data: units = [], isLoading: isLoadingUnits } = useGetUnitsOfMeasurementQuery();
   const { data: products = [] } = useGetProductsQuery();
   const {
@@ -140,13 +138,6 @@ function AddDocumentEntrance() {
       dispatch(setInitialState({ responsibleName: loggedUsername }));
     }
   }, [isEditing, documentData, dispatch, units, isLoadingUnits]);
-
-  useEffect(() => {
-    if (isEditing) return;
-    if (!accountId && financeAccounts.length === 1) {
-      updateDocumentData('accountId', financeAccounts[0].id);
-    }
-  }, [isEditing, accountId, financeAccounts]);
 
   useEffect(() => {
     if (selectedProductWithUnit) {
@@ -255,10 +246,6 @@ function AddDocumentEntrance() {
   };
 
   const handleSaveDocument = async () => {
-    if (!accountId) {
-      toast.error('Выберите счет списания');
-      return;
-    }
     if (!supplierId) {
       toast.error('Выберите поставщика');
       return;
@@ -268,14 +255,10 @@ function AddDocumentEntrance() {
       return;
     }
     const total = items.reduce((sum, item) => sum + item.quantity * (Number(item.purchasePrice) || 0), 0);
-    const selectedAccount = financeAccounts.find((acc) => String(acc.id) === String(accountId));
-    const accountLabel = selectedAccount
-      ? `${selectedAccount.bank_name} (${selectedAccount.account_number})`
-      : `Счет #${accountId}`;
     const documentPayload = {
       date,
       supplier_id: supplierId,
-      account_id: Number(accountId),
+      account_id: accountId ?? null,
       responsible_name: responsibleName,
       supplier_number: supplierNumber?.trim() || null,
       comment: comment || null,
@@ -289,7 +272,6 @@ function AddDocumentEntrance() {
     setPendingPayload({
       payload: documentPayload,
       total,
-      accountLabel,
     });
     setIsConfirmModalOpen(true);
   };
@@ -379,22 +361,7 @@ function AddDocumentEntrance() {
             </div>
 
             {/* Вторая строка: Ответственный | Номер документа */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div>
-                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">Счет списания *</label>
-                <select
-                  value={accountId ?? ''}
-                  onChange={(e) => updateDocumentData('accountId', e.target.value ? Number(e.target.value) : null)}
-                  className="w-full px-3 py-2 sm:px-4 sm:py-3 border border-gray-300 rounded-lg sm:rounded-xl text-sm"
-                >
-                  <option value="">Выберите счет</option>
-                  {financeAccounts.map((acc) => (
-                    <option key={acc.id} value={acc.id}>
-                      {acc.bank_name} ({acc.account_number})
-                    </option>
-                  ))}
-                </select>
-              </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">Ответственный *</label>
                 <input
@@ -731,10 +698,6 @@ function AddDocumentEntrance() {
               <p>
                 <span className="font-medium text-gray-900">Сумма:</span>{' '}
                 {pendingPayload.total.toFixed(2)} ₽
-              </p>
-              <p>
-                <span className="font-medium text-gray-900">Счет списания:</span>{' '}
-                {pendingPayload.accountLabel}
               </p>
             </div>
             <div className="flex gap-2">

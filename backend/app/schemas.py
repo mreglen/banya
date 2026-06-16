@@ -567,7 +567,7 @@ class EntranceDocumentBase(BaseModel):
     total_amount: float
 
 class EntranceDocumentCreate(EntranceDocumentBase):
-    account_id: int
+    account_id: Optional[int] = None
     items: List[EntranceDocumentItemCreate]
 
 class EntranceDocumentRead(EntranceDocumentBase):
