@@ -1,5 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
-import { useGetSettingsQuery, useUpdateSettingsMutation } from '../../../redux/slices/settingsApiSlice';
+import { useSelector } from 'react-redux';
+import {
+  useGetSettingsQuery,
+  useUpdateSettingsMutation,
+  useGetPaymentQrCodeQuery,
+  useUploadPaymentQrCodeMutation,
+} from '../../../redux/slices/settingsApiSlice';
 import { 
   useGetUnitsOfMeasurementQuery,
   useCreateUnitMutation,
@@ -9,9 +15,19 @@ import {
 import ActionDropdown from '../../../components/UI/ActionDropdown/ActionDropdown';
 import SettingsSkeleton from './SettingsSkeleton';
 
+const SERVER_BASE_URL = process.env.REACT_APP_API_URL
+  ? process.env.REACT_APP_API_URL.replace('/api', '')
+  : (window.location.origin || 'http://127.0.0.1:8000');
+
 function SettingsPage() {
+  const currentUser = useSelector((state) => state.auth?.user);
+  const canManagePaymentQr = Boolean(currentUser?.is_admin || currentUser?.is_director);
+
   const { data: settings, isLoading, isError, refetch } = useGetSettingsQuery();
   const [updateSettings, { isLoading: isUpdating }] = useUpdateSettingsMutation();
+  const { data: paymentQr, isLoading: isLoadingQr, refetch: refetchQr } = useGetPaymentQrCodeQuery();
+  const [uploadPaymentQrCode, { isLoading: isUploadingQr }] = useUploadPaymentQrCodeMutation();
+  const qrFileInputRef = useRef(null);
 
   const { data: units = [], isLoading: isLoadingUnits, refetch: refetchUnits } = useGetUnitsOfMeasurementQuery();
   const [createUnit, { isLoading: isCreatingUnit }] = useCreateUnitMutation();
@@ -204,6 +220,31 @@ function SettingsPage() {
     setUnitDescription('');
   };
 
+  const paymentQrImageUrl = paymentQr?.image_url
+    ? `${SERVER_BASE_URL}${paymentQr.image_url}`
+    : null;
+
+  const handleQrFileChange = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setSuccessMessage('');
+    setErrorMessage('');
+
+    try {
+      await uploadPaymentQrCode(file).unwrap();
+      setSuccessMessage('QR-код успешно загружен');
+      refetchQr();
+      setTimeout(() => setSuccessMessage(''), 3000);
+    } catch (err) {
+      setErrorMessage(err.data?.detail || 'Ошибка при загрузке QR-кода');
+    } finally {
+      if (qrFileInputRef.current) {
+        qrFileInputRef.current.value = '';
+      }
+    }
+  };
+
   if (isLoading) {
     return <SettingsSkeleton />;
   }
@@ -272,6 +313,65 @@ function SettingsPage() {
               </button>
             </div>
           </form>
+        </div>
+
+        <div className="bg-white rounded-xl shadow-md p-6 mt-6">
+          <div className="mb-4">
+            <h2 className="text-xl font-semibold text-gray-800">QR-код для оплаты</h2>
+            <p className="text-sm text-gray-600 mt-1">
+              Показывается сотрудникам при выборе оплаты по QR в бронировании
+            </p>
+          </div>
+
+          {isLoadingQr ? (
+            <div className="text-center py-8 text-gray-600">Загрузка...</div>
+          ) : (
+            <div className="space-y-4">
+              {paymentQrImageUrl ? (
+                <div className="flex flex-col items-center gap-3">
+                  <p className="text-sm text-gray-600">Текущий QR-код:</p>
+                  <img
+                    src={paymentQrImageUrl}
+                    alt="QR-код для оплаты"
+                    className="max-w-xs w-full rounded-xl border border-gray-200 shadow-sm"
+                  />
+                </div>
+              ) : (
+                <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50 p-6 text-center text-sm text-gray-500">
+                  QR-код ещё не загружен
+                </div>
+              )}
+
+              {canManagePaymentQr && (
+                <div>
+                  <input
+                    ref={qrFileInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleQrFileChange}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => qrFileInputRef.current?.click()}
+                    disabled={isUploadingQr}
+                    className={`px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition text-sm ${
+                      isUploadingQr ? 'opacity-50 cursor-not-allowed' : ''
+                    }`}
+                  >
+                    {isUploadingQr
+                      ? 'Загрузка...'
+                      : paymentQrImageUrl
+                        ? 'Заменить QR-код'
+                        : 'Загрузить QR-код'}
+                  </button>
+                  <p className="text-xs text-gray-500 mt-2">
+                    Загрузка доступна только администратору и директору
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Units of Measurement Section */}

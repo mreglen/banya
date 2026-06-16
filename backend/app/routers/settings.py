@@ -1,15 +1,21 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Request, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, status, Request, BackgroundTasks, UploadFile, File
 from sqlalchemy.orm import Session
+from pathlib import Path
 from app import models, schemas, database
 from app.auth import get_current_user
 from app.database import SessionLocal
 from app.audit_logger import log_detailed_action, get_client_ip
 from app.pricing import get_markup_percent, price_from_purchase
+from app.image_utils import process_image_to_webp
 
 router = APIRouter(
     prefix="/admin/settings",
     tags=["settings"]
 )
+
+BASE_DIR = Path(__file__).resolve().parent.parent.parent
+PAYMENT_QR_UPLOAD_DIR = BASE_DIR / "uploads" / "payment"
+PAYMENT_QR_FILENAME = "payment_qrcode.webp"
 
 
 def check_admin_or_director(current_user: models.User = Depends(get_current_user)):
@@ -148,3 +154,72 @@ def update_settings(
     db.commit()
 
     return {"message": "Настройки успешно обновлены"}
+
+
+def _get_or_create_payment_qr_row(db: Session) -> models.PaymentQrSetting:
+    row = db.query(models.PaymentQrSetting).filter(models.PaymentQrSetting.id == 1).first()
+    if not row:
+        row = models.PaymentQrSetting(id=1)
+        db.add(row)
+        db.commit()
+        db.refresh(row)
+    return row
+
+
+@router.get("/payment-qrcode", response_model=schemas.PaymentQrCodeResponse)
+def get_payment_qrcode(
+    db: Session = Depends(database.get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    """Получить URL QR-кода для оплаты (доступно всем авторизованным пользователям)."""
+    row = _get_or_create_payment_qr_row(db)
+    return schemas.PaymentQrCodeResponse(image_url=row.image_url)
+
+
+@router.post("/payment-qrcode", response_model=schemas.PaymentQrCodeResponse)
+async def upload_payment_qrcode(
+    background_tasks: BackgroundTasks,
+    request: Request,
+    file: UploadFile = File(...),
+    db: Session = Depends(database.get_db),
+    current_user: models.User = Depends(check_admin_or_director),
+):
+    """Загрузить QR-код для оплаты (только администратор или директор)."""
+    if not file.content_type or not file.content_type.startswith("image/"):
+        raise HTTPException(status_code=400, detail="Файл должен быть изображением")
+
+    content = await file.read()
+    if not content:
+        raise HTTPException(status_code=400, detail="Пустой файл")
+
+    try:
+        webp_bytes = process_image_to_webp(content, max_width=1024, quality=90)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Не удалось обработать изображение")
+
+    PAYMENT_QR_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+    filepath = PAYMENT_QR_UPLOAD_DIR / PAYMENT_QR_FILENAME
+    with open(filepath, "wb") as f:
+        f.write(webp_bytes)
+
+    image_url = f"/uploads/payment/{PAYMENT_QR_FILENAME}"
+    row = _get_or_create_payment_qr_row(db)
+    row.image_url = image_url
+    row.uploaded_by_user_id = current_user.user_id
+    db.commit()
+    db.refresh(row)
+
+    background_tasks.add_task(
+        log_detailed_action,
+        db=SessionLocal(),
+        user_id=current_user.user_id,
+        action="UPDATE",
+        entity_type="payment_qr_setting",
+        entity_id=1,
+        details={"image_url": image_url},
+        summary="Загружен QR-код для оплаты",
+        ip_address=get_client_ip(request),
+        user_agent=request.headers.get("user-agent"),
+    )
+
+    return schemas.PaymentQrCodeResponse(image_url=row.image_url)

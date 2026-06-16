@@ -277,7 +277,7 @@ function AddDocumentEntrance() {
       supplier_id: supplierId,
       account_id: Number(accountId),
       responsible_name: responsibleName,
-      supplier_number: supplierNumber,
+      supplier_number: supplierNumber?.trim() || null,
       comment: comment || null,
       total_amount: total,
       items: items.map((item) => ({
@@ -345,8 +345,8 @@ function AddDocumentEntrance() {
         {/* Блок поставщика и данных — ВОЗВРАЩАЕМ СТАРУЮ СТРУКТУРУ */}
         <div className="bg-white rounded-xl sm:rounded-2xl shadow p-4 sm:p-6 mb-6 border border-gray-100">
           <div className="space-y-4">
-            {/* Первая строка: Поставщик | Номер поставщика | Дата */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            {/* Первая строка: Поставщик | Дата */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">Поставщик *</label>
                 <div className="flex flex-col sm:flex-row gap-2">
@@ -365,17 +365,6 @@ function AddDocumentEntrance() {
                     Выбрать
                   </button>
                 </div>
-              </div>
-              <div>
-                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">Номер поставщика</label>
-                <input
-                  type="text"
-                  value={supplierNumber || ''}
-                  onChange={(e) => updateDocumentData('supplierNumber', e.target.value)}
-                  className="w-full px-3 py-2 sm:px-4 sm:py-3 border border-gray-300 rounded-lg sm:rounded-xl text-sm"
-                  placeholder="Номер"
-                  disabled={isEditing}
-                />
               </div>
               <div>
                 <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">Дата</label>

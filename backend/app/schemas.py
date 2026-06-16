@@ -99,6 +99,7 @@ class ReservationCreate(BaseModel):
     client_name: str
     client_phone: str
     client_email: Optional[str] = None
+    prepayment: Optional[int] = 0
     notes: Optional[str] = None
     guests: int = 1
     status_id: int = 1
@@ -116,6 +117,7 @@ class ReservationUpdate(BaseModel):
     client_name: Optional[str] = None
     client_phone: Optional[str] = None
     client_email: Optional[str] = None
+    prepayment: Optional[int] = None
     notes: Optional[str] = None
     guests: Optional[int] = None
     status_id: Optional[int] = None
@@ -144,10 +146,12 @@ class ReservationResponse(BaseModel):
     client_name: str
     client_phone: str
     client_email: Optional[str]
+    prepayment: int = 0
     notes: Optional[str]
     guests: int
     total_cost: int
     status: str
+    status_id: int
     income_account_id: Optional[int] = None
     applied_promotion_id: Optional[int] = None
     promotion_snapshot: Optional[dict] = None
@@ -643,6 +647,13 @@ class SettingsUpdate(BaseModel):
     booking_interval_minutes: Optional[int] = None
     markup_percent: Optional[float] = None
     update_manual_prices: Optional[bool] = False
+
+
+class PaymentQrCodeResponse(BaseModel):
+    image_url: Optional[str] = None
+
+    class Config:
+        from_attributes = True
 
 
 # === Акции ===

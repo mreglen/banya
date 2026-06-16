@@ -612,13 +612,16 @@ function AdminReservationsNew() {
       </div>
 
       {/* Modals */}
-      <AddBookingModal
-        isOpen={isAddModalOpen || editingBooking !== null}
-        onClose={handleCloseAllModals}
-        booking={editingBooking}
-        selectedDate={filters.date}
-        onCreateSuccess={handleCreateBookingSuccess}
-      />
+      {(isAddModalOpen || editingBooking !== null) && (
+        <AddBookingModal
+          key={editingBooking?.reservation_id ?? 'new'}
+          isOpen
+          onClose={handleCloseAllModals}
+          booking={editingBooking}
+          selectedDate={filters.date}
+          onCreateSuccess={handleCreateBookingSuccess}
+        />
+      )}
     </div>
   );  
 }

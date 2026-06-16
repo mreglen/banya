@@ -83,6 +83,7 @@ class Reservation(Base):
     client_name = Column(String(100), nullable=False)
     client_phone = Column(String(20), nullable=False)
     client_email = Column(String(100))
+    prepayment = Column(Integer, nullable=False, default=0)
     notes = Column(Text)
     total_cost = Column(Integer, nullable=False, default=0)
     guests = Column(Integer, nullable=False)
@@ -310,6 +311,15 @@ class Settings(Base):
     key = Column(String(100), nullable=False, unique=True)
     value = Column(Float, nullable=False)
     description = Column(String(255), nullable=True)
+
+
+class PaymentQrSetting(Base):
+    __tablename__ = "payment_qr_setting"
+
+    id = Column(Integer, primary_key=True, default=1)
+    image_url = Column(String(500), nullable=True)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    uploaded_by_user_id = Column(Integer, ForeignKey("users.user_id"), nullable=True)
 
 
 class OrganizationDetails(Base):

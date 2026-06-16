@@ -6,8 +6,6 @@ import {
   CalendarDays, 
   Package, 
   FileText, 
-  ClipboardList, 
-  Wallet, 
   Menu 
 } from 'lucide-react';
 
@@ -32,16 +30,6 @@ function MobileBottomNav() {
       path: '/admin/documents/entrance',
       label: 'Документы',
       icon: <FileText className="w-6 h-6" />,
-    },
-    hasAccess('bookings:view') && {
-      path: '/admin/bookings',
-      label: 'Заявки',
-      icon: <ClipboardList className="w-6 h-6" />,
-    },
-    hasAccess('finance:view') && {
-      path: '/admin/finance',
-      label: 'Финансы',
-      icon: <Wallet className="w-6 h-6" />,
     },
   ].filter(Boolean); // Удаляем false значения
 

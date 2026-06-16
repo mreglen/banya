@@ -1,9 +1,8 @@
 import { createPortal } from 'react-dom';
-import { useEffect, useState, useRef, useCallback } from 'react';
+import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { useSelector } from 'react-redux';
 import {
   useGetBathsQuery,
-  useGetFinanceAccountsQuery,
 } from '../../../redux/slices/apiSlice';
 import {
   useGetStockProductsQuery,
@@ -15,6 +14,7 @@ import {
   useGetReservationStatusesQuery,
   useGetReservationsByDateQuery,
 } from '../../../redux/slices/reservationSlice';
+import { useGetPaymentQrCodeQuery } from '../../../redux/slices/settingsApiSlice';
 
 import ProductSelectionModal from '../../Admin/Documents/DocumentsEntrance/ProductSelectionModal';
 
@@ -40,36 +40,11 @@ const formatLocalHm = (date) => {
   return `${hh}:${mm}`;
 };
 
-/** Округление вверх до 30 минут (локальное время) */
-const roundUpTo30Min = (date) => {
-  const d = new Date(date.getTime());
-  d.setSeconds(0, 0);
-  const m = d.getMinutes();
-  const rem = m % 30;
-  if (rem === 0) return d;
-  d.setMinutes(m + (30 - rem), 0, 0);
-  return d;
-};
-
-/** Первый доступный слот времени начала для выбранной даты (локально) */
-const getFirstAllowedStartTime = (ymd) => {
-  const today = formatLocalYmd(new Date());
-  if (ymd !== today) return '00:00';
-  return formatLocalHm(roundUpTo30Min(new Date()));
-};
-
 /** Конец брони по дате/времени начала и длительности в часах (может перейти через полночь) */
 const computeEndDateTime = (ymd, hm, durationHours) => {
   const start = new Date(`${ymd}T${hm}:00`);
   const end = new Date(start.getTime() + Number(durationHours) * 60 * 60 * 1000);
   return { endDate: formatLocalYmd(end), endHm: formatLocalHm(end) };
-};
-
-const addDaysYmd = (ymd, days) => {
-  const [y, mo, d] = String(ymd).split('-').map(Number);
-  const dt = new Date(y, mo - 1, d, 12, 0, 0, 0);
-  dt.setDate(dt.getDate() + days);
-  return formatLocalYmd(dt);
 };
 
 // Build ISO string with timezone offset (Python datetime.fromisoformat supports it)
@@ -100,6 +75,35 @@ const normalizeGuestsDigits = (raw) => {
   return digits.replace(/^0+/, '') || '';
 };
 
+const formatReceiptMoney = (value) => `${(value || 0).toLocaleString('ru-RU')} ₽`;
+
+const SERVER_BASE_URL = process.env.REACT_APP_API_URL
+  ? process.env.REACT_APP_API_URL.replace('/api', '')
+  : (window.location.origin || 'http://127.0.0.1:8000');
+
+const toPythonWeekday = (date) => (date.getDay() + 6) % 7;
+
+/** API отдаёт status строкой; status_id может отсутствовать в старых ответах */
+const resolveBookingStatusId = (bookingData, statusOptionsList) => {
+  if (!bookingData) return 1;
+  const directId = bookingData.status_id ?? bookingData.status?.id;
+  if (directId != null && !Number.isNaN(Number(directId))) {
+    return Number(directId);
+  }
+  const statusName =
+    typeof bookingData.status === 'string'
+      ? bookingData.status
+      : bookingData.status?.status_name;
+  if (statusName && statusOptionsList?.length) {
+    const normalized = String(statusName).trim().toLowerCase();
+    const found = statusOptionsList.find(
+      (s) => String(s.status_name || '').trim().toLowerCase() === normalized
+    );
+    if (found?.id != null) return Number(found.id);
+  }
+  return 1;
+};
+
 function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess, onCreateSuccess, prefillData = null }) {
   const isEditing = !!booking;
   const today = formatLocalYmd(new Date());
@@ -110,7 +114,8 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
     currentUser?.is_director ||
     permissionCodes.has('reservations:manage')
   );
-  const isClosedBooking = isEditing && booking?.status === 'закрыт';
+  const isClosedBooking =
+    isEditing && String(booking?.status || '').trim().toLowerCase() === 'закрыт';
   const canRevertClosed = !!(currentUser?.is_admin || currentUser?.is_director);
   const lockStatus = (isClosedBooking && !canRevertClosed) || !canManageReservation;
   const [updateReservation, { isLoading: isUpdating }] = useUpdateReservationMutation();
@@ -118,14 +123,7 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
 
   let initialNewDate =
     selectedDate && String(selectedDate).trim() !== '' ? String(selectedDate) : today;
-  let initialNewStartTime = getFirstAllowedStartTime(initialNewDate);
-  if (initialNewDate === today) {
-    const slots = generateTimeOptions().filter((t) => t >= initialNewStartTime);
-    if (slots.length === 0) {
-      initialNewDate = addDaysYmd(today, 1);
-      initialNewStartTime = '00:00';
-    }
-  }
+  const initialNewStartTime = '12:00';
 
   const [formData, setFormData] = useState({
     bath_id: '',
@@ -134,7 +132,7 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
     duration_hours: 1,
     client_name: '',
     client_phone: '',
-    client_email: '',
+    prepayment: '',
     notes: '',
     guests: '',
     status_id: 1,
@@ -143,8 +141,10 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
 
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
-  const [showAdvanceInput, setShowAdvanceInput] = useState(false);
-  const [advanceAmount, setAdvanceAmount] = useState('');
+  const [paymentModalView, setPaymentModalView] = useState('choose');
+  const { data: paymentQr } = useGetPaymentQrCodeQuery(undefined, {
+    skip: !isPaymentModalOpen,
+  });
   const [validationErrors, setValidationErrors] = useState({});
   const [toast, setToast] = useState(null);
   const prevIsOpenRef = useRef(false);
@@ -153,9 +153,6 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
   const editFormHydratedForRef = useRef(null);
 
   const { data: baths = [], isLoading: isLoadingBaths } = useGetBathsQuery();
-  const { data: financeAccounts = [] } = useGetFinanceAccountsQuery({ active_only: true });
-  const activeIncomeAccount = financeAccounts.find((acc) => acc.is_active) || financeAccounts[0] || null;
-  const activeIncomeAccountId = activeIncomeAccount ? Number(activeIncomeAccount.id) : null;
   const { data: stockProducts = [] } = useGetStockProductsQuery();
   const { data: units = [], isLoading: isLoadingUnits } = useGetUnitsOfMeasurementQuery(); // ← ДОБАВЛЕНО
   const {
@@ -192,15 +189,7 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
 
     let date =
       selectedDate && String(selectedDate).trim() !== '' ? String(selectedDate) : formatLocalYmd(new Date());
-    let start_time = getFirstAllowedStartTime(date);
-    const todayStr = formatLocalYmd(new Date());
-    if (date === todayStr) {
-      const slots = generateTimeOptions().filter((t) => t >= start_time);
-      if (slots.length === 0) {
-        date = addDaysYmd(todayStr, 1);
-        start_time = '00:00';
-      }
-    }
+    const start_time = '12:00';
     setFormData((prev) => ({
       ...prev,
       date,
@@ -209,7 +198,7 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
       bath_id: '',
       client_name: '',
       client_phone: '',
-      client_email: '',
+      prepayment: '',
       notes: '',
       guests: '',
       status_id: 1,
@@ -227,7 +216,6 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
       duration_hours: prefillData.duration_hours || prev.duration_hours,
       client_name: prefillData.client_name || prev.client_name,
       client_phone: prefillData.client_phone || prev.client_phone,
-      client_email: prefillData.client_email || prev.client_email,
       notes: prefillData.notes || prev.notes,
       guests: prefillData.guests ? String(prefillData.guests) : prev.guests,
       selectedProducts: [],
@@ -282,7 +270,7 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
         };
       });
 
-      const statusIdFromBooking = booking.status?.id ?? booking.status_id;
+      const statusIdFromBooking = resolveBookingStatusId(booking, statusOptions);
       const guestsNorm =
         normalizeGuestsDigits(booking.guests ?? 1) || '1';
 
@@ -293,10 +281,10 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
         duration_hours,
         client_name: booking.client_name || '',
         client_phone: booking.client_phone || '',
-        client_email: booking.client_email || '',
+        prepayment: booking.prepayment != null && booking.prepayment > 0 ? String(booking.prepayment) : '',
         notes: booking.notes || '',
         guests: guestsNorm,
-        status_id: parseInt(statusIdFromBooking, 10) || 1,
+        status_id: statusIdFromBooking,
         selectedProducts,
       });
     } catch (error) {
@@ -305,32 +293,11 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
     }
   }, [isOpen, booking, statusOptions.length, stockProducts, findUnitName]);
 
-  // Если выбрана сегодняшняя дата — не даём оставить время в прошлом
-  useEffect(() => {
-    const todayStr = formatLocalYmd(new Date());
-    if (formData.date !== todayStr) return;
-    const minHm = getFirstAllowedStartTime(formData.date);
-    const slots = generateTimeOptions().filter((t) => t >= minHm);
-    if (slots.length === 0) {
-      setFormData((prev) => ({
-        ...prev,
-        date: addDaysYmd(todayStr, 1),
-        start_time: '00:00',
-      }));
-      return;
-    }
-    if (formData.start_time < minHm) {
-      setFormData((prev) => ({ ...prev, start_time: minHm }));
-    }
-  }, [formData.date, formData.start_time]);
-
-  // Если после выбора бани/даты текущее время стало недоступным — ставим ближайшее доступное
+  // Если после выбора бани/даты текущее время занято — ставим ближайшее свободное
   useEffect(() => {
     if (!formData.bath_id) return;
     const allSlots = generateTimeOptions();
-    const minHm = formData.date === formatLocalYmd(new Date()) ? getFirstAllowedStartTime(formData.date) : '00:00';
     const validSlots = allSlots.filter((time) => {
-      if (time < minHm) return false;
       const slotStart = new Date(`${formData.date}T${time}:00`);
       const isBusy = reservationsForDate.some((res) => {
         if (!res?.start_datetime || !res?.end_datetime) return false;
@@ -363,6 +330,9 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
     if (name === 'client_phone') {
       const formatted = formatPhoneInput(value, formData.client_phone);
       setFormData((prev) => ({ ...prev, client_phone: formatted }));
+    } else if (name === 'prepayment') {
+      const digits = value.replace(/\D/g, '');
+      setFormData((prev) => ({ ...prev, prepayment: digits }));
     } else if (name === 'duration_hours') {
       if (value === '') {
         setFormData((prev) => ({ ...prev, duration_hours: '' }));
@@ -514,17 +484,9 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
       errors.client_phone = `Номер введён не полностью (введено ${phoneDigits.length} из 11 цифр)`;
     }
     
-    // Проверка email (если введён)
-    if (formData.client_email && formData.client_email.trim() !== '') {
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(formData.client_email)) {
-        errors.client_email = 'Неверный формат email';
-      }
-    }
-    
-    const minDateStr = formatLocalYmd(new Date());
-    if (!isEditing && formData.date < minDateStr) {
-      errors.date = 'Нельзя выбрать дату в прошлом';
+    const prepaymentNum = formData.prepayment === '' ? 0 : parseInt(formData.prepayment, 10) || 0;
+    if (formData.prepayment !== '' && prepaymentNum < 0) {
+      errors.prepayment = 'Предоплата не может быть отрицательной';
     }
 
     const dh =
@@ -552,10 +514,6 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
       errors.duration_hours = 'Укажите положительную длительность';
     }
 
-    if (!isEditing && new Date(start_iso) < new Date()) {
-      errors.start_time = 'Нельзя выбрать прошедшее время начала';
-    }
-    
     const guestsNum = parseInt(formData.guests, 10);
     if (formData.guests === '' || Number.isNaN(guestsNum) || guestsNum < 1) {
       errors.guests = 'Минимум 1 гость';
@@ -571,11 +529,6 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
         errors[`product_${product.id}`] = `Превышает доступное количество (${product.available})`;
       }
     });
-
-    const selectedStatus = statusOptions.find((status) => Number(status.id) === Number(formData.status_id));
-    if (selectedStatus?.status_name === 'закрыт' && !activeIncomeAccountId) {
-      errors.income_account_id = 'Нет активного счета в разделе "Финансы"';
-    }
     
     setValidationErrors(errors);
     return Object.keys(errors).length === 0;
@@ -643,6 +596,12 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
       return;
     }
 
+    const prepaymentNum = formData.prepayment === '' ? 0 : parseInt(formData.prepayment, 10) || 0;
+    if (receiptSummary.canCalculate && prepaymentNum > receiptSummary.totalCost) {
+      setValidationErrors({ prepayment: 'Предоплата не может превышать сумму брони' });
+      return;
+    }
+
     const dh = Number(formData.duration_hours);
     const { endDate, endHm } = computeEndDateTime(formData.date, formData.start_time, dh);
     const start_datetime = toLocalIsoWithOffset(formData.date, formData.start_time);
@@ -664,8 +623,7 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
 
     // Если бронь закрыта и у пользователя нет прав на откат — оставляем исходный status_id,
     // чтобы исключить случайную попытку смены статуса (бэкенд всё равно вернёт 403)
-    const originalStatusId =
-      booking?.status?.id ?? booking?.status_id ?? formData.status_id;
+    const originalStatusId = resolveBookingStatusId(booking, statusOptions) ?? formData.status_id;
     const submitStatusId = lockStatus
       ? parseInt(originalStatusId, 10) || 1
       : parseInt(formData.status_id, 10) || 1;
@@ -676,11 +634,10 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
       end_datetime,
       client_name: formData.client_name.trim(),
       client_phone: normalizedPhone,
-      client_email: formData.client_email && formData.client_email.trim() !== '' ? formData.client_email.trim() : null,
+      prepayment: formData.prepayment === '' ? 0 : parseInt(formData.prepayment, 10) || 0,
       notes: formData.notes && formData.notes.trim() !== '' ? formData.notes.trim() : null,
       guests: parseInt(formData.guests, 10) || 1,
       status_id: submitStatusId,
-      income_account_id: activeIncomeAccountId,
       products: formData.selectedProducts.map((p) => ({
         product_id: Number(p.id),
         quantity: parseInt(p.quantity, 10) || 1,
@@ -688,14 +645,6 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
     };
 
     console.log('🟢 Payload:', payload);
-
-    const accountLabel = activeIncomeAccount
-      ? `${activeIncomeAccount.bank_name} (${activeIncomeAccount.account_number})`
-      : 'Без счета';
-    const confirmMessage = isEditing
-      ? `Подтвердите сохранение брони.\nСчет зачисления: ${accountLabel}`
-      : `Подтвердите создание брони.\nСчет зачисления: ${accountLabel}`;
-    if (!window.confirm(confirmMessage)) return;
 
     try {
       console.log('🚀 Sending request...');
@@ -746,50 +695,133 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
 
   const handleOpenPaymentModal = () => {
     if (!isEditing || !booking?.reservation_id) return;
+    setPaymentModalView('choose');
     setIsPaymentModalOpen(true);
-    setShowAdvanceInput(false);
-    setAdvanceAmount('');
   };
 
   const handleCashPayment = () => {
     if (!booking?.reservation_id) return;
     window.open(`/admin/reservations/print/${booking.reservation_id}?payment=cash`, '_blank', 'noopener,noreferrer');
     setIsPaymentModalOpen(false);
+    setPaymentModalView('choose');
   };
 
   const handleQrPayment = () => {
     if (!booking?.reservation_id) return;
-    window.open(`/admin/reservations/print/${booking.reservation_id}?payment=qrcode`, '_blank', 'noopener,noreferrer');
-    setIsPaymentModalOpen(false);
+    setPaymentModalView('qr');
   };
 
-  const handleAdvancePayment = () => {
-    if (!booking?.reservation_id) return;
-    if (!advanceAmount) {
-      showToast('Введите сумму аванса', 'error');
-      return;
+  const handleClosePaymentModal = () => {
+    setIsPaymentModalOpen(false);
+    setPaymentModalView('choose');
+  };
+
+  const paymentQrImageUrl = paymentQr?.image_url
+    ? `${SERVER_BASE_URL}${paymentQr.image_url}`
+    : null;
+
+  const receiptSummary = useMemo(() => {
+    if (!selectedBath || !formData.date || !formData.start_time) {
+      return { canCalculate: false };
     }
-    window.open(
-      `/admin/reservations/print/${booking.reservation_id}?payment=advance&advance=${advanceAmount}`,
-      '_blank',
-      'noopener,noreferrer'
-    );
-    setIsPaymentModalOpen(false);
-    setShowAdvanceInput(false);
-    setAdvanceAmount('');
-  };
 
-  if (!isOpen) return null;
-  const isSubmitting = isCreating || isUpdating;
+    const durationHours = Number(formData.duration_hours);
+    if (Number.isNaN(durationHours) || durationHours < minBookingHours) {
+      return { canCalculate: false };
+    }
 
-  const totalProductCost = formData.selectedProducts.reduce(
-    (sum, p) => sum + (parseInt(p.quantity, 10) || 0) * (p.price ?? p.purchase_price ?? 0),
-    0
-  );
+    const start = new Date(`${formData.date}T${formData.start_time}:00`);
+    const weekday = toPythonWeekday(start);
+    const hourlyRate = weekday >= 4
+      ? Number(selectedBath.cost_weekend) || 0
+      : Number(selectedBath.cost_weekday) || 0;
+    const bathBaseCost = Math.floor(hourlyRate * durationHours);
+    const guestsNum = parseInt(formData.guests, 10) || 0;
+    const baseGuests = Number(selectedBath.base_guests) || 0;
+    const extraGuests = Math.max(0, guestsNum - baseGuests);
+    const extraGuestPrice = Number(selectedBath.extra_guest_price) || 0;
+    const extraGuestCost = extraGuests * extraGuestPrice;
 
-  const minDateStr = formatLocalYmd(new Date());
+    const productItems = formData.selectedProducts.map((p) => {
+      const quantity = parseInt(p.quantity, 10) || 0;
+      const unitPrice = p.price ?? p.purchase_price ?? 0;
+      return {
+        name: p.name,
+        quantity,
+        unitPrice,
+        lineTotal: quantity * unitPrice,
+      };
+    });
+    const productTotal = productItems.reduce((sum, item) => sum + item.lineTotal, 0);
+
+    const massageItems = (isEditing && booking?.massages ? booking.massages : []).map((m) => {
+      const quantity = m.quantity || 0;
+      const unitPrice = m.cost || 0;
+      return {
+        name: m.name,
+        quantity,
+        unitPrice,
+        lineTotal: quantity * unitPrice,
+      };
+    });
+    const massageTotal = massageItems.reduce((sum, item) => sum + item.lineTotal, 0);
+
+    const bathServiceCost = bathBaseCost + extraGuestCost;
+    const totalCost = bathServiceCost + productTotal + massageTotal;
+
+    const { endDate, endHm } = computeEndDateTime(formData.date, formData.start_time, durationHours);
+    const endLabel = new Date(`${endDate}T${endHm}:00`).toLocaleString('ru-RU', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+
+    return {
+      canCalculate: true,
+      bathName: selectedBath.name,
+      durationHours,
+      hourlyRate,
+      isWeekendRate: weekday >= 4,
+      bathBaseCost,
+      guestsNum,
+      baseGuests,
+      extraGuests,
+      extraGuestPrice,
+      extraGuestCost,
+      bathServiceCost,
+      productItems,
+      productTotal,
+      massageItems,
+      massageTotal,
+      totalCost,
+      startLabel: start.toLocaleString('ru-RU', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      }),
+      endLabel,
+      clientName: formData.client_name || '—',
+      clientPhone: formData.client_phone || '—',
+    };
+  }, [
+    selectedBath,
+    formData.date,
+    formData.start_time,
+    formData.duration_hours,
+    formData.guests,
+    formData.selectedProducts,
+    formData.client_name,
+    formData.client_phone,
+    minBookingHours,
+    isEditing,
+    booking,
+  ]);
+
   const allTimeSlots = generateTimeOptions();
-  const minStartHmForToday = getFirstAllowedStartTime(formData.date);
   const busyStartTimes = new Set(
     (reservationsForDate || [])
       .filter((res) => {
@@ -806,22 +838,22 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
         });
       })
   );
-  let startTimeOptions =
-    formData.date === minDateStr
-      ? allTimeSlots.filter((t) => t >= minStartHmForToday)
-      : allTimeSlots;
+  let startTimeOptions = allTimeSlots;
   if (formData.bath_id) {
     startTimeOptions = startTimeOptions.filter((t) => !busyStartTimes.has(t));
   }
 
   const durationHint = calculateDurationHint();
+  const isSubmitting = isCreating || isUpdating;
+  const prepaymentAmount = formData.prepayment === '' ? 0 : parseInt(formData.prepayment, 10) || 0;
 
   return createPortal(
+    !isOpen ? null : (
     <div
       className="fixed inset-0 bg-black bg-opacity-50 flex items-start justify-center p-0 sm:p-4 z-50 overflow-y-auto"
     >
       <div
-        className="bg-white rounded-none sm:rounded-2xl shadow-2xl w-full max-w-4xl h-[100dvh] sm:max-h-[95vh] sm:h-auto flex flex-col"
+        className="bg-white rounded-none sm:rounded-2xl shadow-2xl w-full max-w-6xl h-[100dvh] sm:max-h-[95vh] sm:h-auto flex flex-col"
         style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
       >
         <div className="p-4 sm:p-6 border-b border-gray-200 bg-gradient-to-r from-gray-50 to-gray-100 relative flex-shrink-0">
@@ -838,7 +870,8 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
         </div>
 
         <form onSubmit={handleSubmit} className="flex flex-col flex-grow min-h-0">
-          <div className="p-4 sm:p-6 space-y-5 sm:space-y-6 overflow-y-auto flex-grow">
+          <div className="flex flex-col lg:flex-row flex-grow min-h-0 overflow-hidden">
+            <div className="flex-1 p-4 sm:p-6 space-y-5 sm:space-y-6 overflow-y-auto min-h-0">
 
           {/* Статус (только при редактировании) */}
           {isEditing && (
@@ -939,17 +972,8 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
                 ref={dateInputRef}
                 type="date"
                 value={formData.date}
-                min={minDateStr}
                 onChange={(e) => {
-                  const v = e.target.value;
-                  setFormData((prev) => {
-                    const next = { ...prev, date: v };
-                    if (v === minDateStr) {
-                      const minHm = getFirstAllowedStartTime(v);
-                      if (next.start_time < minHm) next.start_time = minHm;
-                    }
-                    return next;
-                  });
+                  setFormData((prev) => ({ ...prev, date: e.target.value }));
                 }}
                 className={`w-full px-3 py-2.5 sm:px-4 sm:py-3 border rounded-xl focus:ring-2 focus:ring-blue-500 text-sm ${
                   validationErrors.date ? 'border-red-500 bg-red-50' : 'border-gray-300'
@@ -1153,22 +1177,24 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
               )}
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Предоплата</label>
               <input
-                type="email"
-                name="client_email"
-                value={formData.client_email}
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                name="prepayment"
+                value={formData.prepayment}
                 onChange={handleChange}
-                placeholder="ivan@example.com"
+                placeholder="Сумма в рублях"
                 className={`w-full px-3 py-2.5 sm:px-4 sm:py-3 border rounded-xl focus:ring-2 text-sm ${
-                  validationErrors.client_email 
-                    ? 'border-red-500 focus:ring-red-500 bg-red-50' 
+                  validationErrors.prepayment
+                    ? 'border-red-500 focus:ring-red-500 bg-red-50'
                     : 'border-gray-300 focus:ring-blue-500'
                 }`}
               />
-              {validationErrors.client_email && (
+              {validationErrors.prepayment && (
                 <p className="mt-1 text-xs text-red-600 flex items-center gap-1">
-                  <span>⚠</span> {validationErrors.client_email}
+                  <span>⚠</span> {validationErrors.prepayment}
                 </p>
               )}
             </div>
@@ -1251,14 +1277,112 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
                 ))}
               </div>
             )}
-
-            {formData.selectedProducts.length > 0 && (
-              <div className="pt-3 border-t border-gray-200 text-right font-semibold text-gray-800">
-                Итого по товарам: {totalProductCost.toFixed(2)} ₽
-              </div>
-            )}
           </div>
-        </div>
+          </div>
+
+            <aside className="lg:w-80 xl:w-96 border-t lg:border-t-0 lg:border-l border-gray-200 bg-gray-50 p-4 sm:p-5 overflow-y-auto flex-shrink-0 lg:sticky lg:top-0 lg:self-start lg:max-h-full">
+              <div className="bg-white border border-gray-300 rounded-xl shadow-sm p-4 text-xs text-gray-900">
+                <header className="text-center border-b border-dashed border-gray-400 pb-3 mb-3">
+                  <h3 className="text-sm font-bold uppercase tracking-wide">Общий чек</h3>
+                  <p className="mt-1 text-gray-600">Предварительный расчёт</p>
+                </header>
+
+                {!receiptSummary.canCalculate ? (
+                  <p className="text-gray-500 text-center py-6">
+                    Выберите баню, дату, время и длительность — чек обновится автоматически
+                  </p>
+                ) : (
+                  <>
+                    <section className="space-y-1 mb-3">
+                      <div className="flex justify-between gap-3">
+                        <span className="text-gray-600">Клиент</span>
+                        <span className="text-right font-medium">{receiptSummary.clientName}</span>
+                      </div>
+                      <div className="flex justify-between gap-3">
+                        <span className="text-gray-600">Телефон</span>
+                        <span>{receiptSummary.clientPhone}</span>
+                      </div>
+                      <div className="flex justify-between gap-3">
+                        <span className="text-gray-600">Баня</span>
+                        <span className="text-right">{receiptSummary.bathName}</span>
+                      </div>
+                      <div className="flex justify-between gap-3">
+                        <span className="text-gray-600">Начало</span>
+                        <span className="text-right">{receiptSummary.startLabel}</span>
+                      </div>
+                      <div className="flex justify-between gap-3">
+                        <span className="text-gray-600">Окончание</span>
+                        <span className="text-right">{receiptSummary.endLabel}</span>
+                      </div>
+                    </section>
+
+                    <section className="mb-3">
+                      <h4 className="font-semibold border-y border-dashed border-gray-400 py-1 mb-2">Позиции</h4>
+
+                      <div className="py-1 border-b border-dashed border-gray-300">
+                        <div className="font-medium">Услуга бани</div>
+                        <div className="text-gray-600 mt-0.5">
+                          {receiptSummary.durationHours} ч × {formatReceiptMoney(receiptSummary.hourlyRate)}
+                          {receiptSummary.isWeekendRate ? ' (выходной)' : ' (будни)'}
+                        </div>
+                        <div className="flex justify-between text-gray-700 mt-1">
+                          <span>Аренда</span>
+                          <span>{formatReceiptMoney(receiptSummary.bathBaseCost)}</span>
+                        </div>
+                        {receiptSummary.extraGuests > 0 && (
+                          <div className="flex justify-between text-gray-700 mt-1">
+                            <span>
+                              Доп. гости ({receiptSummary.extraGuests} × {formatReceiptMoney(receiptSummary.extraGuestPrice)})
+                            </span>
+                            <span>{formatReceiptMoney(receiptSummary.extraGuestCost)}</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {receiptSummary.massageItems.map((item, idx) => (
+                        <div key={`massage-${idx}`} className="py-1 border-b border-dashed border-gray-300">
+                          <div className="font-medium">Массаж: {item.name}</div>
+                          <div className="flex justify-between text-gray-700">
+                            <span>{item.quantity} × {formatReceiptMoney(item.unitPrice)}</span>
+                            <span>{formatReceiptMoney(item.lineTotal)}</span>
+                          </div>
+                        </div>
+                      ))}
+
+                      {receiptSummary.productItems.map((item, idx) => (
+                        <div key={`product-${idx}`} className="py-1 border-b border-dashed border-gray-300">
+                          <div className="font-medium">Товар: {item.name}</div>
+                          <div className="flex justify-between text-gray-700">
+                            <span>{item.quantity} × {formatReceiptMoney(item.unitPrice)}</span>
+                            <span>{formatReceiptMoney(item.lineTotal)}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </section>
+
+                    <footer className="border-t border-dashed border-gray-400 pt-3 space-y-1">
+                      <div className="flex justify-between items-center text-sm font-bold">
+                        <span>ИТОГО</span>
+                        <span className="text-base">{formatReceiptMoney(receiptSummary.totalCost)}</span>
+                      </div>
+                      {prepaymentAmount > 0 && (
+                        <>
+                          <div className="flex justify-between text-amber-700">
+                            <span>Предоплата</span>
+                            <span>{formatReceiptMoney(prepaymentAmount)}</span>
+                          </div>
+                          <div className="flex justify-between font-semibold text-gray-800">
+                            <span>К оплате</span>
+                            <span>{formatReceiptMoney(Math.max(0, receiptSummary.totalCost - prepaymentAmount))}</span>
+                          </div>
+                        </>
+                      )}
+                    </footer>
+                  </>
+                )}
+              </div>
+            </aside>
+          </div>
 
         <div
           className="p-4 sm:p-6 border-t border-gray-200 bg-gray-50 flex-shrink-0"
@@ -1317,68 +1441,81 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
 
         {isPaymentModalOpen && (
           <div className="fixed inset-0 z-[70] bg-black/40 flex items-center justify-center p-4">
-            <div className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-2xl">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Выберите способ оплаты</h3>
-              <div className="space-y-3">
-                <button
-                  type="button"
-                  onClick={handleCashPayment}
-                  className="w-full rounded-xl bg-green-600 text-white py-2.5 px-4 font-medium hover:bg-green-700 transition"
-                >
-                  Наличные
-                </button>
-                <button
-                  type="button"
-                  onClick={handleQrPayment}
-                  className="w-full rounded-xl bg-indigo-600 text-white py-2.5 px-4 font-medium hover:bg-indigo-700 transition"
-                >
-                  QR code
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setShowAdvanceInput((prev) => !prev)}
-                  className="w-full rounded-xl bg-amber-600 text-white py-2.5 px-4 font-medium hover:bg-amber-700 transition"
-                >
-                  Аванс
-                </button>
-                {showAdvanceInput && (
-                  <div className="space-y-2 rounded-xl border border-gray-200 p-3">
-                    <label className="block text-sm text-gray-700">Сумма аванса</label>
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      pattern="[0-9]*"
-                      value={advanceAmount}
-                      onChange={(e) => setAdvanceAmount(e.target.value.replace(/\D/g, ''))}
-                      placeholder="Введите сумму"
-                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
-                    />
+            <div className={`w-full rounded-2xl bg-white p-5 shadow-2xl ${
+              paymentModalView === 'qr' ? 'max-w-md' : 'max-w-sm'
+            }`}>
+              {paymentModalView === 'choose' ? (
+                <>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Выберите способ оплаты</h3>
+                  <div className="space-y-3">
                     <button
                       type="button"
-                      onClick={handleAdvancePayment}
-                      className="w-full rounded-lg bg-amber-600 text-white py-2 px-4 text-sm font-medium hover:bg-amber-700 transition"
+                      onClick={handleCashPayment}
+                      className="w-full rounded-xl bg-green-600 text-white py-2.5 px-4 font-medium hover:bg-green-700 transition"
                     >
-                      Открыть чек с авансом
+                      Наличные
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleQrPayment}
+                      className="w-full rounded-xl bg-indigo-600 text-white py-2.5 px-4 font-medium hover:bg-indigo-700 transition"
+                    >
+                      QR-код
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleClosePaymentModal}
+                      className="w-full rounded-xl bg-gray-200 text-gray-800 py-2.5 px-4 font-medium hover:bg-gray-300 transition"
+                    >
+                      Отмена
                     </button>
                   </div>
-                )}
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsPaymentModalOpen(false);
-                    setShowAdvanceInput(false);
-                    setAdvanceAmount('');
-                  }}
-                  className="w-full rounded-xl bg-gray-200 text-gray-800 py-2.5 px-4 font-medium hover:bg-gray-300 transition"
-                >
-                  Отмена
-                </button>
-              </div>
+                </>
+              ) : (
+                <>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2 text-center">Оплата по QR</h3>
+                  {receiptSummary.canCalculate && (
+                    <p className="text-center text-2xl font-bold text-gray-900 mb-4">
+                      {formatReceiptMoney(Math.max(0, receiptSummary.totalCost - prepaymentAmount))}
+                    </p>
+                  )}
+                  {paymentQrImageUrl ? (
+                    <div className="flex justify-center mb-4">
+                      <img
+                        src={paymentQrImageUrl}
+                        alt="QR-код для оплаты"
+                        className="w-full max-w-[320px] rounded-xl border border-gray-200 shadow-sm"
+                      />
+                    </div>
+                  ) : (
+                    <div className="mb-4 rounded-xl border border-dashed border-amber-300 bg-amber-50 p-4 text-center text-sm text-amber-800">
+                      QR-код не загружен. Загрузите его в разделе «Настройки».
+                    </div>
+                  )}
+                  <div className="space-y-3">
+                    <button
+                      type="button"
+                      onClick={() => setPaymentModalView('choose')}
+                      className="w-full rounded-xl bg-gray-200 text-gray-800 py-2.5 px-4 font-medium hover:bg-gray-300 transition"
+                    >
+                      Назад
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleClosePaymentModal}
+                      className="w-full rounded-xl bg-indigo-600 text-white py-2.5 px-4 font-medium hover:bg-indigo-700 transition"
+                    >
+                      Закрыть
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         )}
       </div>
-    </div>,
+    </div>
+    ),
     document.body
   );
 }

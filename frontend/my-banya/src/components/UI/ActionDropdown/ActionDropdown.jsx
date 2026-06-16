@@ -1,9 +1,9 @@
 // src/components/UI/ActionDropdown/ActionDropdown.jsx
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useLayoutEffect, useCallback } from 'react';
 
 /**
  * ActionDropdown component - Reusable dropdown menu for table actions
- * 
+ *
  * @param {Array} actions - Array of action objects:
  *   - label: string (button text)
  *   - onClick: function (action handler)
@@ -14,11 +14,40 @@ import { useState, useRef, useEffect } from 'react';
  */
 function ActionDropdown({ actions, buttonText = 'Действия' }) {
   const [isOpen, setIsOpen] = useState(false);
-  const [position, setPosition] = useState('down');
+  const [menuStyle, setMenuStyle] = useState(null);
+  const [openUp, setOpenUp] = useState(false);
   const dropdownRef = useRef(null);
   const buttonRef = useRef(null);
+  const menuRef = useRef(null);
 
-  // Close dropdown when clicking outside
+  const updatePosition = useCallback(() => {
+    if (!buttonRef.current) return;
+
+    const rect = buttonRef.current.getBoundingClientRect();
+    const menuHeight = menuRef.current?.offsetHeight || actions.length * 44 + 16;
+    const menuWidth = menuRef.current?.offsetWidth || 192;
+    const gap = 8;
+
+    const spaceBelow = window.innerHeight - rect.bottom - gap;
+    const spaceAbove = rect.top - gap;
+    const shouldOpenUp = spaceBelow < menuHeight;
+
+    let top;
+    if (shouldOpenUp) {
+      top = rect.top - menuHeight - gap;
+    } else if (spaceBelow < menuHeight) {
+      top = Math.max(gap, window.innerHeight - menuHeight - gap);
+    } else {
+      top = rect.bottom + gap;
+    }
+
+    let left = rect.right - menuWidth;
+    left = Math.max(gap, Math.min(left, window.innerWidth - menuWidth - gap));
+
+    setOpenUp(shouldOpenUp);
+    setMenuStyle({ top, left });
+  }, [actions.length]);
+
   useEffect(() => {
     function handleClickOutside(event) {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
@@ -32,26 +61,31 @@ function ActionDropdown({ actions, buttonText = 'Действия' }) {
     };
   }, []);
 
-  // Calculate position when dropdown opens
-  useEffect(() => {
-    if (isOpen && buttonRef.current) {
-      const buttonRect = buttonRef.current.getBoundingClientRect();
-      const dropdownHeight = 200; // Approximate height
-      const viewportHeight = window.innerHeight;
-      const spaceBelow = viewportHeight - buttonRect.bottom;
-      const spaceAbove = buttonRect.top;
-
-      if (spaceBelow < dropdownHeight && spaceAbove > spaceBelow) {
-        setPosition('up');
-      } else {
-        setPosition('down');
-      }
+  useLayoutEffect(() => {
+    if (isOpen) {
+      updatePosition();
     }
-  }, [isOpen]);
+  }, [isOpen, updatePosition]);
 
-  const handleAction = (action) => {
+  useEffect(() => {
+    if (!isOpen) {
+      setMenuStyle(null);
+      return undefined;
+    }
+
+    const handleReposition = () => updatePosition();
+    window.addEventListener('scroll', handleReposition, true);
+    window.addEventListener('resize', handleReposition);
+
+    return () => {
+      window.removeEventListener('scroll', handleReposition, true);
+      window.removeEventListener('resize', handleReposition);
+    };
+  }, [isOpen, updatePosition]);
+
+  const handleAction = (action, event) => {
     if (action.disabled) return;
-    action.onClick();
+    action.onClick?.(event);
     setIsOpen(false);
   };
 
@@ -69,18 +103,17 @@ function ActionDropdown({ actions, buttonText = 'Действия' }) {
 
   return (
     <div className="relative inline-block text-left" ref={dropdownRef}>
-      {/* Main button */}
       <button
         ref={buttonRef}
         onClick={(e) => {
           e.stopPropagation();
-          setIsOpen(!isOpen);
+          setIsOpen((prev) => !prev);
         }}
         className="inline-flex items-center px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm font-medium transition focus:outline-none focus:ring-2 focus:ring-gray-300"
       >
         <span>{buttonText}</span>
         <svg
-          className={`ml-2 w-4 h-4 transition-transform ${isOpen ? 'rotate-180' : ''}`}
+          className={`ml-2 w-4 h-4 transition-transform ${isOpen ? (openUp ? '' : 'rotate-180') : ''}`}
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -89,19 +122,18 @@ function ActionDropdown({ actions, buttonText = 'Действия' }) {
         </svg>
       </button>
 
-      {/* Dropdown menu - appears above all content */}
       {isOpen && (
-        <div 
-          className={`absolute right-0 w-48 bg-white rounded-xl shadow-2xl border border-gray-200 py-1 z-[9999] ${
-            position === 'up' ? 'bottom-full mb-2' : 'top-full mt-2'
-          }`}
+        <div
+          ref={menuRef}
+          className="fixed w-48 bg-white rounded-xl shadow-2xl border border-gray-200 py-1 z-[9999]"
+          style={menuStyle || { visibility: 'hidden' }}
         >
           {actions.map((action, index) => (
             <button
               key={index}
               onClick={(e) => {
                 e.stopPropagation();
-                handleAction(action);
+                handleAction(action, e);
               }}
               disabled={action.disabled}
               className={`w-full text-left px-4 py-2.5 text-sm flex items-center gap-2 transition ${

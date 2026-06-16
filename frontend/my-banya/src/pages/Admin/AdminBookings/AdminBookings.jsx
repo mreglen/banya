@@ -196,7 +196,6 @@ function AdminBookings() {
             duration_hours: bookingToConfirm.duration_hours || 1,
             client_name: bookingToConfirm.name,
             client_phone: bookingToConfirm.phone,
-            client_email: bookingToConfirm.email,
             notes: bookingToConfirm.notes,
             guests: bookingToConfirm.guests || 1,
           }}

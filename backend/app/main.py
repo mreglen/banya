@@ -224,6 +224,35 @@ with engine.begin() as connection:
             """
         )
     )
+    connection.execute(
+        text(
+            """
+            ALTER TABLE reservations
+            ADD COLUMN IF NOT EXISTS prepayment INTEGER NOT NULL DEFAULT 0
+            """
+        )
+    )
+    connection.execute(
+        text(
+            """
+            CREATE TABLE IF NOT EXISTS payment_qr_setting (
+                id INTEGER PRIMARY KEY DEFAULT 1,
+                image_url VARCHAR(500),
+                updated_at TIMESTAMPTZ DEFAULT NOW(),
+                uploaded_by_user_id INTEGER REFERENCES users(user_id)
+            )
+            """
+        )
+    )
+    connection.execute(
+        text(
+            """
+            INSERT INTO payment_qr_setting (id)
+            SELECT 1
+            WHERE NOT EXISTS (SELECT 1 FROM payment_qr_setting WHERE id = 1)
+            """
+        )
+    )
 
 app = FastAPI(title='Бани')
 

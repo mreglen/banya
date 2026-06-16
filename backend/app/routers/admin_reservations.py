@@ -198,6 +198,12 @@ def create_reservation(
                 raise HTTPException(status_code=400, detail=f"Недостаточно товара {product.name} на складе")
             total_cost += product.price * item.quantity
 
+    prepayment = reservation.prepayment or 0
+    if prepayment < 0:
+        raise HTTPException(status_code=400, detail="Предоплата не может быть отрицательной")
+    if total_cost > 0 and prepayment > total_cost:
+        raise HTTPException(status_code=400, detail="Предоплата не может превышать сумму брони")
+
     # 6. Создаём бронь
     db_reservation = models.Reservation(
         bath_id=reservation.bath_id,
@@ -206,6 +212,7 @@ def create_reservation(
         client_name=reservation.client_name,
         client_phone=reservation.client_phone,
         client_email=reservation.client_email,
+        prepayment=prepayment,
         notes=reservation.notes,
         guests=reservation.guests,
         total_cost=total_cost,
@@ -216,8 +223,6 @@ def create_reservation(
     db.flush()
 
     if _is_closed_status(db, reservation.status_id):
-        if not reservation.income_account_id:
-            raise HTTPException(status_code=400, detail="Для закрытия брони выберите счет зачисления")
         realization_doc = models.RealizationDocument(
             date=date.today(),
             reservation_id=db_reservation.reservation_id,
@@ -225,7 +230,7 @@ def create_reservation(
             client_name=db_reservation.client_name,
             client_phone=db_reservation.client_phone,
             total_amount=db_reservation.total_cost,
-            account_id=db_reservation.income_account_id,
+            account_id=reservation.income_account_id,
         )
         db.add(realization_doc)
         db.flush()
@@ -346,10 +351,12 @@ def create_reservation(
         client_name=db_reservation.client_name,
         client_phone=db_reservation.client_phone,
         client_email=db_reservation.client_email,
+        prepayment=db_reservation.prepayment or 0,
         notes=db_reservation.notes,
         guests=db_reservation.guests,
         total_cost=db_reservation.total_cost,
         status=status_obj.status_name,
+        status_id=db_reservation.status_id,
         income_account_id=db_reservation.income_account_id,
         products=response_products,
         # Поле `massages` отсутствует в схеме ReservationResponse (см. schemas.py)
@@ -428,13 +435,8 @@ def update_reservation(
         
         # Обновляем простые поля
         for key, value in update_data.items():
-            if key not in ['guests', 'status_id', 'products', 'start_datetime', 'end_datetime']:
+            if key not in ['guests', 'status_id', 'products', 'start_datetime', 'end_datetime', 'income_account_id']:
                 if value is not None:
-                    if key == "income_account_id" and old_status_name == "закрыт" and value != db_reservation.income_account_id:
-                        raise HTTPException(
-                            status_code=400,
-                            detail="Для закрытой брони нельзя менять счет зачисления"
-                        )
                     setattr(db_reservation, key, value)
                     print(f"Updated {key} = {value}")
 
@@ -486,8 +488,6 @@ def update_reservation(
         
         # Если статус изменен на "закрыт" (проверяем по названию)
         if _is_closed_status(db, new_status_id) and old_status_id != new_status_id:
-            if not db_reservation.income_account_id:
-                raise HTTPException(status_code=400, detail="Для закрытия брони выберите счет зачисления")
             # Получаем товары из брони
             reservation_products = db.query(models.ReservationProduct).filter(
                 models.ReservationProduct.reservation_id == id
@@ -636,6 +636,12 @@ def update_reservation(
                 print(f"Added product: {product.name} x {item.quantity}")
             print(f"✅ Products updated successfully")
 
+        current_prepayment = db_reservation.prepayment or 0
+        if current_prepayment < 0:
+            raise HTTPException(status_code=400, detail="Предоплата не может быть отрицательной")
+        if db_reservation.total_cost > 0 and current_prepayment > db_reservation.total_cost:
+            raise HTTPException(status_code=400, detail="Предоплата не может превышать сумму брони")
+
         print(f"\nCommitting to database...")
         db.commit()
         db.refresh(db_reservation)
@@ -729,10 +735,12 @@ def update_reservation(
             client_name=db_reservation.client_name,
             client_phone=db_reservation.client_phone,
             client_email=db_reservation.client_email,
+            prepayment=db_reservation.prepayment or 0,
             notes=db_reservation.notes,
             guests=db_reservation.guests,
             total_cost=db_reservation.total_cost,
             status=status_name,
+            status_id=db_reservation.status_id,
             income_account_id=db_reservation.income_account_id,
             products=response_products,
             # Поле `massages` отсутствует

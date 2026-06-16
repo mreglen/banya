@@ -90,7 +90,7 @@ function Users() {
         </div>
 
         {/* Desktop Table */}
-        <div className="hidden md:block bg-white rounded-2xl shadow-lg overflow-hidden">
+        <div className="hidden md:block bg-white rounded-2xl shadow-lg overflow-x-auto">
           <table className="w-full">
             <thead className="bg-gray-50 border-b">
               <tr>

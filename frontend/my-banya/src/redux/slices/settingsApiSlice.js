@@ -4,7 +4,7 @@ import baseQuery from '../../utils/baseQuery';
 export const settingsApiSlice = createApi({
     reducerPath: 'settingsApi',
     baseQuery,
-    tagTypes: ['Settings'],
+    tagTypes: ['Settings', 'PaymentQrCode'],
     endpoints: (builder) => ({
         getSettings: builder.query({
             query: () => '/admin/settings/',
@@ -24,7 +24,23 @@ export const settingsApiSlice = createApi({
                 method: 'PUT',
                 body: settingsData,
             }),
-            invalidatesTags: [{ type: 'Settings', id: 'LIST' }],
+            invalidatesTags: ['Settings'],
+        }),
+        getPaymentQrCode: builder.query({
+            query: () => '/admin/settings/payment-qrcode',
+            providesTags: ['PaymentQrCode'],
+        }),
+        uploadPaymentQrCode: builder.mutation({
+            query: (file) => {
+                const formData = new FormData();
+                formData.append('file', file);
+                return {
+                    url: '/admin/settings/payment-qrcode',
+                    method: 'POST',
+                    body: formData,
+                };
+            },
+            invalidatesTags: ['PaymentQrCode'],
         }),
     }),
 });
@@ -32,4 +48,6 @@ export const settingsApiSlice = createApi({
 export const {
     useGetSettingsQuery,
     useUpdateSettingsMutation,
+    useGetPaymentQrCodeQuery,
+    useUploadPaymentQrCodeMutation,
 } = settingsApiSlice;

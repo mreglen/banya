@@ -37,7 +37,7 @@ function ReservationPrintDocument() {
   const searchParams = new URLSearchParams(location.search);
   const paymentMode = searchParams.get('payment');
   const advanceRaw = searchParams.get('advance') || '';
-  const advanceAmount = Number.parseInt(String(advanceRaw).replace(/\D/g, ''), 10) || 0;
+  const advanceFromUrl = Number.parseInt(String(advanceRaw).replace(/\D/g, ''), 10) || 0;
   const isQrPayment = paymentMode === 'qrcode';
   const paymentLabel =
     paymentMode === 'qrcode'
@@ -48,6 +48,7 @@ function ReservationPrintDocument() {
           ? 'Аванс'
           : 'Не указан';
   const { data: reservation, isLoading, error, refetch } = useGetReservationByIdQuery(id, { skip: !id });
+  const advanceAmount = advanceFromUrl || reservation?.prepayment || 0;
   const { data: statusOptions = [] } = useGetReservationStatusesQuery();
   const [updateReservation, { isLoading: isConfirmingPayment }] = useUpdateReservationMutation();
 
