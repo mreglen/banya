@@ -35,7 +35,7 @@ function Home() {
                 <meta property="og:title" content="Николаевские бани - Русские бани на дровах в Екатеринбурге" />
                 <meta property="og:description" content="Настоящие русские бани на дровах с вековыми традициями. Восстанавливаем силы и душевное тепло." />
                 <meta property="og:type" content="website" />
-                <meta property="og:url" content="https://nikolaevskie-bani.ru/" />
+                <meta property="og:url" content="https://nikolaevskie.ru/" />
                 <meta property="og:image" content="%PUBLIC_URL%/img/Logo.png" />
                 <meta property="og:locale" content="ru_RU" />
 
@@ -51,7 +51,7 @@ function Home() {
                         "@type": "LocalBusiness",
                         "name": "Николаевские бани",
                         "description": "Настоящие русские бани на дровах с вековыми традициями",
-                        "url": "https://nikolaevskie-bani.ru/",
+                        "url": "https://nikolaevskie.ru/",
                         "telephone": "+73433448755",
                         "email": "nikolaevskiebani@yandex.ru",
                         "address": {

@@ -33,7 +33,7 @@ function Baths() {
         <meta property="og:title" content="Наши бани - Николаевские бани" />
         <meta property="og:description" content="Каждая баня - особая атмосфера, температура и ритуал. Выберите свою." />
         <meta property="og:type" content="website" />
-        <meta property="og:url" content="https://nikolaevskie-bani.ru/baths" />
+        <meta property="og:url" content="https://nikolaevskie.ru/baths" />
         <meta property="og:locale" content="ru_RU" />
       </Helmet>
       <div className="text-center mb-14 max-w-3xl mx-auto">

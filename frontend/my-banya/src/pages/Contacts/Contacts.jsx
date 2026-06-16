@@ -13,7 +13,7 @@ function Contacts() {
         <meta property="og:title" content="Контакты - Николаевские бани" />
         <meta property="og:description" content="Мы всегда рады гостям. Приезжайте к нам - баня ждёт вас в любое время года." />
         <meta property="og:type" content="website" />
-        <meta property="og:url" content="https://nikolaevskie-bani.ru/contacts" />
+        <meta property="og:url" content="https://nikolaevskie.ru/contacts" />
         <meta property="og:locale" content="ru_RU" />
 
         {/* Schema.org structured data */}
@@ -22,7 +22,7 @@ function Contacts() {
             "@context": "https://schema.org",
             "@type": "LocalBusiness",
             "name": "Николаевские бани",
-            "url": "https://nikolaevskie-bani.ru/",
+            "url": "https://nikolaevskie.ru/",
             "telephone": "+73433448755",
             "email": "nikolaevskiebani@yandex.ru",
             "address": {

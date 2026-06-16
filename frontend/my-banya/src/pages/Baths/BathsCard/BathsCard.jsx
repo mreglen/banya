@@ -91,7 +91,7 @@ function BathsCard() {
         <meta property="og:title" content={`${bath.name} - Николаевские бани`} />
         <meta property="og:description" content={bath.description?.slice(0, 200) || bath.subtitle} />
         <meta property="og:type" content="website" />
-        <meta property="og:url" content={`https://nikolaevskie-bani.ru/baths/${bath.slug || slug}`} />
+        <meta property="og:url" content={`https://nikolaevskie.ru/baths/${bath.slug || slug}`} />
         {images[0] && <meta property="og:image" content={images[0]} />}
         <meta property="og:locale" content="ru_RU" />
         
@@ -108,7 +108,7 @@ function BathsCard() {
             "@type": "TouristAttraction",
             "name": bath.name,
             "description": bath.description,
-            "url": `https://nikolaevskie-bani.ru/baths/${bath.slug || slug}`,
+            "url": `https://nikolaevskie.ru/baths/${bath.slug || slug}`,
             "image": images[0] || '',
             "touristType": "Отдых и оздоровление"
           })}

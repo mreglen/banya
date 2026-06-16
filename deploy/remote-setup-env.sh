@@ -12,7 +12,7 @@ EMAIL_HOST_USER=support@svoygarage.ru
 EMAIL_HOST_PASSWORD=Vfcnth1!
 EMAIL_FROM=support@svoygarage.ru
 
-ALLOWED_ORIGINS=http://89.108.88.31
+ALLOWED_ORIGINS=https://nikolaevskie.ru,https://www.nikolaevskie.ru,http://nikolaevskie.ru,http://www.nikolaevskie.ru,http://89.108.88.31
 EOF
 
 mkdir -p /root/banya/backend/uploads /root/banya/backend/public/img
