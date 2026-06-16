@@ -1,5 +1,5 @@
 // src/components/CategorySelectModal.jsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useCreateCategoryMutation } from '../../../redux/slices/productsApiSlice';
 
 const findCategoryById = (cats, id) => {
@@ -27,6 +27,7 @@ const CategorySelectModal = ({
   const [createParentId, setCreateParentId] = useState(null);
   const [createParentName, setCreateParentName] = useState('Номенклатура');
   const [newCategoryName, setNewCategoryName] = useState('');
+  const [contextMenu, setContextMenu] = useState(null);
 
   const [createCategory, { isLoading: isCreating }] = useCreateCategoryMutation();
 
@@ -38,8 +39,21 @@ const CategorySelectModal = ({
       setCreateParentName('Номенклатура');
       setNewCategoryName('');
       setSearchText('');
+      setContextMenu(null);
     }
   }, [isOpen, currentCategoryId]);
+
+  const closeContextMenu = useCallback(() => {
+    setContextMenu(null);
+  }, []);
+
+  useEffect(() => {
+    const handleClick = () => closeContextMenu();
+    if (contextMenu) {
+      window.addEventListener('click', handleClick);
+    }
+    return () => window.removeEventListener('click', handleClick);
+  }, [contextMenu, closeContextMenu]);
 
   const toggleExpand = (id) => {
     setExpanded(prev => {
@@ -58,6 +72,7 @@ const CategorySelectModal = ({
     setCreateParentName(parentName);
     setNewCategoryName('');
     setMode('create');
+    closeContextMenu();
   };
 
   const handleAddClick = () => {
@@ -69,16 +84,24 @@ const CategorySelectModal = ({
     }
   };
 
-  const handleCategoryContextMenu = (e, category) => {
+  const handleContextMenu = (e, category) => {
     e.preventDefault();
-    setSelectedId(category.id);
-    openCreateMode(category.id, category.name);
+    e.stopPropagation();
+    if (category) {
+      setSelectedId(category.id);
+    } else {
+      setSelectedId(null);
+    }
+    setContextMenu({ x: e.clientX, y: e.clientY, category });
   };
 
-  const handleRootContextMenu = (e) => {
-    e.preventDefault();
-    setSelectedId(null);
-    openCreateMode(null, 'Номенклатура');
+  const handleAddSubcategoryFromMenu = () => {
+    const category = contextMenu?.category;
+    if (category) {
+      openCreateMode(category.id, category.name);
+    } else {
+      openCreateMode(null, 'Номенклатура');
+    }
   };
 
   const handleCreateCategory = async () => {
@@ -131,30 +154,40 @@ const CategorySelectModal = ({
 
       return (
         <div key={cat.id} className="ml-3">
-          <div
-            className="flex items-center py-1 px-1"
-            onContextMenu={(e) => handleCategoryContextMenu(e, cat)}
-          >
-            {hasChildren ? (
-              <span
-                className="mr-1 cursor-pointer select-none"
-                onClick={() => toggleExpand(cat.id)}
-              >
-                {isExpanded || shouldExpand ? '▼' : '►'}
-              </span>
-            ) : (
-              <span className="mr-1 text-gray-500">•</span>
-            )}
-            <label className="flex items-center cursor-pointer ml-1">
-              <input
-                type="radio"
-                name="select-category"
-                checked={selectedId === cat.id}
-                onChange={() => setSelectedId(cat.id)}
-                className="mr-2"
-              />
-              <span className="truncate">{cat.name}</span>
-            </label>
+          <div className="flex items-center justify-between py-1 px-1">
+            <div
+              className="flex items-center flex-1"
+              onContextMenu={(e) => handleContextMenu(e, cat)}
+            >
+              {hasChildren ? (
+                <span
+                  className="mr-1 cursor-pointer select-none"
+                  onClick={() => toggleExpand(cat.id)}
+                >
+                  {isExpanded || shouldExpand ? '▼' : '►'}
+                </span>
+              ) : (
+                <span className="mr-1 text-gray-500">•</span>
+              )}
+              <label className="flex items-center cursor-pointer ml-1 flex-1 min-w-0">
+                <input
+                  type="radio"
+                  name="select-category"
+                  checked={selectedId === cat.id}
+                  onChange={() => setSelectedId(cat.id)}
+                  className="mr-2"
+                />
+                <span className="truncate">{cat.name}</span>
+              </label>
+            </div>
+            <button
+              type="button"
+              onClick={(e) => handleContextMenu(e, cat)}
+              className="ml-2 text-gray-500 hover:text-gray-700 flex-shrink-0"
+              aria-label="Действия"
+            >
+              ⋯
+            </button>
           </div>
           {hasChildren && (isExpanded || shouldExpand) && (
             <div className="ml-3">
@@ -198,28 +231,37 @@ const CategorySelectModal = ({
               )}
             </div>
 
-            <div className="border rounded p-2 max-h-60 overflow-y-auto mb-4">
-              <div
-                className="flex items-center cursor-pointer mb-2 px-1"
-                onContextMenu={handleRootContextMenu}
-              >
-                <label className="flex items-center cursor-pointer">
-                  <input
-                    type="radio"
-                    name="select-category"
-                    checked={selectedId === null}
-                    onChange={() => setSelectedId(null)}
-                    className="mr-2"
-                  />
-                  <span>Номенклатура (без категории)</span>
-                </label>
+            <div
+              className="border rounded p-2 max-h-60 overflow-y-auto mb-4"
+              onClick={closeContextMenu}
+            >
+              <div className="flex items-center justify-between mb-2 px-1">
+                <div
+                  className="flex items-center flex-1"
+                  onContextMenu={(e) => handleContextMenu(e, null)}
+                >
+                  <label className="flex items-center cursor-pointer">
+                    <input
+                      type="radio"
+                      name="select-category"
+                      checked={selectedId === null}
+                      onChange={() => setSelectedId(null)}
+                      className="mr-2"
+                    />
+                    <span>Номенклатура (без категории)</span>
+                  </label>
+                </div>
+                <button
+                  type="button"
+                  onClick={(e) => handleContextMenu(e, null)}
+                  className="ml-2 text-gray-500 hover:text-gray-700 flex-shrink-0"
+                  aria-label="Действия"
+                >
+                  ⋯
+                </button>
               </div>
               {renderCategoryTree(categoriesTree)}
             </div>
-
-            <p className="text-xs text-gray-500 mb-4">
-              ПКМ по категории — добавить подкатегорию
-            </p>
 
             <div className="flex justify-between space-x-2">
               <button
@@ -295,6 +337,28 @@ const CategorySelectModal = ({
           </>
         )}
       </div>
+
+      {contextMenu && mode === 'select' && (
+        <div
+          className="fixed z-[60] bg-white border rounded shadow-lg py-1 min-w-[160px] text-sm"
+          style={{
+            top: contextMenu.y,
+            left: Math.min(contextMenu.x, window.innerWidth - 170),
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button
+            type="button"
+            className="block w-full text-left px-3 py-1.5 hover:bg-gray-100"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleAddSubcategoryFromMenu();
+            }}
+          >
+            {contextMenu.category ? 'Добавить подкатегорию' : 'Добавить категорию'}
+          </button>
+        </div>
+      )}
     </div>
   );
 };

@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { useDispatch } from 'react-redux';
 import { setCredentials, logOut } from './redux/slices/authSlice';
 import { getProfile } from './redux/slices/adminApi';
-import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, useLocation, useNavigate } from 'react-router-dom';
 import { HelmetProvider } from 'react-helmet-async';
 import Header from './components/Header/Header';
 import Home from './pages/Home/Home';
@@ -55,11 +55,22 @@ import Finance from './pages/Admin/Finance/Finance';
 
 import { Toaster } from 'react-hot-toast';
 
+const isPwaStandalone = () =>
+  window.matchMedia('(display-mode: standalone)').matches ||
+  window.navigator.standalone === true;
+
 function AppWithLayout() {
   const dispatch = useDispatch();
   const token = localStorage.getItem('access_token');
   const location = useLocation();
+  const navigate = useNavigate();
   const hideHeader = location.pathname.startsWith('/admin');
+
+  useEffect(() => {
+    if (isPwaStandalone() && location.pathname === '/') {
+      navigate('/admin', { replace: true });
+    }
+  }, [location.pathname, navigate]);
 
   useEffect(() => {
     if (token) {
