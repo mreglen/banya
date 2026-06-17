@@ -168,49 +168,26 @@ function ContactSection() {
                     </div>
                 </div>
 
-                <div className="rounded-2xl overflow-hidden shadow-xl border border-gray-700 h-full min-h-80 md:min-h-96 lg:min-h-[520px] lg:col-span-8">
-                    <div style={{ position: 'relative', overflow: 'hidden', width: '100%', height: '100%' }}>
-                        <a
-                            href="https://yandex.ru/maps/54/yekaterinburg/?utm_medium=mapframe&utm_source=maps"
-                            style={{
-                                color: '#eee',
-                                fontSize: 12,
-                                position: 'absolute',
-                                top: 0,
-                                left: 0,
-                                zIndex: 1,
-                            }}
-                        >
-                            Екатеринбург
-                        </a>
-                        <a
-                            href="https://yandex.ru/maps/54/yekaterinburg/house/kizelovskaya_ulitsa_18/YkkYcwRpSEYPQFtsfXRzcnVqZQ==/?ll=60.539138%2C56.823991&utm_medium=mapframe&utm_source=maps&z=16.68"
-                            style={{
-                                color: '#eee',
-                                fontSize: 12,
-                                position: 'absolute',
-                                top: 14,
-                                left: 0,
-                                zIndex: 1,
-                            }}
-                        >
-                            Кизеловская улица, 18 — Яндекс Карты
-                        </a>
-                        <iframe
-                            src="https://yandex.ru/map-widget/v1/?ll=60.539138%2C56.823991&mode=search&ol=geo&ouri=ymapsbm1%3A%2F%2Fgeo%3Fdata%3DCgg1NjA3MjY2NBJ20KDQvtGB0YHQuNGPLCDQodCy0LXRgNC00LvQvtCy0YHQutCw0Y8g0L7QsdC70LDRgdGC0YwsINCV0LrQsNGC0LXRgNC40L3QsdGD0YDQsywg0JrQuNC30LXQu9C-0LLRgdC60LDRjyDRg9C70LjRhtCwLCAxOCIKDRQockIVxEtjQg%2C%2C&z=16.68"
-                            width="100%"
-                            height="120%"
-                            frameBorder="1"
-                            allowFullScreen
-                            title="Карта: г. Екатеринбург, ул. Кизеловская, 18"
-                            style={{
-                                position: 'absolute',
-                                left: 0,
-                                top: -110,
-                                border: 0,
-                            }}
-                        />
-                    </div>
+                <div className="rounded-2xl overflow-hidden shadow-xl border border-gray-700 h-full min-h-80 md:min-h-96 lg:min-h-[520px] lg:col-span-8 relative bg-gray-800">
+                    <a
+                        href="https://yandex.ru/maps/54/yekaterinburg/?utm_medium=mapframe&utm_source=maps"
+                        className="sr-only"
+                    >
+                        Екатеринбург
+                    </a>
+                    <a
+                        href="https://yandex.ru/maps/54/yekaterinburg/house/kizelovskaya_ulitsa_18/YkkYcwRpSEYPQFtsfXRzcnVqZQ==/?ll=60.539138%2C56.823991&utm_medium=mapframe&utm_source=maps&z=16"
+                        className="sr-only"
+                    >
+                        Кизеловская улица, 18 — Яндекс Карты
+                    </a>
+                    <iframe
+                        src="https://yandex.ru/map-widget/v1/?ll=60.539138%2C56.823991&z=16&pt=60.539138%2C56.823991%2Cpm2rdm"
+                        className="absolute inset-0 w-full h-full border-0"
+                        allowFullScreen
+                        title="Карта: г. Екатеринбург, ул. Кизеловская, 18"
+                        loading="lazy"
+                    />
                 </div>
             </div>
             </div>
