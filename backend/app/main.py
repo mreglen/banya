@@ -5,6 +5,7 @@ from app import models  # noqa: F401 - важно для регистрации 
 from app.routers import api_router
 from app.routers import promotions
 from app.routers import audit_logs
+from app.routers.seo import router as seo_router
 from app.websocket import websocket_endpoint
 from fastapi.middleware.cors import CORSMiddleware
 import os
@@ -287,6 +288,7 @@ uploads_dir.mkdir(parents=True, exist_ok=True)
 app.mount("/uploads", StaticFiles(directory=str(uploads_dir)), name="uploads")
 
 app.include_router(api_router)
+app.include_router(seo_router)
 app.include_router(promotions.router, prefix="/api", tags=["promotions"])
 app.include_router(audit_logs.router)
 

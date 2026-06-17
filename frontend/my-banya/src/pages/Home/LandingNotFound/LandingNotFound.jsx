@@ -1,8 +1,10 @@
 import { Link } from 'react-router-dom';
+import SeoHead from '../../../components/Seo/SeoHead';
 
 function LandingNotFound() {
   return (
     <main className="min-h-[70vh] bg-gray-50 flex items-center justify-center px-6 py-16">
+      <SeoHead title="Страница не найдена" noindex />
       <div className="max-w-xl w-full text-center bg-white rounded-2xl shadow-sm border border-gray-100 p-8 sm:p-12">
         <p className="text-amber-600 font-semibold text-sm uppercase tracking-wide mb-3">404</p>
         <h1 className="text-3xl sm:text-4xl font-light text-gray-900 mb-4">Страница не найдена</h1>

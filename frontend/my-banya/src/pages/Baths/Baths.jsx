@@ -1,6 +1,6 @@
-import { Helmet } from 'react-helmet-async';
 import { useGetBathsQuery } from '../../redux/slices/apiSlice';
 import CustomButton from '../../components/UI/CustomButton/CustomButton';
+import SeoHead from '../../components/Seo/SeoHead';
 
 function Baths() {
   const { data: baths = [], isLoading, error } = useGetBathsQuery();
@@ -23,19 +23,13 @@ function Baths() {
   }
 
   return (
-    <section className="py-16 px-6 bg-gray-50 min-h-screen mt-28">
-      <Helmet>
-        <title>Наши бани - Николаевские бани в Екатеринбурге</title>
-        <meta name="description" content="Выберите свою баню в Николаевских банях Екатеринбурга. Каждая баня - особая атмосфера, температура и ритуал. Русские бани на дровах." />
-        <meta name="keywords" content="бани Екатеринбург, выбрать баню, русская баня, парилка, бани на дровах" />
-        
-        {/* Open Graph */}
-        <meta property="og:title" content="Наши бани - Николаевские бани" />
-        <meta property="og:description" content="Каждая баня - особая атмосфера, температура и ритуал. Выберите свою." />
-        <meta property="og:type" content="website" />
-        <meta property="og:url" content="https://nikolaevskie.ru/baths" />
-        <meta property="og:locale" content="ru_RU" />
-      </Helmet>
+    <main className="py-16 px-6 bg-gray-50 min-h-screen mt-28">
+      <SeoHead
+        title="Наши бани - Николаевские бани в Екатеринбурге"
+        description="Выберите свою баню в Николаевских банях Екатеринбурга. Каждая баня - особая атмосфера, температура и ритуал. Русские бани на дровах."
+        keywords="бани Екатеринбург, выбрать баню, русская баня, парилка, бани на дровах"
+        canonical="/baths"
+      />
       <div className="text-center mb-14 max-w-3xl mx-auto">
         <h1 className="text-4xl sm:text-5xl font-light text-gray-800 mb-4">Наши бани</h1>
         <p className="text-lg text-gray-600 font-extralight">
@@ -48,7 +42,7 @@ function Baths() {
           <p className="text-gray-500 col-span-full text-center">Пока нет доступных бань.</p>
         ) : (
           baths.map((bath) => (
-            <div
+            <article
               key={bath.bath_id}
               className="bg-white rounded-2xl shadow-lg overflow-hidden hover:shadow-2xl transition-shadow duration-300 flex flex-col"
             >
@@ -63,7 +57,7 @@ function Baths() {
 
               <div className="p-6 flex-1 flex flex-col">
                 <div>
-                  <h3 className="text-2xl font-light text-gray-800 mb-1">{bath.name}</h3>
+                  <h2 className="text-2xl font-light text-gray-800 mb-1">{bath.name}</h2>
                   <p className="text-green-600 text-sm font-medium mb-3">{bath.title}</p>
                   <div className="flex items-center justify-between mb-4">
                     <div className="text-sm text-gray-500">
@@ -89,7 +83,7 @@ function Baths() {
                   />
                 </div>
               </div>
-            </div>
+            </article>
           ))
         )}
       </div>
@@ -103,7 +97,7 @@ function Baths() {
           +7 (343) 344-87-55
         </a>
       </div>
-    </section>
+    </main>
   );
 }
 

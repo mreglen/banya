@@ -1,8 +1,9 @@
 import { useParams, useSearchParams } from 'react-router-dom';
-import { Helmet } from 'react-helmet-async';
 import CustomButton from '../../../components/UI/CustomButton/CustomButton';
 import { useGetBathByIdQuery } from '../../../redux/slices/apiSlice';
 import { useState, useEffect } from 'react';
+import SeoHead from '../../../components/Seo/SeoHead';
+import { absoluteUrl } from '../../../config/seo';
 
 function BathsCard() {
   const { slug } = useParams();
@@ -81,40 +82,24 @@ function BathsCard() {
   };
   
   return (
-    <section className="py-12 px-6 bg-white min-h-screen mt-28">
-      <Helmet>
-        <title>{bath.name} - Николаевские бани в Екатеринбурге</title>
-        <meta name="description" content={bath.description || `${bath.name} - ${bath.subtitle}. Русская баня на дровах в Екатеринбурге.`} />
-        <meta name="keywords" content={`${bath.name}, баня ${bath.name}, русская баня, баня на дровах, Николаевские бани`} />
-        
-        {/* Open Graph */}
-        <meta property="og:title" content={`${bath.name} - Николаевские бани`} />
-        <meta property="og:description" content={bath.description?.slice(0, 200) || bath.subtitle} />
-        <meta property="og:type" content="website" />
-        <meta property="og:url" content={`https://nikolaevskie.ru/baths/${bath.slug || slug}`} />
-        {images[0] && <meta property="og:image" content={images[0]} />}
-        <meta property="og:locale" content="ru_RU" />
-        
-        {/* Twitter */}
-        <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:title" content={`${bath.name} - Николаевские бани`} />
-        <meta name="twitter:description" content={bath.description?.slice(0, 200) || bath.subtitle} />
-        {images[0] && <meta name="twitter:image" content={images[0]} />}
-        
-        {/* Schema.org structured data */}
-        <script type="application/ld+json">
-          {JSON.stringify({
-            "@context": "https://schema.org",
-            "@type": "TouristAttraction",
-            "name": bath.name,
-            "description": bath.description,
-            "url": `https://nikolaevskie.ru/baths/${bath.slug || slug}`,
-            "image": images[0] || '',
-            "touristType": "Отдых и оздоровление"
-          })}
-        </script>
-      </Helmet>
-      <div className="max-w-7xl mx-auto">
+    <main className="py-12 px-6 bg-white min-h-screen mt-28">
+      <SeoHead
+        title={`${bath.name} - Николаевские бани в Екатеринбурге`}
+        description={bath.description || `${bath.name} - ${bath.title}. Русская баня на дровах в Екатеринбурге.`}
+        keywords={`${bath.name}, баня ${bath.name}, русская баня, баня на дровах, Николаевские бани`}
+        canonical={`/baths/${bath.slug || slug}`}
+        ogImage={images[0] || undefined}
+        jsonLd={{
+          '@context': 'https://schema.org',
+          '@type': 'TouristAttraction',
+          name: bath.name,
+          description: bath.description,
+          url: absoluteUrl(`/baths/${bath.slug || slug}`),
+          image: images[0] || '',
+          touristType: 'Отдых и оздоровление',
+        }}
+      />
+      <article itemScope itemType="https://schema.org/TouristAttraction" className="max-w-7xl mx-auto">
         <div className="text-center mb-10">
           <h1 className="text-4xl sm:text-5xl font-light text-gray-800">{bath.name}</h1>
           <p className="text-xl text-green-600 font-medium mt-2">{bath.subtitle}</p>
@@ -287,8 +272,8 @@ function BathsCard() {
             </div>
           </div>
         )}
-      </div>
-    </section>
+      </article>
+    </main>
   );
 }
 

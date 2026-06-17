@@ -1,4 +1,3 @@
-import { Helmet } from 'react-helmet-async';
 import { useState, useEffect } from 'react';
 import ListBaths from "./ListBaths/ListBaths";
 import WebsiteCategoriesPreview from "./WebsiteCategoriesPreview/WebsiteCategoriesPreview";
@@ -6,6 +5,8 @@ import Booking from "../Booking/Booking";
 import ContactSection from "./ContactSection/ContactSection";
 import { useReveal } from '../../hooks/useReveal';
 import { Calendar } from 'lucide-react';
+import SeoHead from '../../components/Seo/SeoHead';
+import SEO, { absoluteUrl } from '../../config/seo';
 
 function Home() {
     useReveal();
@@ -25,46 +26,32 @@ function Home() {
     };
 
     return (
-        <div className="overflow-x-hidden">
-            <Helmet>
-                <title>Николаевские бани - Русские бани на дровах в Екатеринбурге</title>
-                <meta name="description" content="Николаевские бани в Екатеринбурге - настоящие русские бани на дровах с вековыми традициями. Бронирование онлайн, парение с вениками, отдых для души и тела." />
-                <meta name="keywords" content="бани Екатеринбург, русская баня, баня на дровах, парение, веники, отдых, Николаевские бани, бронирование бани" />
-
-                {/* Open Graph */}
-                <meta property="og:title" content="Николаевские бани - Русские бани на дровах в Екатеринбурге" />
-                <meta property="og:description" content="Настоящие русские бани на дровах с вековыми традициями. Восстанавливаем силы и душевное тепло." />
-                <meta property="og:type" content="website" />
-                <meta property="og:url" content="https://nikolaevskie.ru/" />
-                <meta property="og:image" content="%PUBLIC_URL%/img/Logo.png" />
-                <meta property="og:locale" content="ru_RU" />
-
-                {/* Twitter */}
-                <meta name="twitter:card" content="summary_large_image" />
-                <meta name="twitter:title" content="Николаевские бани - Русские бани на дровах в Екатеринбурге" />
-                <meta name="twitter:description" content="Настоящие русские бани на дровах с вековыми традициями." />
-
-                {/* Schema.org structured data */}
-                <script type="application/ld+json">
-                    {JSON.stringify({
-                        "@context": "https://schema.org",
-                        "@type": "LocalBusiness",
-                        "name": "Николаевские бани",
-                        "description": "Настоящие русские бани на дровах с вековыми традициями",
-                        "url": "https://nikolaevskie.ru/",
-                        "telephone": "+73433448755",
-                        "email": "nikolaevskiebani@yandex.ru",
-                        "address": {
-                            "@type": "PostalAddress",
-                            "streetAddress": "ул. Кизеловская, 18",
-                            "addressLocality": "Екатеринбург",
-                            "addressCountry": "RU"
-                        },
-                        "priceRange": "₽₽"
-                    })}
-                </script>
-            </Helmet>
-            <div
+        <main className="overflow-x-hidden">
+            <SeoHead
+                canonical="/"
+                jsonLd={{
+                    '@context': 'https://schema.org',
+                    '@type': 'LocalBusiness',
+                    name: SEO.siteName,
+                    description: SEO.defaultDescription,
+                    url: absoluteUrl('/'),
+                    telephone: SEO.telephone,
+                    email: SEO.email,
+                    address: {
+                        '@type': 'PostalAddress',
+                        streetAddress: SEO.address.streetAddress,
+                        addressLocality: SEO.address.addressLocality,
+                        addressCountry: SEO.address.addressCountry,
+                    },
+                    geo: {
+                        '@type': 'GeoCoordinates',
+                        latitude: SEO.geo.latitude,
+                        longitude: SEO.geo.longitude,
+                    },
+                    priceRange: '₽₽',
+                }}
+            />
+            <header
                 className="relative w-full min-h-[100svh] flex items-center bg-cover bg-no-repeat bg-[center_top] sm:bg-center bg-scroll md:bg-fixed"
                 style={{
                     backgroundImage: "url('/img/bg-home.png')",
@@ -115,7 +102,7 @@ function Home() {
                         </svg>
                     </button>
                 </div>
-            </div>
+            </header>
 
             <div className="reveal"><ListBaths /></div>
             <div className="reveal"><WebsiteCategoriesPreview /></div>
@@ -132,7 +119,7 @@ function Home() {
                     <span className="font-bold text-lg hidden sm:inline">Забронировать</span>
                 </button>
             </div>
-        </div>
+        </main>
     );
 }
 

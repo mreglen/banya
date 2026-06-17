@@ -5,6 +5,7 @@ import { useSelector } from 'react-redux';
 import { useGetPermissionsQuery } from '../../redux/slices/apiSlice';
 import MobileSidebar from './MobileSidebar';
 import MobileBottomNav from '../../components/Admin/MobileBottomNav';
+import SeoHead from '../../components/Seo/SeoHead';
 import { 
   ShieldCheck, 
   CalendarDays, 
@@ -446,6 +447,7 @@ function Admin() {
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
+      <SeoHead title="Админ-панель" noindex />
       {/* Desktop Sidebar */}
       <DesktopSidebar />
 

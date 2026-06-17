@@ -158,7 +158,7 @@ function Header() {
           </NavLink>
 
           {/* Десктопная навигация */}
-          <nav className="hidden lg:flex items-center gap-2">
+          <nav className="hidden lg:flex items-center gap-2" aria-label="Основное меню">
             {navLinks.map(({ title, anchor, sectionId, icon }) => (
               <a
                 key={title}
@@ -257,7 +257,7 @@ function Header() {
           </div>
 
           {/* Навигация */}
-          <nav className="flex-1 overflow-y-auto p-6">
+          <nav className="flex-1 overflow-y-auto p-6" aria-label="Мобильное меню">
             <div className="space-y-2">
               {navLinks.map(({ title, anchor, sectionId, icon }) => (
                 <a

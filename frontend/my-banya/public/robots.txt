@@ -2,8 +2,10 @@
 User-agent: *
 Allow: /
 
-# Запрет индексации админ-панели
+# Запрет индексации админ-панели и API
+Disallow: /admin
 Disallow: /admin/
+Disallow: /api/
 
 # Sitemap
 Sitemap: https://nikolaevskie.ru/sitemap.xml

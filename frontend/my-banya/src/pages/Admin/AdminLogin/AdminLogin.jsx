@@ -5,6 +5,7 @@ import { useDispatch } from 'react-redux';
 import { setCredentials } from '../../../redux/slices/authSlice';
 import { login, getProfile } from '../../../redux/slices/adminApi'; // ← getProfile
 import { toast } from 'react-hot-toast';
+import SeoHead from '../../../components/Seo/SeoHead';
 
 function AdminLogin() {
   const navigate = useNavigate();
@@ -75,6 +76,7 @@ function AdminLogin() {
   return (
 
     <div className="min-h-screen bg-gradient-to-br from-green-50 to-amber-50 flex items-center justify-center px-4">
+      <SeoHead title="Вход в админ-панель" noindex />
       <div className="w-full max-w-md bg-white rounded-3xl shadow-xl p-8 border border-gray-200">
         <div className="text-center mb-8">
           <div className="w-16 h-16 bg-green-600 text-white rounded-full flex items-center justify-center mx-auto mb-4 text-2xl">

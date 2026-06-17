@@ -1,44 +1,35 @@
-import { Helmet } from 'react-helmet-async';
 import CustomButton from "../../components/UI/CustomButton/CustomButton";
+import SeoHead from '../../components/Seo/SeoHead';
+import SEO, { absoluteUrl } from '../../config/seo';
 
 function Contacts() {
   return (
-    <section className="bg-gradient-to-b from-white via-green-50 to-amber-50 min-h-screen mt-28">
-      <Helmet>
-        <title>Контакты - Николаевские бани в Екатеринбурге</title>
-        <meta name="description" content="Контакты Николаевских бань в Екатеринбурге. Адрес: ул. Кизеловская, 18. Телефон: +7 (343) 344-87-55. Бронирование бань онлайн." />
-        <meta name="keywords" content="Николаевские бани контакты, адрес бани Екатеринбург, телефон бани, как добраться" />
-
-        {/* Open Graph */}
-        <meta property="og:title" content="Контакты - Николаевские бани" />
-        <meta property="og:description" content="Мы всегда рады гостям. Приезжайте к нам - баня ждёт вас в любое время года." />
-        <meta property="og:type" content="website" />
-        <meta property="og:url" content="https://nikolaevskie.ru/contacts" />
-        <meta property="og:locale" content="ru_RU" />
-
-        {/* Schema.org structured data */}
-        <script type="application/ld+json">
-          {JSON.stringify({
-            "@context": "https://schema.org",
-            "@type": "LocalBusiness",
-            "name": "Николаевские бани",
-            "url": "https://nikolaevskie.ru/",
-            "telephone": "+73433448755",
-            "email": "nikolaevskiebani@yandex.ru",
-            "address": {
-              "@type": "PostalAddress",
-              "streetAddress": "ул. Кизеловская, 18",
-              "addressLocality": "Екатеринбург",
-              "addressCountry": "RU"
-            },
-            "geo": {
-              "@type": "GeoCoordinates",
-              "latitude": 56.842733,
-              "longitude": 60.837443
-            }
-          })}
-        </script>
-      </Helmet>
+    <main className="bg-gradient-to-b from-white via-green-50 to-amber-50 min-h-screen mt-28">
+      <SeoHead
+        title="Контакты - Николаевские бани в Екатеринбурге"
+        description="Контакты Николаевских бань в Екатеринбурге. Адрес: ул. Кизеловская, 18. Телефон: +7 (343) 344-87-55. Бронирование бань онлайн."
+        keywords="Николаевские бани контакты, адрес бани Екатеринбург, телефон бани, как добраться"
+        canonical="/contacts"
+        jsonLd={{
+          '@context': 'https://schema.org',
+          '@type': 'LocalBusiness',
+          name: SEO.siteName,
+          url: absoluteUrl('/'),
+          telephone: SEO.telephone,
+          email: SEO.email,
+          address: {
+            '@type': 'PostalAddress',
+            streetAddress: SEO.address.streetAddress,
+            addressLocality: SEO.address.addressLocality,
+            addressCountry: SEO.address.addressCountry,
+          },
+          geo: {
+            '@type': 'GeoCoordinates',
+            latitude: SEO.geo.latitude,
+            longitude: SEO.geo.longitude,
+          },
+        }}
+      />
 
       <div className="py-16 px-6 text-center max-w-4xl mx-auto">
         <h1 className="text-4xl sm:text-5xl font-light text-gray-800 mb-4">Контакты</h1>
@@ -147,7 +138,7 @@ function Contacts() {
           </div>
         </div>
       </div>
-    </section>
+    </main>
   );
 }
 

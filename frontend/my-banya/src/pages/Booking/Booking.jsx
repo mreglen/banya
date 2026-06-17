@@ -6,6 +6,8 @@ import {
   useGetBathsQuery,
   useGetBookingAvailabilityQuery,
 } from '../../redux/slices/apiSlice';
+import SeoHead from '../../components/Seo/SeoHead';
+import SEO from '../../config/seo';
 
 function Booking() {
   const [createBooking, { isLoading, isError, error }] = useCreateBookingMutation();
@@ -256,7 +258,13 @@ function Booking() {
   }
 
   return (
-    <div id="booking" className="min-h-screen bg-gradient-to-br from-amber-50 via-white to-green-50 py-20 px-4 sm:px-6 lg:px-8">
+    <main id="booking" className="min-h-screen bg-gradient-to-br from-amber-50 via-white to-green-50 py-20 px-4 sm:px-6 lg:px-8">
+      <SeoHead
+        title={`Забронировать баню - ${SEO.siteName}`}
+        description="Онлайн-бронирование русской бани на дровах в Екатеринбурге. Выберите дату, время и баню — мы подготовим парную к вашему приходу."
+        keywords="бронирование бани Екатеринбург, забронировать баню онлайн, Николаевские бани"
+        canonical="/booking"
+      />
       <div className="max-w-4xl mx-auto">
         <div className="text-center mb-12">
           <h2 className="text-4xl sm:text-5xl font-light text-gray-800 mb-4">Забронировать баню</h2>
@@ -510,7 +518,7 @@ function Booking() {
           </form>
         </div>
       </div>
-    </div>
+    </main>
   );
 }
 

@@ -1,6 +1,7 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useGetWebsiteCategoriesPreviewQuery } from '../../../redux/slices/apiSlice';
-import { ChevronDown, ChevronUp, ShoppingBag, Info } from 'lucide-react';
+import { ChevronDown, ChevronUp, Info } from 'lucide-react';
 
 const SERVER_BASE_URL = process.env.REACT_APP_API_URL
   ? process.env.REACT_APP_API_URL.replace('/api', '')
@@ -143,9 +144,18 @@ function WebsiteCategoriesPreview() {
                 ))}
               </div>
 
-              {/* View More Button */}
+              {/* View More / Full category page */}
               {hasMore && (
-                <div className="flex justify-center mt-16">
+                <div className="flex flex-col sm:flex-row justify-center items-center gap-4 mt-16">
+                  <Link
+                    to={`/categories/${category.id}/products`}
+                    className={`group flex items-center gap-3 px-10 py-4 rounded-full text-base font-medium transition-all duration-300 ${isDark
+                        ? 'bg-amber-600 text-white hover:bg-amber-500'
+                        : 'bg-amber-600 text-white hover:bg-amber-700'
+                      }`}
+                  >
+                    <span>Смотреть все товары</span>
+                  </Link>
                   <button
                     type="button"
                     onClick={() => toggleCategoryExpand(category.id)}
@@ -154,7 +164,7 @@ function WebsiteCategoriesPreview() {
                         : 'bg-zinc-100 text-zinc-900 border border-zinc-200 hover:bg-white hover:shadow-xl hover:border-amber-600/50'
                       }`}
                   >
-                    <span>{expanded ? 'Свернуть коллекцию' : 'Показать всю категорию'}</span>
+                    <span>{expanded ? 'Свернуть коллекцию' : 'Показать ещё на странице'}</span>
                     <div className="transition-transform duration-300 group-hover:scale-125">
                       {expanded ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
                     </div>
