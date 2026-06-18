@@ -16,8 +16,19 @@ router = APIRouter(prefix="/admin/products", tags=["products"])
 
 
 UPLOAD_DIR = Path("uploads/photos/products/")
+VIDEO_UPLOAD_DIR = Path("uploads/videos/products/")
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-MAX_PRODUCT_FILES = 5
+VIDEO_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+
+VIDEO_EXTENSIONS = {".mp4", ".webm", ".mov", ".ogg", ".mkv", ".m4v"}
+
+
+def _is_video_upload(file: UploadFile) -> bool:
+    content_type = (file.content_type or "").lower()
+    if content_type.startswith("video/"):
+        return True
+    ext = Path(file.filename or "").suffix.lower()
+    return ext in VIDEO_EXTENSIONS
 
 
 def create_product_with_photos(db: Session, product_data: ProductCreate, photo_urls: List[str] = None):
@@ -144,40 +155,71 @@ async def upload_product_photos(
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
 
-    if len(files) > MAX_PRODUCT_FILES:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Можно загрузить не более {MAX_PRODUCT_FILES} изображений"
-        )
-
-    db.query(Photo).filter(Photo.product_id == product_id).delete()
-
     urls = []
     for file in files:
         content = await file.read()
 
-        try:
-            webp_bytes = process_image_to_webp(content)
-        except Exception:
-            raise HTTPException(status_code=400, detail=f"Не удалось обработать изображение: {file.filename}")
+        if _is_video_upload(file):
+            ext = Path(file.filename or "").suffix.lower()
+            if ext not in VIDEO_EXTENSIONS:
+                ext = ".mp4"
+            file_hash = hashlib.sha256(content).hexdigest()[:16]
+            unique_filename = f"{file_hash}{ext}"
+            filepath = VIDEO_UPLOAD_DIR / unique_filename
+            with open(filepath, "wb") as f:
+                f.write(content)
+            image_url = f"/uploads/videos/products/{unique_filename}"
+        else:
+            try:
+                webp_bytes = process_image_to_webp(content)
+            except Exception:
+                raise HTTPException(status_code=400, detail=f"Не удалось обработать изображение: {file.filename}")
 
-        file_hash = hashlib.sha256(webp_bytes).hexdigest()[:16]
-        safe_filename = f"{file_hash}.webp"
-        filepath = UPLOAD_DIR / safe_filename
+            file_hash = hashlib.sha256(webp_bytes).hexdigest()[:16]
+            safe_filename = f"{file_hash}.webp"
+            filepath = UPLOAD_DIR / safe_filename
 
-        with open(filepath, "wb") as f:
-            f.write(webp_bytes)
+            with open(filepath, "wb") as f:
+                f.write(webp_bytes)
 
-        # Сохраняем URL в БД
+            image_url = f"/uploads/photos/products/{safe_filename}"
+
         db_photo = Photo(
-            image_url=f"/uploads/photos/products/{safe_filename}",
+            image_url=image_url,
             product_id=product_id
         )
         db.add(db_photo)
-        urls.append(f"/uploads/photos/products/{safe_filename}")
+        urls.append(image_url)
 
     db.commit()
     return urls
+
+
+@router.delete("/{product_id}/photos/{photo_id}", status_code=200)
+def delete_product_photo(
+    product_id: int,
+    photo_id: int,
+    db: Session = Depends(get_db)
+):
+    db_photo = db.query(Photo).filter(
+        Photo.photo_id == photo_id,
+        Photo.product_id == product_id
+    ).first()
+
+    if not db_photo:
+        raise HTTPException(status_code=404, detail="Фото не найдено")
+
+    try:
+        filepath = Path(".") / db_photo.image_url.lstrip("/")
+        if filepath.exists():
+            filepath.unlink()
+    except Exception as e:
+        print(f"Warning: Could not delete file {db_photo.image_url}: {e}")
+
+    db.delete(db_photo)
+    db.commit()
+
+    return {"message": "Фото успешно удалено"}
 
 @router.delete("/{product_id}", status_code=204)
 def delete_product(product_id: int, db: Session = Depends(get_db)):

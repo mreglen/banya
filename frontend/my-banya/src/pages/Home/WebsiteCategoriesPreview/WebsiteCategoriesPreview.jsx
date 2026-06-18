@@ -27,6 +27,8 @@ function CategoryProductCard({ product }) {
         <img
           src={productPhoto}
           alt={product.name}
+          loading="lazy"
+          decoding="async"
           className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
         />
       ) : (
@@ -45,8 +47,9 @@ function CategoryProductCard({ product }) {
           <h3 className="text-xl sm:text-2xl font-bold text-white leading-tight drop-shadow-lg">
             {product.name}
           </h3>
-          <div className="bg-amber-500 text-black px-3 py-1 rounded-lg font-bold text-sm sm:text-base transform transition-transform group-hover:scale-110">
-            {(product.price ?? 0).toLocaleString()} ₽
+          <div className="bg-amber-500 text-black px-3 py-1 rounded-lg font-bold text-sm sm:text-base whitespace-nowrap inline-flex items-baseline gap-1 shrink-0 transform transition-transform group-hover:scale-110">
+            <span>{(product.price ?? 0).toLocaleString()}</span>
+            <span>₽</span>
           </div>
         </div>
 
@@ -110,7 +113,6 @@ function WebsiteCategoriesPreview() {
                   backgroundImage: `url("${categoryBackground}")`,
                   backgroundSize: 'cover',
                   backgroundPosition: 'center',
-                  backgroundAttachment: 'fixed'
                 }}
               />
             )}

@@ -106,7 +106,7 @@ function AdminBathsList() {
               <button
                 type="button"
                 onClick={() => handleEditClick(bath.slug)}
-                className="flex-1 rounded-lg bg-blue-600 text-white py-2 text-sm font-medium hover:bg-blue-700 transition"
+                className="flex-1 text-sm bg-green-100 text-green-800 px-3 py-2 rounded-xl font-medium hover:bg-green-200 transition min-h-[44px]"
               >
                 Редактировать
               </button>
@@ -114,7 +114,11 @@ function AdminBathsList() {
                 type="button"
                 onClick={(e) => handleDeleteClick(e, bath)}
                 disabled={isDeleting && deletingId === bath.bath_id}
-                className="flex-1 rounded-lg bg-red-600 text-white py-2 text-sm font-medium hover:bg-red-700 transition disabled:opacity-50"
+                className={`flex-1 text-sm bg-red-100 text-red-800 px-3 py-2 rounded-xl font-medium transition min-h-[44px] ${
+                  isDeleting && deletingId === bath.bath_id
+                    ? 'opacity-50 cursor-not-allowed'
+                    : 'hover:bg-red-200'
+                }`}
               >
                 {isDeleting && deletingId === bath.bath_id ? 'Удаление...' : 'Удалить'}
               </button>

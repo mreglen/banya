@@ -50,7 +50,7 @@ function AdminDashboard() {
   const currentDate = new Date();
   const hours = currentDate.getHours();
   const greeting = hours < 6 ? 'Доброй ночи' : hours < 12 ? 'Доброе утро' : hours < 18 ? 'Добрый день' : 'Добрый вечер';
-  const userName = user?.full_name?.trim().split(/\s+/)[0] || 'Администратор';
+  const userName = user?.full_name?.trim() || 'Администратор';
 
   const [revenuePeriod, setRevenuePeriod] = useState('month');
 

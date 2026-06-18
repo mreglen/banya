@@ -1,12 +1,18 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import ListBaths from "./ListBaths/ListBaths";
-import WebsiteCategoriesPreview from "./WebsiteCategoriesPreview/WebsiteCategoriesPreview";
-import Booking from "../Booking/Booking";
-import ContactSection from "./ContactSection/ContactSection";
+import LazySection from '../../components/LazySection/LazySection';
 import { useReveal } from '../../hooks/useReveal';
 import { Calendar } from 'lucide-react';
 import SeoHead from '../../components/Seo/SeoHead';
 import SEO, { absoluteUrl } from '../../config/seo';
+
+const WebsiteCategoriesPreview = lazy(() => import('./WebsiteCategoriesPreview/WebsiteCategoriesPreview'));
+const Booking = lazy(() => import('../Booking/Booking'));
+const ContactSection = lazy(() => import('./ContactSection/ContactSection'));
+
+const SectionFallback = () => (
+  <div className="py-16 text-center text-gray-400">Загрузка...</div>
+);
 
 function Home() {
     useReveal();
@@ -52,7 +58,7 @@ function Home() {
                 }}
             />
             <header
-                className="relative w-full min-h-[100svh] flex items-center bg-cover bg-no-repeat bg-[center_top] sm:bg-center bg-scroll md:bg-fixed"
+                className="relative w-full min-h-[100svh] flex items-center bg-cover bg-no-repeat bg-[center_top] sm:bg-center bg-scroll"
                 style={{
                     backgroundImage: "url('/img/bg-home.png')",
                 }}
@@ -105,9 +111,21 @@ function Home() {
             </header>
 
             <div className="reveal"><ListBaths /></div>
-            <div className="reveal"><WebsiteCategoriesPreview /></div>
-            <div className="reveal"><Booking /></div>
-            <div className="reveal"><ContactSection /></div>
+            <LazySection className="reveal" minHeight="400px">
+              <Suspense fallback={<SectionFallback />}>
+                <WebsiteCategoriesPreview />
+              </Suspense>
+            </LazySection>
+            <LazySection className="reveal" minHeight="600px">
+              <Suspense fallback={<SectionFallback />}>
+                <Booking />
+              </Suspense>
+            </LazySection>
+            <LazySection className="reveal" minHeight="300px">
+              <Suspense fallback={<SectionFallback />}>
+                <ContactSection />
+              </Suspense>
+            </LazySection>
 
             {/* Sticky Booking Button for Mobile */}
             <div className={`fixed bottom-6 right-6 z-[100] transition-all duration-500 transform ${showSticky ? 'translate-y-0 opacity-100' : 'translate-y-20 opacity-0'}`}>

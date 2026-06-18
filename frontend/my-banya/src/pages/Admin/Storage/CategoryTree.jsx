@@ -140,7 +140,7 @@ const CategoryTree = ({
   };
 
   const handleModalSubmit = async (data) => {
-    const { id, name, parent_id, is_visible_on_website, imageFiles, deletePhoto } = data;
+    const { id, name, description, parent_id, is_visible_on_website, imageFiles, deletePhoto } = data;
 
     console.log('Submitting category update:', { id, name, parent_id, is_visible_on_website });
 
@@ -150,11 +150,11 @@ const CategoryTree = ({
       if (id) {
         // Редактирование
         console.log('Updating category with data:', { id, name, parent_id, is_visible_on_website });
-        await updateCategory({ id, name, parent_id, is_visible_on_website }).unwrap();
+        await updateCategory({ id, name, description, parent_id, is_visible_on_website }).unwrap();
         categoryId = id;
       } else {
         // Создание
-        const result = await createCategory({ name, parent_id, is_visible_on_website }).unwrap();
+        const result = await createCategory({ name, description, parent_id, is_visible_on_website }).unwrap();
         categoryId = result.id;
       }
 

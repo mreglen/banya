@@ -10,6 +10,7 @@ const CategoryModal = ({
   categoriesTree,
 }) => {
   const [name, setName] = useState('');
+  const [description, setDescription] = useState('');
   const [selectedParentId, setSelectedParentId] = useState(null);
   const [imageFiles, setImageFiles] = useState([]);
   const [currentImageUrls, setCurrentImageUrls] = useState([]);
@@ -73,6 +74,7 @@ const CategoryModal = ({
   useEffect(() => {
     if (isOpen) {
       setName(category?.name || '');
+      setDescription(category?.description || '');
       setSelectedParentId(category?.parent_id ?? null);
       setIsVisibleOnWebsite(Boolean(category?.is_visible_on_website));
       setImageFiles([]);
@@ -168,6 +170,7 @@ const CategoryModal = ({
     onSubmit({
       id: category?.id,
       name,
+      description: description.trim() || null,
       parent_id: selectedParentId,
       is_visible_on_website: isVisibleOnWebsite,
       imageFiles,
@@ -194,6 +197,16 @@ const CategoryModal = ({
               onChange={(e) => setName(e.target.value)}
               className="w-full p-2 border border-gray-300 rounded text-sm"
               placeholder="Название категории"
+            />
+          </div>
+
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-700 mb-1">Описание</label>
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              className="w-full p-2 border border-gray-300 rounded text-sm min-h-[80px] resize-y"
+              placeholder="Описание категории для сайта"
             />
           </div>
 

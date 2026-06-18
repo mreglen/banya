@@ -133,6 +133,7 @@ class Category(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, nullable=False)
+    description = Column(Text, nullable=True)
     is_visible_on_website = Column(Boolean, nullable=False, default=False)
     parent_id = Column(Integer, ForeignKey("categories.id"), nullable=True)
 

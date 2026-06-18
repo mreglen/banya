@@ -497,6 +497,7 @@ class Product(ProductBase):
 # === Категории товаров (для склада) ===
 class CategoryBase(BaseModel):
     name: str
+    description: Optional[str] = None
     parent_id: Optional[int] = None
     is_visible_on_website: bool = False
 
@@ -505,6 +506,7 @@ class CategoryCreate(CategoryBase):
 
 class CategoryUpdate(BaseModel):
     name: Optional[str] = None
+    description: Optional[str] = None
     parent_id: Optional[int] = None
     is_visible_on_website: Optional[bool] = None
     photo_urls: Optional[List[str]] = None
@@ -534,6 +536,7 @@ class WebsiteCategoryProduct(BaseModel):
 class WebsiteCategoryPreview(BaseModel):
     id: int
     name: str
+    description: Optional[str] = None
     photos: List[PhotoOut] = []
     products: List[WebsiteCategoryProduct] = []
 

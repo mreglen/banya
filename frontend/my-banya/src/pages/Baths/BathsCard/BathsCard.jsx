@@ -189,15 +189,20 @@ function BathsCard() {
               </p>
 
               <div className="pt-4">
-                <h3 className="text-xl font-medium text-gray-800 mb-4">Характеристики:</h3>
                 <div className="space-y-3 text-gray-700">
                   <div className="flex justify-between py-2 border-b border-gray-200">
                     <span className="text-gray-600">Цена с пн-чт:</span>
-                    <span className="font-medium">{bath.cost_weekday} ₽/час</span>
+                    <span className="font-medium inline-flex items-baseline gap-1">
+                      <span>{bath.cost_weekday}</span>
+                      <span>₽/час</span>
+                    </span>
                   </div>
                   <div className="flex justify-between py-2 border-b border-gray-200">
                     <span className="text-gray-600">Цена с пт-вс:</span>
-                    <span className="font-medium">{bath.cost_weekend} ₽/час</span>
+                    <span className="font-medium inline-flex items-baseline gap-1">
+                      <span>{bath.cost_weekend}</span>
+                      <span>₽/час</span>
+                    </span>
                   </div>
                   <div className="flex justify-between py-2 border-b border-gray-200">
                     <span className="text-gray-600">Базовое кол-во гостей:</span>
@@ -205,7 +210,10 @@ function BathsCard() {
                   </div>
                   <div className="flex justify-between py-2 border-b border-gray-200">
                     <span className="text-gray-600">Цена за доп. гостя:</span>
-                    <span className="font-medium">{bath.extra_guest_price} ₽</span>
+                    <span className="font-medium inline-flex items-baseline gap-1">
+                      <span>{bath.extra_guest_price}</span>
+                      <span>₽</span>
+                    </span>
                   </div>
                 </div>
               </div>
@@ -213,14 +221,15 @@ function BathsCard() {
               <div className="flex flex-col sm:flex-row gap-4 mt-8">
                 <CustomButton
                   to="/booking"
-                  text="Забронировать эту баню"
+                  text="Забронировать"
                   variant="green"
-                  className="py-3 text-base flex-1 text-center"
+                  className="py-3 text-base flex-1 w-full sm:w-auto"
                 />
                 <CustomButton
                   to="/baths"
                   text="Все бани"
-                  className="py-3 text-base flex-1 text-center border border-gray-300 text-gray-700 hover:bg-gray-100"
+                  variant="outline"
+                  className="py-3 text-base flex-1 w-full sm:w-auto"
                 />
               </div>
             </div>

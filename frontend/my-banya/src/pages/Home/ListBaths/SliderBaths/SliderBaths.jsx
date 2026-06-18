@@ -52,19 +52,23 @@ function SliderBaths() {
         speed={800}
         className="h-80 sm:h-96 md:h-[500px] lg:h-[600px] rounded-2xl"
       >
-        {baths.map((bath) => (
-          <SwiperSlide key={bath.id}>
+        {baths.map((bath, index) => {
+          const imageUrl = bath.photos?.[0]
+            ? `${SERVER_BASE_URL}${bath.photos[0].image_url}`
+            : bath.image;
+
+          return (
+          <SwiperSlide key={bath.bath_id || bath.id}>
             <div className="relative flex flex-col md:flex-row items-center justify-center h-full">
-
-           
-              <div
-                className="absolute inset-0 bg-cover bg-center"
-                style={{ backgroundImage: `url(${bath.photos?.[0] ? `${SERVER_BASE_URL}${bath.photos[0].image_url}` : bath.image})` }}
-              >
-                <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/50 to-transparent md:to-black/20"></div>
-              </div>
-
-         
+              <img
+                src={imageUrl}
+                alt={bath.name}
+                loading={index === 0 ? 'eager' : 'lazy'}
+                decoding="async"
+                fetchPriority={index === 0 ? 'high' : 'auto'}
+                className="absolute inset-0 w-full h-full object-cover"
+              />
+              <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/50 to-transparent md:to-black/20" />
               <div className="relative z-10 md:w-1/2 w-full px-6 md:px-12 py-16 md:py-0">
                 <div className="space-y-6 max-w-lg mx-auto md:mx-0 md:bg-black/30 md:backdrop-blur-sm md:p-8 md:rounded-2xl">
                   <h1 className="text-4xl sm:text-5xl lg:text-6xl font-light tracking-tight text-white drop-shadow-lg">
@@ -78,14 +82,15 @@ function SliderBaths() {
                     <CustomButton
                       to={`/baths/${bath.slug}`}
                       text="Подробнее"
-                      className="px-6 py-3"
+                      className="px-6 py-3 w-auto"
                     />
                   </div>
                 </div>
               </div>
             </div>
           </SwiperSlide>
-        ))}
+          );
+        })}
       </Swiper>
     </div>
   );

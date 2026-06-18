@@ -10,6 +10,8 @@ import {
 import CategorySelectModal from './CategorySelectModal';
 import UnitCreateModal from './UnitCreateModal';
 import { toast } from 'react-hot-toast';
+import { prepareImageForUpload } from '../../../utils/imageProcessing';
+import { isVideoFile } from '../../../utils/mediaHelpers';
 
 const findCategoryById = (cats, id) => {
   for (const cat of cats) {
@@ -62,13 +64,35 @@ const AddStorageProduct = () => {
     setFormData(prev => ({ ...prev, [name]: value === '' ? null : value }));
   };
 
-  const handleImageChange = (e) => {
-    const files = Array.from(e.target.files);
-    setImages(prev => [...prev, ...files]);
+  const handleImageChange = async (e) => {
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
+
+    try {
+      const processed = await Promise.all(
+        files.map(async (file) => {
+          if (isVideoFile(file)) {
+            return { file, preview: URL.createObjectURL(file), isVideo: true };
+          }
+          const preparedFile = await prepareImageForUpload(file);
+          return { file: preparedFile, preview: URL.createObjectURL(preparedFile), isVideo: false };
+        })
+      );
+      setImages((prev) => [...prev, ...processed]);
+    } catch (err) {
+      toast.error(err.message || 'Не удалось подготовить файлы');
+    } finally {
+      e.target.value = '';
+    }
   };
 
   const handleRemoveImage = (index) => {
-    setImages(prev => prev.filter((_, i) => i !== index));
+    setImages((prev) => {
+      const updated = [...prev];
+      const [removed] = updated.splice(index, 1);
+      if (removed?.preview) URL.revokeObjectURL(removed.preview);
+      return updated;
+    });
   };
 
   const handleCategorySelect = (categoryId) => {
@@ -124,7 +148,7 @@ const AddStorageProduct = () => {
 
       if (images.length > 0) {
         const formDataUpload = new FormData();
-        images.forEach(file => {
+        images.forEach(({ file }) => {
           formDataUpload.append('files', file);
         });
         await uploadProductPhotos({ productId, formData: formDataUpload }).unwrap();
@@ -249,17 +273,25 @@ const AddStorageProduct = () => {
             </label>
           </div>
 
-          {/* Фотографии */}
           <div className="mb-6">
-            <label className="block text-sm font-medium text-gray-700 mb-2">Фотографии</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Фотографии и видео</label>
             <div className="flex flex-wrap gap-3 mb-3">
-              {images.map((file, index) => (
+              {images.map((item, index) => (
                 <div key={index} className="relative">
-                  <img
-                    src={URL.createObjectURL(file)}
-                    alt={`preview ${index}`}
-                    className="w-20 h-20 object-cover rounded border"
-                  />
+                  {item.isVideo ? (
+                    <video
+                      src={item.preview}
+                      className="w-20 h-20 object-cover rounded border bg-black"
+                      muted
+                      playsInline
+                    />
+                  ) : (
+                    <img
+                      src={item.preview}
+                      alt={`preview ${index}`}
+                      className="w-20 h-20 object-cover rounded border"
+                    />
+                  )}
                   <button
                     type="button"
                     onClick={() => handleRemoveImage(index)}
@@ -273,7 +305,7 @@ const AddStorageProduct = () => {
             <input
               type="file"
               multiple
-              accept="image/*"
+              accept="image/*,video/*"
               onChange={handleImageChange}
               className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
             />

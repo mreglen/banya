@@ -1,18 +1,18 @@
 // src/pages/Admin/Storage/Product.jsx
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import {
   useGetProductByIdQuery,
   useUpdateProductMutation,
   useGetCategoriesQuery,
   useUploadProductPhotosMutation,
+  useDeleteProductPhotoMutation,
   useGetUnitsOfMeasurementQuery,
 } from '../../../redux/slices/productsApiSlice';
 import CategorySelectModal from './CategorySelectModal';
 import { prepareImageForUpload } from '../../../utils/imageProcessing';
+import { isVideoFile, isVideoUrl } from '../../../utils/mediaHelpers';
 import UnitCreateModal from './UnitCreateModal';
-
-const MAX_PRODUCT_IMAGES = 5;
 const ADD_UNIT_OPTION_VALUE = '__add_unit__';
 
 const findCategoryById = (categories, categoryId) => {
@@ -41,8 +41,11 @@ function Product() {
   const { data: units = [], isLoading: isLoadingUnits, refetch: refetchUnits } = useGetUnitsOfMeasurementQuery();
   const [updateProduct, { isLoading: isUpdating }] = useUpdateProductMutation();
   const [uploadPhotos, { isLoading: isUploadingPhotos }] = useUploadProductPhotosMutation();
+  const [deleteProductPhoto] = useDeleteProductPhotoMutation();
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
   const [isUnitModalOpen, setIsUnitModalOpen] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const fileInputRef = useRef(null);
 
   const [form, setForm] = useState({
     name: '',
@@ -58,7 +61,10 @@ function Product() {
 
   const [existingImages, setExistingImages] = useState([]);
   const [newImages, setNewImages] = useState([]);
-  const [photosTouched, setPhotosTouched] = useState(false);
+
+  const SERVER_BASE_URL = process.env.REACT_APP_API_URL
+    ? process.env.REACT_APP_API_URL.replace('/api', '')
+    : (window.location.origin || 'http://127.0.0.1:8000');
 
   useEffect(() => {
     if (isEditing && product) {
@@ -78,20 +84,20 @@ function Product() {
           : false,
       });
       if (product.photos?.length) {
-        const baseUrl = process.env.REACT_APP_API_URL ? process.env.REACT_APP_API_URL.replace('/api', '') : (window.location.origin || 'http://127.0.0.1:8000');
-        const fullUrls = product.photos.map(photo => {
-          const url = photo.image_url;
-          return url.startsWith('/')
-            ? `${baseUrl}${url}`
-            : `${baseUrl}/${url}`;
-        });
-        setExistingImages(fullUrls);
+        setExistingImages(
+          product.photos.map((photo) => ({
+            photoId: photo.photo_id,
+            url: photo.image_url.startsWith('/')
+              ? `${SERVER_BASE_URL}${photo.image_url}`
+              : `${SERVER_BASE_URL}/${photo.image_url}`,
+            isVideo: isVideoUrl(photo.image_url),
+          }))
+        );
       } else {
         setExistingImages([]);
       }
       newImages.forEach((item) => URL.revokeObjectURL(item.preview));
       setNewImages([]);
-      setPhotosTouched(false);
     }
   }, [isEditing, product, categories]);
 
@@ -115,46 +121,76 @@ function Product() {
     }));
   };
 
-  const handleImageChange = async (e) => {
-    const files = Array.from(e.target.files || []);
-    if (files.length === 0) return;
-
-    const usedSlots = existingImages.length + newImages.length;
-    const availableSlots = MAX_PRODUCT_IMAGES - usedSlots;
-    if (availableSlots <= 0) {
-      alert(`Можно загрузить не более ${MAX_PRODUCT_IMAGES} изображений`);
-      e.target.value = '';
-      return;
-    }
-
-    const filesToProcess = files.slice(0, availableSlots);
-    if (files.length > availableSlots) {
-      alert(`Будут добавлены только первые ${availableSlots} изображений (лимит ${MAX_PRODUCT_IMAGES})`);
-    }
+  const processFiles = async (files) => {
+    if (!files.length) return;
 
     try {
       const processed = await Promise.all(
-        filesToProcess.map(async (file) => {
-          if (!file.type.startsWith('image/')) {
-            throw new Error('Можно загружать только изображения');
+        files.map(async (file) => {
+          if (isVideoFile(file)) {
+            return {
+              file,
+              preview: URL.createObjectURL(file),
+              isVideo: true,
+            };
           }
+
           const preparedFile = await prepareImageForUpload(file);
-          return { file: preparedFile, preview: URL.createObjectURL(preparedFile) };
+          return {
+            file: preparedFile,
+            preview: URL.createObjectURL(preparedFile),
+            isVideo: false,
+          };
         })
       );
       setNewImages((prev) => [...prev, ...processed]);
-      setPhotosTouched(true);
     } catch (err) {
-      console.error('Ошибка обработки изображений товара:', err);
-      alert(err.message || 'Не удалось подготовить фото');
-    } finally {
-      e.target.value = '';
+      console.error('Ошибка обработки файлов товара:', err);
+      alert(err.message || 'Не удалось подготовить файлы');
     }
   };
 
-  const removeExistingImage = (indexToRemove) => {
+  const handleImageChange = async (e) => {
+    const files = Array.from(e.target.files || []);
+    await processFiles(files);
+    e.target.value = '';
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  };
+
+  const handleDrop = async (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    const files = Array.from(e.dataTransfer.files || []);
+    await processFiles(files);
+  };
+
+  const removeExistingImage = async (indexToRemove) => {
+    const image = existingImages[indexToRemove];
+    if (!image) return;
+
+    if (image.photoId) {
+      try {
+        await deleteProductPhoto({ productId, photoId: image.photoId }).unwrap();
+      } catch (err) {
+        console.error('Ошибка удаления фото:', err);
+        alert('Не удалось удалить файл');
+        return;
+      }
+    }
+
     setExistingImages((prev) => prev.filter((_, index) => index !== indexToRemove));
-    setPhotosTouched(true);
   };
 
   const removeNewImage = (indexToRemove) => {
@@ -164,7 +200,6 @@ function Product() {
       updated.splice(indexToRemove, 1);
       return updated;
     });
-    setPhotosTouched(true);
   };
 
   const handleCategorySelect = (categoryId) => {
@@ -200,7 +235,7 @@ function Product() {
 
       await updateProduct(productData).unwrap();
 
-      if (photosTouched) {
+      if (newImages.length > 0) {
         const formData = new FormData();
         newImages.forEach(({ file }) => {
           formData.append('files', file);
@@ -295,23 +330,32 @@ function Product() {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Фотографии (макс. 5)
+                Фотографии и видео
               </label>
 
               {(existingImages.length > 0 || newImages.length > 0) && (
                 <div className="grid grid-cols-3 sm:grid-cols-5 gap-3 mb-4">
-                  {existingImages.map((url, index) => (
-                    <div key={index} className="relative group">
-                      <img
-                        src={url}
-                        alt={`Фото ${index + 1}`}
-                        className="w-full h-24 object-cover rounded-lg border"
-                      />
+                  {existingImages.map((item, index) => (
+                    <div key={`existing-${item.photoId || index}`} className="relative group">
+                      {item.isVideo ? (
+                        <video
+                          src={item.url}
+                          className="w-full h-24 object-cover rounded-lg border bg-black"
+                          muted
+                          playsInline
+                        />
+                      ) : (
+                        <img
+                          src={item.url}
+                          alt={`Медиа ${index + 1}`}
+                          className="w-full h-24 object-cover rounded-lg border"
+                        />
+                      )}
                       <button
                         type="button"
                         onClick={() => removeExistingImage(index)}
                         className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow"
-                        title="Удалить фото"
+                        title="Удалить"
                       >
                         ×
                       </button>
@@ -319,16 +363,25 @@ function Product() {
                   ))}
                   {newImages.map((item, index) => (
                     <div key={`new-${index}`} className="relative group">
-                      <img
-                        src={item.preview}
-                        alt={`Новое фото ${index + 1}`}
-                        className="w-full h-24 object-cover rounded-lg border"
-                      />
+                      {item.isVideo ? (
+                        <video
+                          src={item.preview}
+                          className="w-full h-24 object-cover rounded-lg border bg-black"
+                          muted
+                          playsInline
+                        />
+                      ) : (
+                        <img
+                          src={item.preview}
+                          alt={`Новое медиа ${index + 1}`}
+                          className="w-full h-24 object-cover rounded-lg border"
+                        />
+                      )}
                       <button
                         type="button"
                         onClick={() => removeNewImage(index)}
                         className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow"
-                        title="Удалить фото"
+                        title="Удалить"
                       >
                         ×
                       </button>
@@ -337,22 +390,30 @@ function Product() {
                 </div>
               )}
 
-              {existingImages.length + newImages.length < MAX_PRODUCT_IMAGES && (
-                <label className="block w-full px-4 py-3 bg-white border-2 border-dashed border-gray-300 rounded-xl text-center text-gray-600 cursor-pointer hover:border-blue-500 hover:text-blue-500 transition">
-                  <span>Выберите файлы или перетащите сюда</span>
-                  <input
-                    type="file"
-                    multiple
-                    accept="image/*"
-                    onChange={handleImageChange}
-                    className="hidden"
-                    title={`Можно выбрать до ${MAX_PRODUCT_IMAGES - (existingImages.length + newImages.length)} изображений`}
-                  />
-                </label>
-              )}
+              <div
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+                onClick={() => fileInputRef.current?.click()}
+                className={`block w-full px-4 py-3 bg-white border-2 border-dashed rounded-xl text-center text-gray-600 cursor-pointer transition ${
+                  isDragging
+                    ? 'border-blue-500 text-blue-500 bg-blue-50'
+                    : 'border-gray-300 hover:border-blue-500 hover:text-blue-500'
+                }`}
+              >
+                <span>Выберите файлы или перетащите сюда</span>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  multiple
+                  accept="image/*,video/*"
+                  onChange={handleImageChange}
+                  className="hidden"
+                />
+              </div>
 
               <p className="text-xs text-gray-500 mt-1">
-                Поддерживаются только изображения. Максимум {MAX_PRODUCT_IMAGES} фото.
+                Поддерживаются изображения и видео.
               </p>
             </div>
 

@@ -86,6 +86,14 @@ with engine.begin() as connection:
     connection.execute(
         text(
             """
+            ALTER TABLE categories
+            ADD COLUMN IF NOT EXISTS description TEXT
+            """
+        )
+    )
+    connection.execute(
+        text(
+            """
             ALTER TABLE products
             ADD COLUMN IF NOT EXISTS is_countable BOOLEAN NOT NULL DEFAULT TRUE
             """

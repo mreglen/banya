@@ -38,6 +38,7 @@ def get_category(category_id: int, db: Session = Depends(get_db)):
 def create_category(category: CategoryCreate, db: Session = Depends(get_db)):
     db_category = Category(
         name=category.name,
+        description=category.description,
         parent_id=category.parent_id,
         is_visible_on_website=category.is_visible_on_website
     )
@@ -90,6 +91,10 @@ def update_category(
     # Handle name
     if "name" in update_data:
         db_category.name = update_data["name"]
+
+    # Handle description
+    if "description" in update_data:
+        db_category.description = update_data["description"]
     
     # Handle parent_id with cycle protection
     if "parent_id" in update_data:
@@ -213,6 +218,7 @@ def get_website_categories_preview(db: Session = Depends(get_db)):
             WebsiteCategoryPreview(
                 id=category.id,
                 name=category.name,
+                description=category.description,
                 photos=category.photos,
                 products=website_products,
             )

@@ -137,6 +137,15 @@ export const productsApiSlice = createApi({
                 { type: 'Product', id: productId }
             ],
         }),
+        deleteProductPhoto: builder.mutation({
+            query: ({ productId, photoId }) => ({
+                url: `/admin/products/${productId}/photos/${photoId}`,
+                method: 'DELETE',
+            }),
+            invalidatesTags: (result, error, { productId }) => [
+                { type: 'Product', id: productId }
+            ],
+        }),
         // --- ДОКУМЕНТЫ ПОСТУПЛЕНИЯ ---
         getEntranceDocuments: builder.query({
             query: () => '/admin/documents/entrance/',
@@ -217,6 +226,7 @@ export const {
     useGetStockProductsQuery,
     useUpdateProductMutation,
     useUploadProductPhotosMutation,
+    useDeleteProductPhotoMutation,
     useGetEntranceDocumentsQuery,
     useGetEntranceDocumentByIdQuery,
     useCreateEntranceDocumentMutation,

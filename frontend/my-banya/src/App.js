@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, lazy, Suspense } from 'react';
 import { useDispatch } from 'react-redux';
 import { setCredentials, logOut } from './redux/slices/authSlice';
 import { getProfile } from './redux/slices/adminApi';
@@ -14,46 +14,51 @@ import BathsCard from './pages/Baths/BathsCard/BathsCard';
 import AdminLogin from './pages/Admin/AdminLogin/AdminLogin';
 import PrivateRoute from './components/PrivateRoute';
 import Admin from './pages/Admin/Admin';
-import AdminReservations from './pages/Admin/Reservations/AdminReservationsNew';
-import AdminBookings from './pages/Admin/AdminBookings/AdminBookings';
-import AdminBathsList from './pages/Admin/AdminBaths/AdminBathsList';
-import BathForm from './pages/Admin/AdminBaths/BathForm';
-import DocumentEntrance from './pages/Admin/Documents/DocumentsEntrance/DocumentEntrance';
-import AddDocumentEntrance from './pages/Admin/Documents/DocumentsEntrance/AddDocumentEntrance';
-import Clients from './pages/Admin/Company/Clients/Clients';
-import ClientForm from './pages/Admin/Company/Clients/ClientsForm';
-import Partner from './pages/Admin/Company/Partners/Partner';
-import PartnerForm from './pages/Admin/Company/Partners/PartnerForm'
-import AddProduct from './pages/Admin/Services/AddProduct';
-import Storage from './pages/Admin/Storage/Storage';
-import Product from './pages/Admin/Storage/Product';
-import AddStorageProduct from './pages/Admin/Storage/AddStorageProduct';
-import DocumentsRealization from './pages/Admin/Documents/DocumentsRealization/DocumentsRealization';
-import DeletionRequestsPage from './pages/Admin/DeletionRequestsPage/DeletionRequestsPage';
-import Users from './pages/Admin/Company/Staffs/Users';
-import UserForm from './pages/Admin/Company/Staffs/UserForm';
 import RoleBasedRoute from './pages/Admin/Company/RoleBasedRoute/RoleBasedRoute';
-import Organization from './pages/Admin/Company/Organization/Organization';
-import AdminDashboard from './pages/Admin/AdminDashboard';
-import PasswordResetRequest from './pages/Admin/AdminLogin/PasswordResetRequest';
-import PasswordResetVerify from './pages/Admin/AdminLogin/PasswordResetVerify';
-import PasswordResetComplete from './pages/Admin/AdminLogin/PasswordResetComplete';
-import AdministratorHubPage from './pages/Admin/Administrator/AdministratorHubPage';
-import AdministratorAuditPage from './pages/Admin/Administrator/AdministratorPageNew';
-import Roles from './pages/Admin/Company/Staffs/Roles/Roles';
-import Promotions from './pages/Admin/Promotions/Promotions';
-import SettingsPage from './pages/Admin/Settings/SettingsPage';
-import SupportPage from './pages/Admin/Support/SupportPage';
-import CreateTicketForm from './pages/Admin/Support/CreateTicketForm';
-import ChatPage from './pages/Admin/Support/ChatPage';
-import ReservationPrintDocument from './pages/Admin/Reservations/ReservationPrintDocument';
-import AdminNotFound from './pages/Admin/AdminNotFound/AdminNotFound';
-import Finance from './pages/Admin/Finance/Finance';
-
-
-
-
 import { Toaster } from 'react-hot-toast';
+
+const AdminReservations = lazy(() => import('./pages/Admin/Reservations/AdminReservationsNew'));
+const AdminBookings = lazy(() => import('./pages/Admin/AdminBookings/AdminBookings'));
+const AdminBathsList = lazy(() => import('./pages/Admin/AdminBaths/AdminBathsList'));
+const BathForm = lazy(() => import('./pages/Admin/AdminBaths/BathForm'));
+const DocumentEntrance = lazy(() => import('./pages/Admin/Documents/DocumentsEntrance/DocumentEntrance'));
+const AddDocumentEntrance = lazy(() => import('./pages/Admin/Documents/DocumentsEntrance/AddDocumentEntrance'));
+const Clients = lazy(() => import('./pages/Admin/Company/Clients/Clients'));
+const ClientForm = lazy(() => import('./pages/Admin/Company/Clients/ClientsForm'));
+const Partner = lazy(() => import('./pages/Admin/Company/Partners/Partner'));
+const PartnerForm = lazy(() => import('./pages/Admin/Company/Partners/PartnerForm'));
+const AddProduct = lazy(() => import('./pages/Admin/Services/AddProduct'));
+const Storage = lazy(() => import('./pages/Admin/Storage/Storage'));
+const Product = lazy(() => import('./pages/Admin/Storage/Product'));
+const AddStorageProduct = lazy(() => import('./pages/Admin/Storage/AddStorageProduct'));
+const DocumentsRealization = lazy(() => import('./pages/Admin/Documents/DocumentsRealization/DocumentsRealization'));
+const DeletionRequestsPage = lazy(() => import('./pages/Admin/DeletionRequestsPage/DeletionRequestsPage'));
+const Users = lazy(() => import('./pages/Admin/Company/Staffs/Users'));
+const UserForm = lazy(() => import('./pages/Admin/Company/Staffs/UserForm'));
+const Organization = lazy(() => import('./pages/Admin/Company/Organization/Organization'));
+const AdminDashboard = lazy(() => import('./pages/Admin/AdminDashboard'));
+const PasswordResetRequest = lazy(() => import('./pages/Admin/AdminLogin/PasswordResetRequest'));
+const PasswordResetVerify = lazy(() => import('./pages/Admin/AdminLogin/PasswordResetVerify'));
+const PasswordResetComplete = lazy(() => import('./pages/Admin/AdminLogin/PasswordResetComplete'));
+const AdministratorHubPage = lazy(() => import('./pages/Admin/Administrator/AdministratorHubPage'));
+const AdministratorAuditPage = lazy(() => import('./pages/Admin/Administrator/AdministratorPageNew'));
+const Roles = lazy(() => import('./pages/Admin/Company/Staffs/Roles/Roles'));
+const Promotions = lazy(() => import('./pages/Admin/Promotions/Promotions'));
+const SettingsPage = lazy(() => import('./pages/Admin/Settings/SettingsPage'));
+const SupportPage = lazy(() => import('./pages/Admin/Support/SupportPage'));
+const CreateTicketForm = lazy(() => import('./pages/Admin/Support/CreateTicketForm'));
+const ChatPage = lazy(() => import('./pages/Admin/Support/ChatPage'));
+const ReservationPrintDocument = lazy(() => import('./pages/Admin/Reservations/ReservationPrintDocument'));
+const AdminNotFound = lazy(() => import('./pages/Admin/AdminNotFound/AdminNotFound'));
+const Finance = lazy(() => import('./pages/Admin/Finance/Finance'));
+
+const AdminPageFallback = () => (
+  <div className="min-h-[40vh] flex items-center justify-center text-gray-500">Загрузка...</div>
+);
+
+const withAdminSuspense = (element) => (
+  <Suspense fallback={<AdminPageFallback />}>{element}</Suspense>
+);
 
 const isPwaStandalone = () =>
   window.matchMedia('(display-mode: standalone)').matches ||
@@ -73,29 +78,23 @@ function AppWithLayout() {
   }, [location.pathname, navigate]);
 
   useEffect(() => {
-    if (token) {
-      console.log('\n=== RESTORING USER SESSION ===');
-      console.log('Token present:', !!token);
+    const isAdminSessionRoute =
+      location.pathname.startsWith('/admin') &&
+      location.pathname !== '/admin/login' &&
+      !location.pathname.startsWith('/admin/reset-password');
+
+    if (token && isAdminSessionRoute) {
       getProfile()
         .then((res) => {
-          console.log("✅ User loaded:", res.data);
           dispatch(setCredentials({ access_token: token, user: res.data }));
         })
         .catch((err) => {
-          console.error('❌ Failed to restore user:', err.message);
-          console.error('Response status:', err.response?.status);
-          console.error('Response data:', err.response?.data);
-          // Don't log out immediately on error - keep stored user data
-          // Only clear if it's a 401 (token expired/invalid)
           if (err.response?.status === 401) {
-            console.log('🔐 Token expired, logging out');
             dispatch(logOut());
-          } else {
-            console.log('⚠️ Network error, keeping stored user data');
           }
         });
     }
-  }, [dispatch, token]);
+  }, [dispatch, token, location.pathname]);
 
   return (
     <>
@@ -138,50 +137,50 @@ function AppWithLayout() {
           </PrivateRoute>
         }>
           {/* <Route index element={<div>Добро пожаловать в админ-панель</div>} /> */}
-          <Route index element={<AdminDashboard />} />
+          <Route index element={withAdminSuspense(<AdminDashboard />)} />
 
-          <Route path="administrator" element={<AdministratorHubPage />} />
-          <Route path="administrator/audit" element={<AdministratorAuditPage />} />
-          <Route path="administrator/roles" element={<Roles />} />
-          <Route path="reservations" element={<RoleBasedRoute requiredPermission="reservations:view"><AdminReservations /></RoleBasedRoute>} />
-          <Route path="reservations/print/:id" element={<RoleBasedRoute requiredPermission="reservations:view"><ReservationPrintDocument /></RoleBasedRoute>} />
-          <Route path="bookings" element={<RoleBasedRoute requiredPermission="bookings:view"><AdminBookings /></RoleBasedRoute>} />
-          <Route path="baths" element={<RoleBasedRoute requiredPermission="baths:view"><AdminBathsList /></RoleBasedRoute>} />
-          <Route path="baths/add" element={<RoleBasedRoute requiredPermission="baths:manage"><BathForm /></RoleBasedRoute>} />
-          <Route path="baths/edit/:id" element={<RoleBasedRoute requiredPermission="baths:manage"><BathForm /></RoleBasedRoute>} />
-          <Route path="promotions" element={<RoleBasedRoute requiredPermission="promotions:view"><Promotions /></RoleBasedRoute>} />
-          <Route path="documents/entrance" element={<RoleBasedRoute requiredPermission="documents:view"><DocumentEntrance /></RoleBasedRoute>} />
-          <Route path="documents/entrance/add" element={<RoleBasedRoute requiredPermission="documents:manage"><AddDocumentEntrance /></RoleBasedRoute>} />
-          <Route path="documents/entrance/edit/:id" element={<RoleBasedRoute requiredPermission="documents:manage"><AddDocumentEntrance /></RoleBasedRoute>} />
-          <Route path="documents/realization" element={<RoleBasedRoute requiredPermission="documents:view"><DocumentsRealization /></RoleBasedRoute>} />
-          <Route path="company/client" element={<RoleBasedRoute requiredPermission="clients:view"><Clients /></RoleBasedRoute>} />
-          <Route path="company/client/edit/:id" element={<RoleBasedRoute requiredPermission="clients:manage"><ClientForm /></RoleBasedRoute>} />
-          <Route path="company/client/add" element={<RoleBasedRoute requiredPermission="clients:manage"><ClientForm /></RoleBasedRoute>} />
-          <Route path="company/user" element={<RoleBasedRoute requiredPermission="staff:view"><Users /></RoleBasedRoute>} />
-          <Route path="company/user/edit/:id" element={<RoleBasedRoute requiredPermission="staff:manage"><UserForm /></RoleBasedRoute>} />
-          <Route path="company/user/add" element={<RoleBasedRoute requiredPermission="staff:manage"><UserForm /></RoleBasedRoute>} />
-          <Route path="company/partner" element={<RoleBasedRoute requiredPermission="partners:view"><Partner /></RoleBasedRoute>} />
-          <Route path="company/partner/edit/:id" element={<RoleBasedRoute requiredPermission="partners:manage"><PartnerForm /></RoleBasedRoute>} />
-          <Route path="company/partner/add" element={<RoleBasedRoute requiredPermission="partners:manage"><PartnerForm /></RoleBasedRoute>} />
-          <Route path="company/organization" element={<Organization />} />
-          <Route path="storage/nomenclature" element={<RoleBasedRoute requiredPermission="storage:view"><Storage /></RoleBasedRoute>} />
-          <Route path="storage/nomenclature/add/product" element={<RoleBasedRoute requiredPermission="storage:manage"><AddStorageProduct /></RoleBasedRoute>} />
-          <Route path="storage/product/:id" element={<RoleBasedRoute requiredPermission="storage:view"><Product /></RoleBasedRoute>} />
-          <Route path="deletion-requests" element={<RoleBasedRoute requiredPermission="staff:manage"><DeletionRequestsPage /></RoleBasedRoute>} />
-          <Route path="add-product" element={<RoleBasedRoute requiredPermission="storage:manage"><AddProduct /></RoleBasedRoute>} />
-          <Route path="settings" element={<SettingsPage />} />
-          <Route path="finance" element={<RoleBasedRoute requiredPermission="finance:view"><Finance /></RoleBasedRoute>} />
-          <Route path="support" element={<SupportPage />} />
-          <Route path="support/create" element={<CreateTicketForm />} />
-          <Route path="support/ticket/:id" element={<ChatPage />} />
-          <Route path="*" element={<AdminNotFound />} />
+          <Route path="administrator" element={withAdminSuspense(<AdministratorHubPage />)} />
+          <Route path="administrator/audit" element={withAdminSuspense(<AdministratorAuditPage />)} />
+          <Route path="administrator/roles" element={withAdminSuspense(<Roles />)} />
+          <Route path="reservations" element={withAdminSuspense(<RoleBasedRoute requiredPermission="reservations:view"><AdminReservations /></RoleBasedRoute>)} />
+          <Route path="reservations/print/:id" element={withAdminSuspense(<RoleBasedRoute requiredPermission="reservations:view"><ReservationPrintDocument /></RoleBasedRoute>)} />
+          <Route path="bookings" element={withAdminSuspense(<RoleBasedRoute requiredPermission="bookings:view"><AdminBookings /></RoleBasedRoute>)} />
+          <Route path="baths" element={withAdminSuspense(<RoleBasedRoute requiredPermission="baths:view"><AdminBathsList /></RoleBasedRoute>)} />
+          <Route path="baths/add" element={withAdminSuspense(<RoleBasedRoute requiredPermission="baths:manage"><BathForm /></RoleBasedRoute>)} />
+          <Route path="baths/edit/:id" element={withAdminSuspense(<RoleBasedRoute requiredPermission="baths:manage"><BathForm /></RoleBasedRoute>)} />
+          <Route path="promotions" element={withAdminSuspense(<RoleBasedRoute requiredPermission="promotions:view"><Promotions /></RoleBasedRoute>)} />
+          <Route path="documents/entrance" element={withAdminSuspense(<RoleBasedRoute requiredPermission="documents:view"><DocumentEntrance /></RoleBasedRoute>)} />
+          <Route path="documents/entrance/add" element={withAdminSuspense(<RoleBasedRoute requiredPermission="documents:manage"><AddDocumentEntrance /></RoleBasedRoute>)} />
+          <Route path="documents/entrance/edit/:id" element={withAdminSuspense(<RoleBasedRoute requiredPermission="documents:manage"><AddDocumentEntrance /></RoleBasedRoute>)} />
+          <Route path="documents/realization" element={withAdminSuspense(<RoleBasedRoute requiredPermission="documents:view"><DocumentsRealization /></RoleBasedRoute>)} />
+          <Route path="company/client" element={withAdminSuspense(<RoleBasedRoute requiredPermission="clients:view"><Clients /></RoleBasedRoute>)} />
+          <Route path="company/client/edit/:id" element={withAdminSuspense(<RoleBasedRoute requiredPermission="clients:manage"><ClientForm /></RoleBasedRoute>)} />
+          <Route path="company/client/add" element={withAdminSuspense(<RoleBasedRoute requiredPermission="clients:manage"><ClientForm /></RoleBasedRoute>)} />
+          <Route path="company/user" element={withAdminSuspense(<RoleBasedRoute requiredPermission="staff:view"><Users /></RoleBasedRoute>)} />
+          <Route path="company/user/edit/:id" element={withAdminSuspense(<RoleBasedRoute requiredPermission="staff:manage"><UserForm /></RoleBasedRoute>)} />
+          <Route path="company/user/add" element={withAdminSuspense(<RoleBasedRoute requiredPermission="staff:manage"><UserForm /></RoleBasedRoute>)} />
+          <Route path="company/partner" element={withAdminSuspense(<RoleBasedRoute requiredPermission="partners:view"><Partner /></RoleBasedRoute>)} />
+          <Route path="company/partner/edit/:id" element={withAdminSuspense(<RoleBasedRoute requiredPermission="partners:manage"><PartnerForm /></RoleBasedRoute>)} />
+          <Route path="company/partner/add" element={withAdminSuspense(<RoleBasedRoute requiredPermission="partners:manage"><PartnerForm /></RoleBasedRoute>)} />
+          <Route path="company/organization" element={withAdminSuspense(<Organization />)} />
+          <Route path="storage/nomenclature" element={withAdminSuspense(<RoleBasedRoute requiredPermission="storage:view"><Storage /></RoleBasedRoute>)} />
+          <Route path="storage/nomenclature/add/product" element={withAdminSuspense(<RoleBasedRoute requiredPermission="storage:manage"><AddStorageProduct /></RoleBasedRoute>)} />
+          <Route path="storage/product/:id" element={withAdminSuspense(<RoleBasedRoute requiredPermission="storage:view"><Product /></RoleBasedRoute>)} />
+          <Route path="deletion-requests" element={withAdminSuspense(<RoleBasedRoute requiredPermission="staff:manage"><DeletionRequestsPage /></RoleBasedRoute>)} />
+          <Route path="add-product" element={withAdminSuspense(<RoleBasedRoute requiredPermission="storage:manage"><AddProduct /></RoleBasedRoute>)} />
+          <Route path="settings" element={withAdminSuspense(<SettingsPage />)} />
+          <Route path="finance" element={withAdminSuspense(<RoleBasedRoute requiredPermission="finance:view"><Finance /></RoleBasedRoute>)} />
+          <Route path="support" element={withAdminSuspense(<SupportPage />)} />
+          <Route path="support/create" element={withAdminSuspense(<CreateTicketForm />)} />
+          <Route path="support/ticket/:id" element={withAdminSuspense(<ChatPage />)} />
+          <Route path="*" element={withAdminSuspense(<AdminNotFound />)} />
         </Route>
 
 
         <Route path="/admin/login" element={<AdminLogin />} />
-        <Route path="/admin/reset-password" element={<PasswordResetRequest />} />
-        <Route path="/admin/reset-password/verify" element={<PasswordResetVerify />} />
-        <Route path="/admin/reset-password/complete" element={<PasswordResetComplete />} />
+        <Route path="/admin/reset-password" element={withAdminSuspense(<PasswordResetRequest />)} />
+        <Route path="/admin/reset-password/verify" element={withAdminSuspense(<PasswordResetVerify />)} />
+        <Route path="/admin/reset-password/complete" element={withAdminSuspense(<PasswordResetComplete />)} />
         <Route path="*" element={<LandingNotFound />} />
       </Routes>
     </>
