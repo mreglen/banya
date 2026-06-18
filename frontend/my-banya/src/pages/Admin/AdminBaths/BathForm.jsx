@@ -78,8 +78,15 @@ function BathForm() {
       base_guests: bath.base_guests ?? 4,
       extra_guest_price: bath.extra_guest_price ?? 500,
     });
-    setSelectedPromotionIds(bath.promotions?.map((p) => p.id) || []);
   }, [bath]);
+
+  // Акции инициализируем только при открытии другой бани, не при каждом refetch
+  useEffect(() => {
+    if (!bathFromApi?.bath_id) return;
+    setSelectedPromotionIds(
+      (bathFromApi.promotions || []).map((p) => Number(p.id))
+    );
+  }, [bathFromApi?.bath_id]);
 
   // Старые ссылки /edit/1 → /edit/slug
   useEffect(() => {
@@ -416,12 +423,19 @@ function BathForm() {
                 <label key={promo.id} className="flex items-center gap-3 p-2 hover:bg-gray-50 rounded-lg cursor-pointer">
                   <input
                     type="checkbox"
-                    checked={selectedPromotionIds.includes(promo.id)}
+                    checked={selectedPromotionIds.some((id) => Number(id) === Number(promo.id))}
                     onChange={(e) => {
+                      const promoId = Number(promo.id);
                       if (e.target.checked) {
-                        setSelectedPromotionIds(prev => [...prev, promo.id]);
+                        setSelectedPromotionIds((prev) =>
+                          prev.some((id) => Number(id) === promoId)
+                            ? prev
+                            : [...prev, promoId]
+                        );
                       } else {
-                        setSelectedPromotionIds(prev => prev.filter(id => id !== promo.id));
+                        setSelectedPromotionIds((prev) =>
+                          prev.filter((id) => Number(id) !== promoId)
+                        );
                       }
                     }}
                     className="w-4 h-4 text-green-600 rounded focus:ring-green-500"

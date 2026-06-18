@@ -164,7 +164,7 @@ function Header() {
                 key={title}
                 href={anchor}
                 onClick={(e) => handleClick(e, anchor)}
-                className={`relative px-4 py-2 rounded-xl text-base font-medium transition-all duration-300 group
+                className={`relative px-4 py-2 rounded-xl text-lg font-medium transition-all duration-300 group
                   ${activeSection === sectionId 
                     ? isScrolled
                       ? 'text-green-700 bg-green-50'
@@ -186,7 +186,7 @@ function Header() {
             <a
               href="#booking"
               onClick={handleBookClick}
-              className={`ml-4 px-6 py-2.5 rounded-xl font-semibold transition-all duration-300 transform hover:scale-105 hover:shadow-xl
+              className={`ml-4 px-6 py-2.5 rounded-xl text-lg font-semibold transition-all duration-300 transform hover:scale-105 hover:shadow-xl
                 ${isScrolled
                   ? 'bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white shadow-lg shadow-green-500/30'
                   : 'bg-white text-green-700 hover:bg-green-50 shadow-lg shadow-black/20'
@@ -264,7 +264,7 @@ function Header() {
                   key={title}
                   href={anchor}
                   onClick={(e) => handleClick(e, anchor)}
-                  className={`flex items-center gap-4 px-4 py-3 rounded-xl text-base font-medium transition-all duration-300
+                  className={`flex items-center gap-4 px-4 py-3 rounded-xl text-lg font-medium transition-all duration-300
                     ${activeSection === sectionId 
                       ? 'text-green-700 bg-green-50'
                       : 'text-gray-700 hover:text-green-700 hover:bg-green-50/50'
@@ -284,7 +284,7 @@ function Header() {
             <a
               href="#booking"
               onClick={handleBookClick}
-              className="flex items-center justify-center gap-2 w-full px-6 py-3 rounded-xl font-semibold bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white shadow-lg shadow-green-500/30 transition-all duration-300 transform hover:scale-105"
+              className="flex items-center justify-center gap-2 w-full px-6 py-3 rounded-xl text-lg font-semibold bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white shadow-lg shadow-green-500/30 transition-all duration-300 transform hover:scale-105"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
