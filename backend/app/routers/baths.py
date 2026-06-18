@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.exc import IntegrityError
 from typing import List, Optional
 import os
 import uuid
@@ -186,9 +187,16 @@ def delete_bath(bath_id: int, db: Session = Depends(get_db)):
     db_bath = db.query(Bath).filter(Bath.bath_id == bath_id).first()
     if not db_bath:
         raise HTTPException(status_code=404, detail="Баня не найдена")
-    
-    db.delete(db_bath)
-    db.commit()
+
+    try:
+        db.delete(db_bath)
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=400,
+            detail="Нельзя удалить баню: есть связанные бронирования или заявки",
+        )
     return None
 
 @router.delete("/{bath_id}/photos/{photo_id}", status_code=200)
@@ -220,9 +228,22 @@ def delete_bath_photo(
     
     return {"message": "Фото успешно удалено"}
 
-# добавить фото
+# добавить фото и видео
 UPLOAD_DIR = Path("uploads/photos/baths/")
+VIDEO_UPLOAD_DIR = Path("uploads/videos/baths/")
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+VIDEO_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+
+VIDEO_EXTENSIONS = {".mp4", ".webm", ".mov", ".ogg", ".mkv", ".m4v"}
+
+
+def _is_video_upload(file: UploadFile) -> bool:
+    content_type = (file.content_type or "").lower()
+    if content_type.startswith("video/"):
+        return True
+    ext = Path(file.filename or "").suffix.lower()
+    return ext in VIDEO_EXTENSIONS
+
 
 @router.post("/{bath_id}/upload", response_model=List[str])
 async def upload_bath_photos(
@@ -234,29 +255,38 @@ async def upload_bath_photos(
     if not db_bath:
         raise HTTPException(status_code=404, detail="Баня не найдена")
 
-    # Удаляем старые фото перед загрузкой новых
-    db.query(Photo).filter(Photo.bath_id == bath_id).delete()
-
     urls = []
     for file in files:
         content = await file.read()
-        
-        # Process: compress, convert to WebP, strip metadata
-        webp_bytes = process_image_to_webp(content)
-        
-        # Generate hash-based filename
-        file_hash = hashlib.sha256(webp_bytes).hexdigest()[:16]
-        unique_filename = f"{file_hash}.webp"
-        filepath = UPLOAD_DIR / unique_filename
-        
-        # Save processed WebP file
-        with open(filepath, "wb") as f:
-            f.write(webp_bytes)
-        
-        # Save URL to database (relative to uploads directory)
-        db_photo = Photo(image_url=f"/uploads/photos/baths/{unique_filename}", bath=db_bath)
+
+        if _is_video_upload(file):
+            ext = Path(file.filename or "").suffix.lower()
+            if ext not in VIDEO_EXTENSIONS:
+                ext = ".mp4"
+            file_hash = hashlib.sha256(content).hexdigest()[:16]
+            unique_filename = f"{file_hash}{ext}"
+            filepath = VIDEO_UPLOAD_DIR / unique_filename
+            with open(filepath, "wb") as f:
+                f.write(content)
+            image_url = f"/uploads/videos/baths/{unique_filename}"
+        else:
+            try:
+                webp_bytes = process_image_to_webp(content)
+            except Exception:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Не удалось обработать изображение: {file.filename}",
+                )
+            file_hash = hashlib.sha256(webp_bytes).hexdigest()[:16]
+            unique_filename = f"{file_hash}.webp"
+            filepath = UPLOAD_DIR / unique_filename
+            with open(filepath, "wb") as f:
+                f.write(webp_bytes)
+            image_url = f"/uploads/photos/baths/{unique_filename}"
+
+        db_photo = Photo(image_url=image_url, bath=db_bath)
         db.add(db_photo)
-        urls.append(f"/uploads/photos/baths/{unique_filename}")
+        urls.append(image_url)
 
     db.commit()
     return urls

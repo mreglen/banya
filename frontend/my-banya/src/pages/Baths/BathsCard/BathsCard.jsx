@@ -4,6 +4,23 @@ import { useGetBathByIdQuery } from '../../../redux/slices/apiSlice';
 import { useState, useEffect } from 'react';
 import SeoHead from '../../../components/Seo/SeoHead';
 import { absoluteUrl } from '../../../config/seo';
+import { isVideoUrl } from '../../../utils/mediaHelpers';
+
+function BathMedia({ url, alt, className, controls = false, muted = false }) {
+  if (isVideoUrl(url)) {
+    return (
+      <video
+        src={url}
+        className={className}
+        controls={controls}
+        muted={muted}
+        playsInline
+      />
+    );
+  }
+
+  return <img src={url} alt={alt} className={className} />;
+}
 
 function BathsCard() {
   const { slug } = useParams();
@@ -33,8 +50,8 @@ function BathsCard() {
   }, [bath, mainIndex]);
 
   const handleThumbnailClick = (thumbIndex) => {
-    setCurrentImageIndex(thumbIndex + 1);
-    setSearchParams({ main: thumbIndex + 1 });
+    setCurrentImageIndex(thumbIndex);
+    setSearchParams({ main: thumbIndex });
   };
 
   const handlePreviousImage = () => {
@@ -81,6 +98,8 @@ function BathsCard() {
     );
   };
   
+  const ogImage = images.find((url) => !isVideoUrl(url)) || images[0];
+
   return (
     <main className="py-12 px-6 bg-white min-h-screen mt-28">
       <SeoHead
@@ -88,14 +107,14 @@ function BathsCard() {
         description={bath.description || `${bath.name} - ${bath.title}. Русская баня на дровах в Екатеринбурге.`}
         keywords={`${bath.name}, баня ${bath.name}, русская баня, баня на дровах, Николаевские бани`}
         canonical={`/baths/${bath.slug || slug}`}
-        ogImage={images[0] || undefined}
+        ogImage={ogImage || undefined}
         jsonLd={{
           '@context': 'https://schema.org',
           '@type': 'TouristAttraction',
           name: bath.name,
           description: bath.description,
           url: absoluteUrl(`/baths/${bath.slug || slug}`),
-          image: images[0] || '',
+          image: ogImage || '',
           touristType: 'Отдых и оздоровление',
         }}
       />
@@ -107,11 +126,12 @@ function BathsCard() {
 
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-8 items-start">
           <div className="lg:col-span-2 space-y-4">
-            <div className="relative rounded-2xl overflow-hidden shadow-lg">
-              <img
-                src={images[currentImageIndex]}
+            <div className="relative rounded-2xl overflow-hidden shadow-lg bg-black">
+              <BathMedia
+                url={images[currentImageIndex]}
                 alt={bath.name}
                 className="w-full h-64 sm:h-80 object-cover"
+                controls={isVideoUrl(images[currentImageIndex])}
               />
               
               {/* Навигационные стрелки поверх фото */}
@@ -151,10 +171,11 @@ function BathsCard() {
                   }`}
                   onClick={() => handleThumbnailClick(index)}
                 >
-                  <img
-                    src={img}
+                  <BathMedia
+                    url={img}
                     alt={`${bath.name} — деталь ${index + 1}`}
                     className="w-full h-24 object-cover hover:scale-105 transition-transform duration-300"
+                    muted
                   />
                 </div>
               ))}

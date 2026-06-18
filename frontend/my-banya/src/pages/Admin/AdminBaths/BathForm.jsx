@@ -10,9 +10,8 @@ import {
 } from '../../../redux/slices/apiSlice';
 import { useGetPromotionsQuery } from '../../../redux/slices/promotionsApiSlice';
 import { prepareImageForUpload } from '../../../utils/imageProcessing';
+import { isVideoFile, isVideoUrl } from '../../../utils/mediaHelpers';
 import { toast } from 'react-hot-toast';
-
-const MAX_FILES = 5;
 
 const formatApiError = (detail, fallback = 'Ошибка при сохранении бани') => {
   if (!detail) return fallback;
@@ -197,27 +196,31 @@ function BathForm() {
 
   const handleFileChange = async (e) => {
     const files = Array.from(e.target.files);
-    if (files.length + selectedFiles.length > MAX_FILES) {
-      toast.error(`Можно загрузить не более ${MAX_FILES} фото`);
-      return;
-    }
 
     try {
       const processedFiles = await Promise.all(
         files.map(async (file) => {
-          const preparedFile = await prepareImageForUpload(file);
+          if (isVideoFile(file)) {
+            return {
+              file,
+              preview: URL.createObjectURL(file),
+              isVideo: true,
+            };
+          }
 
+          const preparedFile = await prepareImageForUpload(file);
           return {
             file: preparedFile,
             preview: URL.createObjectURL(preparedFile),
+            isVideo: false,
           };
         })
       );
 
-      setSelectedFiles(prev => [...prev, ...processedFiles]);
+      setSelectedFiles((prev) => [...prev, ...processedFiles]);
     } catch (err) {
-      console.error('Ошибка обработки изображений:', err);
-      toast.error(err.message || 'Не удалось подготовить изображения');
+      console.error('Ошибка обработки файлов:', err);
+      toast.error(err.message || 'Не удалось подготовить файлы');
     } finally {
       e.target.value = '';
     }
@@ -437,15 +440,15 @@ function BathForm() {
             </div>
           </div>
 
-          {/* Загрузка фото */}
+          {/* Загрузка фото и видео */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Загрузить фото (до 5 шт.)
+              Загрузить фото и видео
             </label>
             <input
               type="file"
               multiple
-              accept="image/*"
+              accept="image/*,video/*"
               onChange={handleFileChange}
               disabled={isSaving}
               className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 disabled:opacity-50"
@@ -455,7 +458,7 @@ function BathForm() {
             {selectedFiles.length > 0 && (
               <div className="mt-3">
                 <div className="flex justify-between items-center mb-2">
-                  <p className="text-sm text-gray-600">Выбранные фото:</p>
+                  <p className="text-sm text-gray-600">Выбранные файлы:</p>
                   {!isSaving && (
                     <button
                       type="button"
@@ -472,11 +475,20 @@ function BathForm() {
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
                   {selectedFiles.map((item, idx) => (
                     <div key={idx} className="relative group">
-                      <img
-                        src={item.preview}
-                        alt={`Превью ${idx + 1}`}
-                        className="w-full h-32 object-cover rounded-lg border border-gray-200"
-                      />
+                      {item.isVideo ? (
+                        <video
+                          src={item.preview}
+                          className="w-full h-32 object-cover rounded-lg border border-gray-200 bg-black"
+                          muted
+                          playsInline
+                        />
+                      ) : (
+                        <img
+                          src={item.preview}
+                          alt={`Превью ${idx + 1}`}
+                          className="w-full h-32 object-cover rounded-lg border border-gray-200"
+                        />
+                      )}
                       {!isSaving && (
                         <button
                           type="button"
@@ -514,16 +526,29 @@ function BathForm() {
           {isEditing && bath?.photos && bath.photos.length > 0 && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Текущие фото:
+                Текущие фото и видео:
               </label>
               <div className="flex flex-wrap gap-4">
-                {bath.photos.map((photo, idx) => (
+                {bath.photos.map((photo, idx) => {
+                  const mediaUrl = `${SERVER_BASE_URL}${photo.image_url}`;
+                  const isVideo = isVideoUrl(photo.image_url);
+                  return (
                   <div key={photo.photo_id} className="relative">
-                    <img
-                      src={`${SERVER_BASE_URL}${photo.image_url}`}
-                      alt={`Фото ${idx + 1}`}
-                      className="w-24 h-24 object-cover rounded-lg border border-gray-200"
-                    />
+                    {isVideo ? (
+                      <video
+                        src={mediaUrl}
+                        className="w-24 h-24 object-cover rounded-lg border border-gray-200 bg-black"
+                        muted
+                        playsInline
+                        controls
+                      />
+                    ) : (
+                      <img
+                        src={mediaUrl}
+                        alt={`Медиа ${idx + 1}`}
+                        className="w-24 h-24 object-cover rounded-lg border border-gray-200"
+                      />
+                    )}
                     <button
                       type="button"
                       onClick={() => handleDeletePhoto(photo.photo_id)}
@@ -533,7 +558,8 @@ function BathForm() {
                       ×
                     </button>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}
