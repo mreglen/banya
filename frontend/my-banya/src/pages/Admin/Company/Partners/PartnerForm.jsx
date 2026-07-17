@@ -136,15 +136,17 @@ function PartnerForm() {
     const payload = {
       supplier_name: name,
       person_name: contactPerson,
-      partner_inn: inn || null,
-      partner_phone: normalizedPhone,
-      partner_email: email || null,
+      partner_inn: inn || '',
+      partner_phone: normalizedPhone || '',
+      partner_email: email || '',
     };
 
     try {
       let newPartner = null;
 
       if (isEditing) {
+        newPartner = await updatePartner({ id, ...payload }).unwrap();
+      } else {
         newPartner = await createPartner(payload).unwrap();
       }
 
@@ -161,7 +163,11 @@ function PartnerForm() {
       }
     } catch (err) {
       console.error('Ошибка сохранения:', err);
-      toast.error(err.data?.detail || 'Не удалось сохранить партнёра');
+      const detail = err.data?.detail;
+      const message = Array.isArray(detail)
+        ? detail.map((d) => d.msg).join('; ')
+        : detail || 'Не удалось сохранить партнёра';
+      toast.error(message);
     }
   };
 
