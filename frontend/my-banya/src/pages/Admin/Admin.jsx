@@ -16,7 +16,6 @@ import {
   FileText, 
   FilePlus2, 
   FileMinus2, 
-  ClipboardList, 
   Package, 
   Barcode, 
   Trash2, 
@@ -221,8 +220,7 @@ function Admin() {
 
         {/* Документы */}
         {(hasAccess('/admin/documents/entrance') ||
-          hasAccess('/admin/documents/realization') ||
-          hasAccess('/admin/documents/product-requests')) && (
+          hasAccess('/admin/documents/realization')) && (
             <div>
               <button
                 onClick={toggleDocuments}
@@ -268,20 +266,6 @@ function Admin() {
                     >
                       <FileMinus2 className="w-4 h-4 mr-2" />
                       Реализация
-                    </NavLink>
-                  )}
-                  {hasAccess('/admin/documents/product-requests') && (
-                    <NavLink
-                      to="/admin/documents/product-requests"
-                      className={({ isActive }) =>
-                        `flex items-center px-4 py-2 rounded-lg text-sm transition ${isActive
-                          ? 'bg-green-100 text-green-800 font-medium'
-                          : 'text-gray-600 hover:bg-green-50 hover:text-green-700'
-                        }`
-                      }
-                    >
-                      <ClipboardList className="w-4 h-4 mr-2" />
-                      Заявки на товар
                     </NavLink>
                   )}
                 </div>

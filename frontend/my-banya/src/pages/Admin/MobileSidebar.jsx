@@ -13,7 +13,6 @@ import {
   FileText, 
   FilePlus2, 
   FileMinus2, 
-  ClipboardList, 
   Package, 
   Barcode, 
   Trash2, 
@@ -158,8 +157,7 @@ function MobileSidebar({ isOpen, onClose }) {
 
           {/* Документы */}
           {(hasAccess('/admin/documents/entrance') ||
-            hasAccess('/admin/documents/realization') ||
-            hasAccess('/admin/documents/product-requests')) && (
+            hasAccess('/admin/documents/realization')) && (
               <div>
                 <button
                   onClick={toggleDocuments}
@@ -194,16 +192,6 @@ function MobileSidebar({ isOpen, onClose }) {
                         >
                           <FileMinus2 className="w-4 h-4 mr-2" />
                           Реализация
-                        </NavLink>
-                    )}
-                    {hasAccess('/admin/documents/product-requests') && (
-                        <NavLink
-                          to="/admin/documents/product-requests"
-                          className="flex items-center px-4 py-2 text-sm text-gray-600 hover:bg-green-50 rounded-lg"
-                          onClick={onClose}
-                        >
-                          <ClipboardList className="w-4 h-4 mr-2" />
-                          Заявки на товар
                         </NavLink>
                     )}
                   </div>
