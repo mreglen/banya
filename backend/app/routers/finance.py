@@ -119,6 +119,7 @@ def get_operations(
 
     if operation_type in ("all", "expense"):
         query = db.query(models.EntranceDocument).options(joinedload(models.EntranceDocument.supplier))
+        query = query.filter(models.EntranceDocument.status == "posted")
         if period_start:
             query = query.filter(models.EntranceDocument.date >= period_start)
         if period_end:
@@ -200,7 +201,7 @@ def get_summary(
 ):
     period_start, period_end = _resolve_period(period, date_from, date_to)
 
-    expense_query = db.query(models.EntranceDocument)
+    expense_query = db.query(models.EntranceDocument).filter(models.EntranceDocument.status == "posted")
     income_query = db.query(models.RealizationDocument).filter(models.RealizationDocument.total_amount >= 0)
     realization_expense_query = db.query(models.RealizationDocument).filter(models.RealizationDocument.total_amount < 0)
 
@@ -243,7 +244,10 @@ def get_operation_detail(
                 joinedload(models.EntranceDocument.supplier),
                 joinedload(models.EntranceDocument.items).joinedload(models.EntranceDocumentItem.product),
             )
-            .filter(models.EntranceDocument.id == operation_id)
+            .filter(
+                models.EntranceDocument.id == operation_id,
+                models.EntranceDocument.status == "posted",
+            )
             .first()
         )
         if not row:

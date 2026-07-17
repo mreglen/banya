@@ -66,15 +66,23 @@ function DocumentEntrance() {
       <div className="max-w-7xl mx-auto">
         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
           <h1 className="text-xl sm:text-2xl font-bold text-gray-800">Поступление товаров</h1>
-          <button
-            onClick={() => navigate('/admin/documents/entrance/add')}
-            className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 sm:px-6 sm:py-3 rounded-lg sm:rounded-xl font-medium shadow transition flex items-center justify-center space-x-1 sm:space-x-2"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-            </svg>
-            <span className="text-sm sm:text-base">Новый документ</span>
-          </button>
+          <div className="flex flex-col sm:flex-row gap-2">
+            <button
+              onClick={() => navigate('/admin/documents/entrance/drafts')}
+              className="bg-amber-500 hover:bg-amber-600 text-white px-4 py-2 sm:px-6 sm:py-3 rounded-lg sm:rounded-xl font-medium shadow transition flex items-center justify-center"
+            >
+              <span className="text-sm sm:text-base">Черновики</span>
+            </button>
+            <button
+              onClick={() => navigate('/admin/documents/entrance/add')}
+              className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 sm:px-6 sm:py-3 rounded-lg sm:rounded-xl font-medium shadow transition flex items-center justify-center space-x-1 sm:space-x-2"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+              <span className="text-sm sm:text-base">Новый документ</span>
+            </button>
+          </div>
         </div>
 
         {sortedDocs.length === 0 ? (

@@ -178,16 +178,19 @@ class EntranceDocument(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     date = Column(Date, nullable=False, default=date.today)
-    supplier_id = Column(Integer, ForeignKey("partners.partner_id"), nullable=False)
+    supplier_id = Column(Integer, ForeignKey("partners.partner_id"), nullable=True)
     responsible_name = Column(String, nullable=False)
     supplier_number = Column(String, nullable=True)
     comment = Column(Text, nullable=True)
     total_amount = Column(Float, nullable=False, default=0.0)
     account_id = Column(Integer, ForeignKey("organization_accounts.id"), nullable=True)
+    status = Column(String(20), nullable=False, default="posted")  # draft | posted
+    created_from_request_id = Column(Integer, ForeignKey("product_requests.id"), nullable=True)
 
     supplier = relationship("Partner", backref="entrance_documents")
     account = relationship("OrganizationAccount")
     items = relationship("EntranceDocumentItem", back_populates="document", cascade="all, delete-orphan")
+    created_from_request = relationship("ProductRequest", foreign_keys=[created_from_request_id])
 
 
 class EntranceDocumentItem(Base):
@@ -201,6 +204,42 @@ class EntranceDocumentItem(Base):
 
     document = relationship("EntranceDocument", back_populates="items")
     product = relationship("Product")
+
+
+# === Заявки на товар ===
+class ProductRequest(Base):
+    __tablename__ = "product_requests"
+
+    id = Column(Integer, primary_key=True, index=True)
+    date = Column(Date, nullable=False, default=date.today)
+    comment = Column(Text, nullable=True)
+    created_by_user_id = Column(Integer, ForeignKey("users.user_id"), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    created_by = relationship("User")
+    items = relationship("ProductRequestItem", back_populates="request", cascade="all, delete-orphan")
+
+
+class ProductRequestItem(Base):
+    __tablename__ = "product_request_items"
+
+    id = Column(Integer, primary_key=True, index=True)
+    request_id = Column(Integer, ForeignKey("product_requests.id", ondelete="CASCADE"), nullable=False)
+    product_id = Column(Integer, ForeignKey("products.id"), nullable=False)
+    quantity = Column(Integer, nullable=False)
+    purchase_price = Column(Float, nullable=False, default=0.0)
+    status = Column(String(20), nullable=False, default="pending")  # pending | approved | rejected
+    added_by_user_id = Column(Integer, ForeignKey("users.user_id"), nullable=True)
+    processed_by_user_id = Column(Integer, ForeignKey("users.user_id"), nullable=True)
+    processed_at = Column(DateTime(timezone=True), nullable=True)
+    entrance_document_id = Column(Integer, ForeignKey("entrance_documents.id"), nullable=True)
+
+    request = relationship("ProductRequest", back_populates="items")
+    product = relationship("Product")
+    added_by = relationship("User", foreign_keys=[added_by_user_id])
+    processed_by = relationship("User", foreign_keys=[processed_by_user_id])
+    entrance_document = relationship("EntranceDocument", foreign_keys=[entrance_document_id])
 
 
 # === Товары в бронировании ===

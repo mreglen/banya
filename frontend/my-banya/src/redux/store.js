@@ -9,6 +9,7 @@ import { supportApi } from './supportApiSlice';
 import deletionRequestsSlice from './slices/deletionRequestsSlice';
 import bookingReducer from './slices/bookingSlice';
 import documentEntranceFormReducer from './slices/documentEntranceFormSlice';
+import productRequestFormReducer from './slices/productRequestFormSlice';
 
 export const store = configureStore({
   reducer: {
@@ -19,6 +20,7 @@ export const store = configureStore({
     [settingsApiSlice.reducerPath]: settingsApiSlice.reducer,
     booking: bookingReducer,
     documentEntranceForm: documentEntranceFormReducer,
+    productRequestForm: productRequestFormReducer,
     deletionRequests: deletionRequestsSlice,
     [supportApi.reducerPath]: supportApi.reducer,
   },

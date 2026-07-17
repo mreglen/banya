@@ -262,6 +262,72 @@ with engine.begin() as connection:
             """
         )
     )
+    # Product requests + entrance document drafts
+    connection.execute(
+        text(
+            """
+            CREATE TABLE IF NOT EXISTS product_requests (
+                id SERIAL PRIMARY KEY,
+                date DATE NOT NULL DEFAULT CURRENT_DATE,
+                comment TEXT,
+                created_by_user_id INTEGER NOT NULL REFERENCES users(user_id),
+                created_at TIMESTAMPTZ DEFAULT NOW(),
+                updated_at TIMESTAMPTZ DEFAULT NOW()
+            )
+            """
+        )
+    )
+    connection.execute(
+        text(
+            """
+            ALTER TABLE entrance_documents
+            ADD COLUMN IF NOT EXISTS status VARCHAR(20) NOT NULL DEFAULT 'posted'
+            """
+        )
+    )
+    connection.execute(
+        text(
+            """
+            UPDATE entrance_documents
+            SET status = 'posted'
+            WHERE status IS NULL OR status = ''
+            """
+        )
+    )
+    connection.execute(
+        text(
+            """
+            ALTER TABLE entrance_documents
+            ADD COLUMN IF NOT EXISTS created_from_request_id INTEGER REFERENCES product_requests(id)
+            """
+        )
+    )
+    connection.execute(
+        text(
+            """
+            ALTER TABLE entrance_documents
+            ALTER COLUMN supplier_id DROP NOT NULL
+            """
+        )
+    )
+    connection.execute(
+        text(
+            """
+            CREATE TABLE IF NOT EXISTS product_request_items (
+                id SERIAL PRIMARY KEY,
+                request_id INTEGER NOT NULL REFERENCES product_requests(id) ON DELETE CASCADE,
+                product_id INTEGER NOT NULL REFERENCES products(id),
+                quantity INTEGER NOT NULL,
+                purchase_price DOUBLE PRECISION NOT NULL DEFAULT 0,
+                status VARCHAR(20) NOT NULL DEFAULT 'pending',
+                added_by_user_id INTEGER REFERENCES users(user_id),
+                processed_by_user_id INTEGER REFERENCES users(user_id),
+                processed_at TIMESTAMPTZ,
+                entrance_document_id INTEGER REFERENCES entrance_documents(id)
+            )
+            """
+        )
+    )
 
 app = FastAPI(title='Бани')
 

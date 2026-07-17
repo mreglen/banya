@@ -23,6 +23,10 @@ const AdminBathsList = lazy(() => import('./pages/Admin/AdminBaths/AdminBathsLis
 const BathForm = lazy(() => import('./pages/Admin/AdminBaths/BathForm'));
 const DocumentEntrance = lazy(() => import('./pages/Admin/Documents/DocumentsEntrance/DocumentEntrance'));
 const AddDocumentEntrance = lazy(() => import('./pages/Admin/Documents/DocumentsEntrance/AddDocumentEntrance'));
+const EntranceDrafts = lazy(() => import('./pages/Admin/Documents/DocumentsEntrance/EntranceDrafts'));
+const ProductRequestsList = lazy(() => import('./pages/Admin/Documents/ProductRequests/ProductRequestsList'));
+const AddProductRequest = lazy(() => import('./pages/Admin/Documents/ProductRequests/AddProductRequest'));
+const ProductRequestReview = lazy(() => import('./pages/Admin/Documents/ProductRequests/ProductRequestReview'));
 const Clients = lazy(() => import('./pages/Admin/Company/Clients/Clients'));
 const ClientForm = lazy(() => import('./pages/Admin/Company/Clients/ClientsForm'));
 const Partner = lazy(() => import('./pages/Admin/Company/Partners/Partner'));
@@ -150,8 +154,13 @@ function AppWithLayout() {
           <Route path="baths/edit/:id" element={withAdminSuspense(<RoleBasedRoute requiredPermission="baths:manage"><BathForm /></RoleBasedRoute>)} />
           <Route path="promotions" element={withAdminSuspense(<RoleBasedRoute requiredPermission="promotions:view"><Promotions /></RoleBasedRoute>)} />
           <Route path="documents/entrance" element={withAdminSuspense(<RoleBasedRoute requiredPermission="documents:view"><DocumentEntrance /></RoleBasedRoute>)} />
+          <Route path="documents/entrance/drafts" element={withAdminSuspense(<RoleBasedRoute requiredPermission="documents:view"><EntranceDrafts /></RoleBasedRoute>)} />
           <Route path="documents/entrance/add" element={withAdminSuspense(<RoleBasedRoute requiredPermission="documents:manage"><AddDocumentEntrance /></RoleBasedRoute>)} />
           <Route path="documents/entrance/edit/:id" element={withAdminSuspense(<RoleBasedRoute requiredPermission="documents:manage"><AddDocumentEntrance /></RoleBasedRoute>)} />
+          <Route path="documents/product-requests" element={withAdminSuspense(<RoleBasedRoute requiredPermission="documents:view"><ProductRequestsList /></RoleBasedRoute>)} />
+          <Route path="documents/product-requests/add" element={withAdminSuspense(<RoleBasedRoute requiredPermission="documents:manage"><AddProductRequest /></RoleBasedRoute>)} />
+          <Route path="documents/product-requests/edit/:id" element={withAdminSuspense(<RoleBasedRoute requiredPermission="documents:manage"><AddProductRequest /></RoleBasedRoute>)} />
+          <Route path="documents/product-requests/:id" element={withAdminSuspense(<RoleBasedRoute requiredPermission="documents:view"><ProductRequestReview /></RoleBasedRoute>)} />
           <Route path="documents/realization" element={withAdminSuspense(<RoleBasedRoute requiredPermission="documents:view"><DocumentsRealization /></RoleBasedRoute>)} />
           <Route path="company/client" element={withAdminSuspense(<RoleBasedRoute requiredPermission="clients:view"><Clients /></RoleBasedRoute>)} />
           <Route path="company/client/edit/:id" element={withAdminSuspense(<RoleBasedRoute requiredPermission="clients:manage"><ClientForm /></RoleBasedRoute>)} />

@@ -562,12 +562,14 @@ class EntranceDocumentItemRead(EntranceDocumentItemBase):
 
 class EntranceDocumentBase(BaseModel):
     date: date
-    supplier_id: int
+    supplier_id: Optional[int] = None
     responsible_name: str
     supplier_number: Optional[str] = None
     comment: Optional[str] = None
     account_id: Optional[int] = None
     total_amount: float
+    status: str = "posted"
+    created_from_request_id: Optional[int] = None
 
 class EntranceDocumentCreate(EntranceDocumentBase):
     account_id: Optional[int] = None
@@ -575,11 +577,76 @@ class EntranceDocumentCreate(EntranceDocumentBase):
 
 class EntranceDocumentRead(EntranceDocumentBase):
     id: int
-    supplier: PartnerResponse
+    supplier: Optional[PartnerResponse] = None
     items: List[EntranceDocumentItemRead] = []
 
     class Config:
         from_attributes = True
+
+
+# === Заявки на товар ===
+class ProductRequestItemBase(BaseModel):
+    product_id: int
+    quantity: int
+    purchase_price: float = 0.0
+
+
+class ProductRequestItemCreate(ProductRequestItemBase):
+    pass
+
+
+class ProductRequestItemRead(ProductRequestItemBase):
+    id: int
+    status: str
+    added_by_user_id: Optional[int] = None
+    processed_by_user_id: Optional[int] = None
+    processed_at: Optional[datetime] = None
+    entrance_document_id: Optional[int] = None
+    product: Product
+
+    class Config:
+        from_attributes = True
+
+
+class ProductRequestCreate(BaseModel):
+    date: Optional[date] = None
+    comment: Optional[str] = None
+    items: List[ProductRequestItemCreate]
+
+
+class ProductRequestUpdate(BaseModel):
+    date: Optional[date] = None
+    comment: Optional[str] = None
+    items: List[ProductRequestItemCreate]
+
+
+class ProductRequestAuthor(BaseModel):
+    user_id: int
+    full_name: str
+
+    class Config:
+        from_attributes = True
+
+
+class ProductRequestRead(BaseModel):
+    id: int
+    date: date
+    comment: Optional[str] = None
+    created_by_user_id: int
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+    created_by: Optional[ProductRequestAuthor] = None
+    items: List[ProductRequestItemRead] = []
+    pending_count: int = 0
+    approved_count: int = 0
+    rejected_count: int = 0
+
+    class Config:
+        from_attributes = True
+
+
+class ProductRequestItemIds(BaseModel):
+    item_ids: List[int]
 
 
 # === Склад: Товары ===

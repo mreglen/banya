@@ -52,6 +52,7 @@ function Admin() {
       '/admin/company/partner': 'Поставщики',
       '/admin/company/organization': 'Организация',
       '/admin/documents/entrance': 'Поступление',
+      '/admin/documents/entrance/drafts': 'Черновики поступления',
       '/admin/documents/realization': 'Реализация',
       '/admin/documents/product-requests': 'Заявки на товар',
       '/admin/storage/nomenclature': 'Номенклатура',

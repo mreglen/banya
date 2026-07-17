@@ -13,6 +13,7 @@ from app.routers.products.categories import router as categories_router
 from app.routers.products.products import router as products_router
 from app.routers.stock.stock_balance import router as stock_router
 from app.routers.documents_entrance.documents_entrance import router as documents_entrance_router
+from app.routers.documents_product_requests import router as documents_product_requests_router
 from app.routers.documents_realization import router as documents_realization_router
 from app.routers.staffs.permissions import router as permissions_router
 from app.routers.password_reset import router as password_reset_router
@@ -43,6 +44,7 @@ api_router.include_router(categories_router)
 api_router.include_router(products_router)
 api_router.include_router(stock_router)
 api_router.include_router(documents_entrance_router)
+api_router.include_router(documents_product_requests_router)
 api_router.include_router(documents_realization_router)
 api_router.include_router(support_router)
 api_router.include_router(dashboard_router)

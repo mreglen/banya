@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { useGetUnitsOfMeasurementQuery } from '../../../redux/slices/productsApiSlice';
 import { markForDeletion, unmarkForDeletion } from '../../../redux/slices/deletionRequestsSlice';
 import ActionDropdown from '../../../components/UI/ActionDropdown/ActionDropdown';
+import { useHasAccess } from '../../../hooks/useHasAccess';
 
 const truncateDescription = (str, maxLength = 50) => {
     if (!str) return '—';
@@ -78,6 +79,8 @@ const ProductList = ({
 }) => {
     const dispatch = useDispatch();
     const navigate = useNavigate();
+    const hasAccess = useHasAccess();
+    const canCreateRequest = hasAccess('documents:manage');
     const deletionArray = useSelector(state => state.deletionRequests);
     const { data: units = [] } = useGetUnitsOfMeasurementQuery();
 
@@ -184,6 +187,19 @@ const ProductList = ({
                                                             handleEdit(product.id);
                                                         },
                                                     },
+                                                    ...(canCreateRequest
+                                                        ? [
+                                                            {
+                                                                label: 'Создать заявку',
+                                                                icon: '',
+                                                                color: 'green',
+                                                                onClick: (e) => {
+                                                                    e.stopPropagation();
+                                                                    navigate(`/admin/documents/product-requests/add?productId=${product.id}`);
+                                                                },
+                                                            },
+                                                        ]
+                                                        : []),
                                                     {
                                                         label: markedForDeletion ? 'Снять с удаления' : 'Пометить на удаление',
                                                         icon: markedForDeletion ? '✓' : '',
@@ -252,6 +268,17 @@ const ProductList = ({
                                                     color: 'blue',
                                                     onClick: () => handleEdit(product.id),
                                                 },
+                                                ...(canCreateRequest
+                                                    ? [
+                                                        {
+                                                            label: 'Создать заявку',
+                                                            icon: '',
+                                                            color: 'green',
+                                                            onClick: () =>
+                                                                navigate(`/admin/documents/product-requests/add?productId=${product.id}`),
+                                                        },
+                                                    ]
+                                                    : []),
                                                 {
                                                     label: markedForDeletion ? 'Снять с удаления' : 'Пометить на удаление',
                                                     icon: markedForDeletion ? '✓' : '',

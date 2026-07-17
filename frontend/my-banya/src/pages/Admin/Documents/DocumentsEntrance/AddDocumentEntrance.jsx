@@ -16,6 +16,7 @@ import {
   useGetEntranceDocumentByIdQuery,
   useCreateEntranceDocumentMutation,
   useUpdateEntranceDocumentMutation,
+  usePostEntranceDocumentMutation,
   useGetUnitsOfMeasurementQuery,
   useGetProductsQuery,
 } from '../../../../redux/slices/productsApiSlice';
@@ -38,6 +39,7 @@ function AddDocumentEntrance() {
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
   const [pendingPayload, setPendingPayload] = useState(null);
+  const [confirmMode, setConfirmMode] = useState('save'); // save | post
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [productSearch, setProductSearch] = useState('');
   const [isProductDropdownOpen, setIsProductDropdownOpen] = useState(false);
@@ -55,8 +57,12 @@ function AddDocumentEntrance() {
 
   const [createDocument, { isLoading: isCreating }] = useCreateEntranceDocumentMutation();
   const [updateDocument, { isLoading: isUpdating }] = useUpdateEntranceDocumentMutation();
+  const [postDocument, { isLoading: isPosting }] = usePostEntranceDocumentMutation();
 
   const isLoading = isLoadingPartners || isLoadingDoc || isLoadingUnits;
+  const isDraft = isEditing && documentData?.status === 'draft';
+  const isPostedLocked = isEditing && !isDraft;
+  const isBusy = isCreating || isUpdating || isPosting;
 
   const enhancedItems = useMemo(() => {
     return items.map(item => {
@@ -229,12 +235,25 @@ function AddDocumentEntrance() {
     dispatch(updateField({ field, value }));
   };
 
-  const submitDocument = async (documentPayload) => {
+  const submitDocument = async (documentPayload, mode = 'save') => {
     try {
       if (isEditing) {
-        await updateDocument({ id: parseInt(id), ...documentPayload }).unwrap();
+        await updateDocument({ id: parseInt(id), ...documentPayload, status: isDraft ? 'draft' : documentPayload.status }).unwrap();
+        if (mode === 'post' && isDraft) {
+          await postDocument(parseInt(id)).unwrap();
+          toast.success('Документ проведён');
+          dispatch(resetForm());
+          navigate('/admin/documents/entrance');
+          return;
+        }
+        if (isDraft) {
+          toast.success('Черновик сохранён');
+          navigate('/admin/documents/entrance/drafts');
+          return;
+        }
       } else {
-        await createDocument(documentPayload).unwrap();
+        await createDocument({ ...documentPayload, status: 'posted' }).unwrap();
+        toast.success('Документ создан');
       }
 
       dispatch(resetForm());
@@ -245,8 +264,31 @@ function AddDocumentEntrance() {
     }
   };
 
+  const buildPayload = () => {
+    const total = items.reduce((sum, item) => sum + (Number(item.quantity) || 0) * (Number(item.purchasePrice) || 0), 0);
+    return {
+      payload: {
+        date,
+        supplier_id: supplierId,
+        account_id: accountId ?? null,
+        responsible_name: responsibleName,
+        supplier_number: supplierNumber?.trim() || null,
+        comment: comment || null,
+        total_amount: total,
+        status: isDraft ? 'draft' : 'posted',
+        created_from_request_id: documentData?.created_from_request_id || null,
+        items: items.map((item) => ({
+          product_id: item.productId,
+          quantity: Number(item.quantity) || 0,
+          purchase_price: Number(item.purchasePrice) || 0,
+        })),
+      },
+      total,
+    };
+  };
+
   const handleSaveDocument = async () => {
-    if (!supplierId) {
+    if (!isDraft && !supplierId) {
       toast.error('Выберите поставщика');
       return;
     }
@@ -254,25 +296,22 @@ function AddDocumentEntrance() {
       toast.error('Добавьте хотя бы один товар');
       return;
     }
-    const total = items.reduce((sum, item) => sum + item.quantity * (Number(item.purchasePrice) || 0), 0);
-    const documentPayload = {
-      date,
-      supplier_id: supplierId,
-      account_id: accountId ?? null,
-      responsible_name: responsibleName,
-      supplier_number: supplierNumber?.trim() || null,
-      comment: comment || null,
-      total_amount: total,
-      items: items.map((item) => ({
-        product_id: item.productId,
-        quantity: Number(item.quantity) || 0,
-        purchase_price: Number(item.purchasePrice) || 0,
-      })),
-    };
-    setPendingPayload({
-      payload: documentPayload,
-      total,
-    });
+    setConfirmMode('save');
+    setPendingPayload(buildPayload());
+    setIsConfirmModalOpen(true);
+  };
+
+  const handlePostDocument = async () => {
+    if (!supplierId) {
+      toast.error('Укажите поставщика перед проведением');
+      return;
+    }
+    if (items.length === 0) {
+      toast.error('Добавьте хотя бы один товар');
+      return;
+    }
+    setConfirmMode('post');
+    setPendingPayload(buildPayload());
     setIsConfirmModalOpen(true);
   };
 
@@ -297,31 +336,55 @@ function AddDocumentEntrance() {
       <div className="max-w-7xl mx-auto">
         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
           <h1 className="text-xl sm:text-2xl font-bold text-gray-800">
-            {isEditing ? 'Редактирование документа поступления' : 'Поступление товаров'}
+            {isDraft
+              ? `Черновик поступления #${id}`
+              : isEditing
+                ? 'Редактирование документа поступления'
+                : 'Поступление товаров'}
           </h1>
-          <button
-            onClick={handleSaveDocument}
-            disabled={isCreating || isUpdating}
-            className={`px-4 py-2 sm:px-6 sm:py-3 rounded-lg sm:rounded-xl font-medium shadow transition text-sm sm:text-base flex items-center justify-center space-x-1 sm:space-x-2 ${isCreating || isUpdating
-              ? 'bg-gray-400 text-gray-200 cursor-not-allowed'
-              : 'bg-green-600 hover:bg-green-700 text-white'
-              }`}
-          >
-            {!isEditing && !isCreating && (
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-              </svg>
+          <div className="flex flex-wrap gap-2">
+            {isDraft && (
+              <button
+                onClick={handlePostDocument}
+                disabled={isBusy}
+                className={`px-4 py-2 sm:px-6 sm:py-3 rounded-lg sm:rounded-xl font-medium shadow transition text-sm sm:text-base ${
+                  isBusy
+                    ? 'bg-gray-400 text-gray-200 cursor-not-allowed'
+                    : 'bg-blue-600 hover:bg-blue-700 text-white'
+                }`}
+              >
+                {isPosting ? 'Проведение...' : 'Провести'}
+              </button>
             )}
-            <span>
-              {isEditing
-                ? isUpdating
-                  ? 'Сохранение...'
-                  : 'Сохранить изменения'
-                : isCreating
-                  ? 'Создание...'
-                  : 'Создать документ'}
-            </span>
-          </button>
+            <button
+              onClick={handleSaveDocument}
+              disabled={isBusy}
+              className={`px-4 py-2 sm:px-6 sm:py-3 rounded-lg sm:rounded-xl font-medium shadow transition text-sm sm:text-base flex items-center justify-center space-x-1 sm:space-x-2 ${
+                isBusy
+                  ? 'bg-gray-400 text-gray-200 cursor-not-allowed'
+                  : 'bg-green-600 hover:bg-green-700 text-white'
+              }`}
+            >
+              {!isEditing && !isCreating && (
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+              )}
+              <span>
+                {isDraft
+                  ? isUpdating
+                    ? 'Сохранение...'
+                    : 'Сохранить черновик'
+                  : isEditing
+                    ? isUpdating
+                      ? 'Сохранение...'
+                      : 'Сохранить изменения'
+                    : isCreating
+                      ? 'Создание...'
+                      : 'Создать документ'}
+              </span>
+            </button>
+          </div>
         </div>
 
         {/* Блок поставщика и данных — ВОЗВРАЩАЕМ СТАРУЮ СТРУКТУРУ */}
@@ -342,7 +405,7 @@ function AddDocumentEntrance() {
                   <button
                     onClick={handleOpenContractorModal}
                     className="px-3 py-2 sm:px-4 sm:py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg sm:rounded-xl font-medium shadow transition text-xs sm:text-sm"
-                    disabled={isEditing}
+                    disabled={isPostedLocked}
                   >
                     Выбрать
                   </button>
@@ -355,7 +418,7 @@ function AddDocumentEntrance() {
                   value={date}
                   onChange={(e) => updateDocumentData('date', e.target.value)}
                   className="w-full px-3 py-2 sm:px-4 sm:py-3 border border-gray-300 rounded-lg sm:rounded-xl text-sm"
-                  disabled={isEditing}
+                  disabled={isPostedLocked}
                 />
               </div>
             </div>
@@ -398,6 +461,7 @@ function AddDocumentEntrance() {
         </div>
 
         {/* Блок добавления товара */}
+        {!isPostedLocked && (
         <div className="bg-white rounded-xl sm:rounded-2xl shadow p-4 sm:p-6 mb-6 border border-gray-100">
           <h2 className="text-lg sm:text-xl font-semibold text-gray-800 mb-3 sm:mb-4">Добавить товар</h2>
           <div className="mb-4 relative" ref={productSearchRef}>
@@ -455,6 +519,7 @@ function AddDocumentEntrance() {
             )}
           </div>
         </div>
+        )}
 
         {/* Таблица товаров — Desktop */}
         {enhancedItems.length > 0 && (
@@ -491,7 +556,7 @@ function AddDocumentEntrance() {
                             value={item.quantity}
                             onChange={(e) => updateItemInList(index, 'quantity', e.target.value)}
                             className="w-16 sm:w-20 px-2 py-1 border border-gray-300 rounded"
-                            disabled={isEditing}
+                            disabled={isPostedLocked}
                           />
                           <span className="text-xs sm:text-sm text-gray-600">{item.unitName}</span>
                         </div>
@@ -510,7 +575,7 @@ function AddDocumentEntrance() {
                           value={item.purchasePrice}
                           onChange={(e) => updateItemInList(index, 'purchasePrice', e.target.value)}
                           className="w-20 sm:w-24 px-2 py-1 border border-gray-300 rounded"
-                          disabled={isEditing}
+                          disabled={isPostedLocked}
                         />
                       </td>
                       <td className="px-3 py-2 sm:px-6 sm:py-4 whitespace-nowrap text-xs sm:text-sm text-gray-900">
@@ -523,7 +588,7 @@ function AddDocumentEntrance() {
                             removeItemFromList(index);
                           }}
                           className="text-red-600 hover:text-red-900 transition text-xs sm:text-sm"
-                          disabled={isEditing}
+                          disabled={isPostedLocked}
                         >
                           Удалить
                         </button>
@@ -587,7 +652,7 @@ function AddDocumentEntrance() {
                                 value={item.quantity}
                                 onChange={(e) => updateItemInList(index, 'quantity', e.target.value)}
                                 className="flex-grow px-2 py-1.5 border border-gray-300 rounded bg-white"
-                                disabled={isEditing}
+                                disabled={isPostedLocked}
                               />
                               <span className="text-gray-600 min-w-max">{item.unitName}</span>
                             </div>
@@ -611,7 +676,7 @@ function AddDocumentEntrance() {
                               value={item.purchasePrice}
                               onChange={(e) => updateItemInList(index, 'purchasePrice', e.target.value)}
                               className="w-full px-2 py-1.5 border border-gray-300 rounded bg-white"
-                              disabled={isEditing}
+                              disabled={isPostedLocked}
                             />
                           </div>
 
@@ -625,7 +690,7 @@ function AddDocumentEntrance() {
                         </div>
 
                         {/* Кнопка удаления */}
-                        {!isEditing && (
+                        {!isPostedLocked && (
                           <div className="mt-3 flex justify-end">
                             <button
                               onClick={(e) => {
@@ -642,7 +707,7 @@ function AddDocumentEntrance() {
                     ))}
                   </div>
 
-                  {!isEditing && (
+                  {!isPostedLocked && (
                     <div className="flex justify-end">
                       <button
                         onClick={(e) => {
@@ -692,13 +757,16 @@ function AddDocumentEntrance() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl">
             <h3 className="text-lg font-bold text-gray-900 mb-3">
-              Подтверждение документа
+              {confirmMode === 'post' ? 'Провести документ?' : 'Подтверждение документа'}
             </h3>
             <div className="space-y-2 text-sm text-gray-700 mb-5">
               <p>
                 <span className="font-medium text-gray-900">Сумма:</span>{' '}
                 {pendingPayload.total.toFixed(2)} ₽
               </p>
+              {confirmMode === 'post' && (
+                <p className="text-amber-700">После проведения остатки на складе будут обновлены.</p>
+              )}
             </div>
             <div className="flex gap-2">
               <button
@@ -715,10 +783,10 @@ function AddDocumentEntrance() {
                 type="button"
                 onClick={() => {
                   const payloadToSend = pendingPayload.payload;
+                  const mode = confirmMode;
                   setIsConfirmModalOpen(false);
                   setPendingPayload(null);
-                  submitDocument(payloadToSend);
-                  toast.success(isEditing ? 'Документ обновлен' : 'Документ создан');
+                  submitDocument(payloadToSend, mode);
                 }}
                 className="flex-1 rounded-lg bg-green-600 px-3 py-2 text-sm text-white hover:bg-green-700"
               >

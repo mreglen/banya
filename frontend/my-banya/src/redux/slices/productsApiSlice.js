@@ -5,7 +5,7 @@ import baseQuery from '../../utils/baseQuery';
 export const productsApiSlice = createApi({
     reducerPath: 'productsApi',
     baseQuery,
-    tagTypes: ['Category', 'Product', 'RealizationDocument'],
+    tagTypes: ['Category', 'Product', 'RealizationDocument', 'EntranceDocument', 'ProductRequest'],
     endpoints: (builder) => ({
         // --- КАТЕГОРИИ ---
         getCategories: builder.query({
@@ -148,8 +148,14 @@ export const productsApiSlice = createApi({
         }),
         // --- ДОКУМЕНТЫ ПОСТУПЛЕНИЯ ---
         getEntranceDocuments: builder.query({
-            query: () => '/admin/documents/entrance/',
-            providesTags: [{ type: 'EntranceDocument', id: 'LIST' }],
+            query: (status) => ({
+                url: '/admin/documents/entrance/',
+                params: { status: status || 'posted' },
+            }),
+            providesTags: (result, error, status) => [
+                { type: 'EntranceDocument', id: `LIST-${status || 'posted'}` },
+                { type: 'EntranceDocument', id: 'LIST' },
+            ],
         }),
 
         getEntranceDocumentById: builder.query({
@@ -163,7 +169,12 @@ export const productsApiSlice = createApi({
                 method: 'POST',
                 body,
             }),
-            invalidatesTags: [{ type: 'Product', id: 'LIST' }, { type: 'EntranceDocument', id: 'LIST' }],
+            invalidatesTags: [
+                { type: 'Product', id: 'LIST' },
+                { type: 'EntranceDocument', id: 'LIST' },
+                { type: 'EntranceDocument', id: 'LIST-posted' },
+                { type: 'EntranceDocument', id: 'LIST-draft' },
+            ],
         }),
 
         updateEntranceDocument: builder.mutation({
@@ -172,7 +183,25 @@ export const productsApiSlice = createApi({
                 method: 'PUT',
                 body,
             }),
-            invalidatesTags: [{ type: 'Product', id: 'LIST' }, { type: 'EntranceDocument', id: 'LIST' }],
+            invalidatesTags: [
+                { type: 'Product', id: 'LIST' },
+                { type: 'EntranceDocument', id: 'LIST' },
+                { type: 'EntranceDocument', id: 'LIST-posted' },
+                { type: 'EntranceDocument', id: 'LIST-draft' },
+            ],
+        }),
+
+        postEntranceDocument: builder.mutation({
+            query: (id) => ({
+                url: `/admin/documents/entrance/${id}/post`,
+                method: 'POST',
+            }),
+            invalidatesTags: [
+                { type: 'Product', id: 'LIST' },
+                { type: 'EntranceDocument', id: 'LIST' },
+                { type: 'EntranceDocument', id: 'LIST-posted' },
+                { type: 'EntranceDocument', id: 'LIST-draft' },
+            ],
         }),
 
         deleteEntranceDocument: builder.mutation({
@@ -180,8 +209,71 @@ export const productsApiSlice = createApi({
                 url: `/admin/documents/entrance/${id}/`,
                 method: 'DELETE',
             }),
-            invalidatesTags: [{ type: 'EntranceDocument', id: 'LIST' }],
+            invalidatesTags: [
+                { type: 'EntranceDocument', id: 'LIST' },
+                { type: 'EntranceDocument', id: 'LIST-posted' },
+                { type: 'EntranceDocument', id: 'LIST-draft' },
+            ],
         }),
+
+        // --- ЗАЯВКИ НА ТОВАР ---
+        getProductRequests: builder.query({
+            query: () => '/admin/documents/product-requests/',
+            providesTags: [{ type: 'ProductRequest', id: 'LIST' }],
+        }),
+
+        getProductRequestById: builder.query({
+            query: (id) => `/admin/documents/product-requests/${id}/`,
+            providesTags: (result, error, id) => [{ type: 'ProductRequest', id }],
+        }),
+
+        createProductRequest: builder.mutation({
+            query: (body) => ({
+                url: '/admin/documents/product-requests/',
+                method: 'POST',
+                body,
+            }),
+            invalidatesTags: [{ type: 'ProductRequest', id: 'LIST' }],
+        }),
+
+        updateProductRequest: builder.mutation({
+            query: ({ id, ...body }) => ({
+                url: `/admin/documents/product-requests/${id}/`,
+                method: 'PUT',
+                body,
+            }),
+            invalidatesTags: (result, error, { id }) => [
+                { type: 'ProductRequest', id: 'LIST' },
+                { type: 'ProductRequest', id },
+            ],
+        }),
+
+        approveProductRequestItems: builder.mutation({
+            query: ({ id, item_ids }) => ({
+                url: `/admin/documents/product-requests/${id}/approve`,
+                method: 'POST',
+                body: { item_ids },
+            }),
+            invalidatesTags: (result, error, { id }) => [
+                { type: 'ProductRequest', id: 'LIST' },
+                { type: 'ProductRequest', id },
+                { type: 'EntranceDocument', id: 'LIST-draft' },
+                { type: 'EntranceDocument', id: 'LIST' },
+            ],
+        }),
+
+        rejectProductRequestItems: builder.mutation({
+            query: ({ id, item_ids }) => ({
+                url: `/admin/documents/product-requests/${id}/reject`,
+                method: 'POST',
+                body: { item_ids },
+            }),
+            invalidatesTags: (result, error, { id }) => [
+                { type: 'ProductRequest', id: 'LIST' },
+                { type: 'ProductRequest', id },
+            ],
+        }),
+
         deleteProduct: builder.mutation({
             query: (productId) => ({
                 url: `/admin/products/${productId}/`,
@@ -231,7 +323,14 @@ export const {
     useGetEntranceDocumentByIdQuery,
     useCreateEntranceDocumentMutation,
     useUpdateEntranceDocumentMutation,
+    usePostEntranceDocumentMutation,
     useDeleteEntranceDocumentMutation,
+    useGetProductRequestsQuery,
+    useGetProductRequestByIdQuery,
+    useCreateProductRequestMutation,
+    useUpdateProductRequestMutation,
+    useApproveProductRequestItemsMutation,
+    useRejectProductRequestItemsMutation,
     useUpdateCategoryMutation,
     useUploadCategoryPhotosMutation,
     useGetUnitsOfMeasurementQuery,
