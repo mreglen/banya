@@ -439,6 +439,18 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
     }));
   };
 
+  const updateProductPrice = (productId, newPrice) => {
+    if (newPrice !== '' && !/^\d*([.,]\d{0,2})?$/.test(newPrice)) return;
+    const pid = Number(productId);
+    const normalized = newPrice === '' ? '' : newPrice.replace(',', '.');
+    setFormData((prev) => ({
+      ...prev,
+      selectedProducts: prev.selectedProducts.map((p) =>
+        Number(p.id) === pid ? { ...p, price: normalized } : p
+      ),
+    }));
+  };
+
   const removeProduct = (productId) => {
     const pid = Number(productId);
     setFormData(prev => ({
@@ -641,6 +653,7 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
       products: formData.selectedProducts.map((p) => ({
         product_id: Number(p.id),
         quantity: parseInt(p.quantity, 10) || 1,
+        price: parseFloat(String(p.price ?? p.purchase_price ?? 0).replace(',', '.')) || 0,
       })),
     };
 
@@ -744,7 +757,7 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
 
     const productItems = formData.selectedProducts.map((p) => {
       const quantity = parseInt(p.quantity, 10) || 0;
-      const unitPrice = p.price ?? p.purchase_price ?? 0;
+      const unitPrice = parseFloat(String(p.price ?? p.purchase_price ?? 0).replace(',', '.')) || 0;
       return {
         name: p.name,
         quantity,
@@ -1239,26 +1252,40 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
                         Услуга / неисчисляемая позиция — можно указать несколько штук; остаток на складе не ограничивает
                       </div>
                     )}
-                    <div className="flex items-center justify-between mt-2">
-                      <div className="flex items-center space-x-2">
-                        <span className="text-sm text-gray-700">Кол-во:</span>
-                        <input
-                          type="text"
-                          inputMode="numeric"
-                          pattern="\d*"
-                          value={item.quantity}
-                          onChange={(e) => updateProductQuantity(item.id, e.target.value)}
-                          className={`w-16 px-2 py-1 border rounded text-sm ${
-                            validationErrors[`product_${item.id}`]
-                              ? 'border-red-500 bg-red-50'
-                              : 'border-gray-300'
-                          }`}
-                        />
-                        <span className="text-sm text-gray-600">{item.unit_name}</span>
+                    <div className="flex flex-wrap items-center justify-between gap-2 mt-2">
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+                        <div className="flex items-center space-x-2">
+                          <span className="text-sm text-gray-700">Кол-во:</span>
+                          <input
+                            type="text"
+                            inputMode="numeric"
+                            pattern="\d*"
+                            value={item.quantity}
+                            onChange={(e) => updateProductQuantity(item.id, e.target.value)}
+                            className={`w-16 px-2 py-1 border rounded text-sm ${
+                              validationErrors[`product_${item.id}`]
+                                ? 'border-red-500 bg-red-50'
+                                : 'border-gray-300'
+                            }`}
+                          />
+                          <span className="text-sm text-gray-600">{item.unit_name}</span>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <span className="text-sm text-gray-700">Цена:</span>
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            value={item.price ?? ''}
+                            onChange={(e) => updateProductPrice(item.id, e.target.value)}
+                            className="w-24 px-2 py-1 border border-gray-300 rounded text-sm"
+                            aria-label={`Цена продажи: ${item.name}`}
+                          />
+                          <span className="text-sm text-gray-600">₽</span>
+                        </div>
                       </div>
                       <div className="text-right">
                         <div className="text-sm font-medium">
-                          {((parseInt(item.quantity, 10) || 0) * (item.price ?? item.purchase_price ?? 0)).toFixed(2)} ₽
+                          {((parseInt(item.quantity, 10) || 0) * (parseFloat(String(item.price ?? item.purchase_price ?? 0).replace(',', '.')) || 0)).toFixed(2)} ₽
                         </div>
                         {/* Показывать ошибку валидации */}
                         {validationErrors[`product_${item.id}`] && (

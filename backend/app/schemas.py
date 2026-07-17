@@ -79,6 +79,8 @@ class BathOut(BathBase):
 class ReservationProductCreate(BaseModel):
     product_id: int
     quantity: int = 1
+    # Цена продажи в брони; если не передана — используется текущая цена товара
+    price: Optional[float] = None
 
 class ReservationProductResponse(BaseModel):
     product_id: int

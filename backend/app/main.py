@@ -328,6 +328,14 @@ with engine.begin() as connection:
             """
         )
     )
+    connection.execute(
+        text(
+            """
+            ALTER TABLE reservation_products
+            ADD COLUMN IF NOT EXISTS sale_price DOUBLE PRECISION
+            """
+        )
+    )
 
 app = FastAPI(title='Бани')
 

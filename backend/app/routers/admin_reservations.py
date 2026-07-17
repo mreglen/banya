@@ -51,6 +51,26 @@ def _is_closed_status(db: Session, status_id: int) -> bool:
     )
 
 
+def _resolve_sale_price(item, product) -> float:
+    """Цена продажи в брони: из запроса/записи, иначе текущая цена товара."""
+    if item is not None and getattr(item, "price", None) is not None:
+        return float(item.price)
+    if item is not None and getattr(item, "sale_price", None) is not None:
+        return float(item.sale_price)
+    return float(product.price or 0)
+
+
+def _reservation_product_response(rp) -> schemas.ReservationProductResponse:
+    product = rp.product
+    return schemas.ReservationProductResponse(
+        product_id=product.id,
+        name=product.name,
+        quantity=rp.quantity,
+        price=_resolve_sale_price(rp, product),
+        unit_id=product.unit_id,
+    )
+
+
 def check_overlap(db: Session, bath_id: int, start: datetime, end: datetime, exclude_id: int = None):
     """
     Проверяет пересечение с существующими бронями, включая время на уборку после каждой.
@@ -115,13 +135,7 @@ def get_reservations(
     for res in reservations:
         # Товары — только если объект существует
         res.products = [
-            schemas.ReservationProductResponse(
-                product_id=rp.product.id,
-                name=rp.product.name,
-                quantity=rp.quantity,
-                price=rp.product.price,
-                unit_id=rp.product.unit_id
-            )
+            _reservation_product_response(rp)
             for rp in res.reservation_products
             if rp.product is not None
         ]
@@ -196,7 +210,7 @@ def create_reservation(
                 raise HTTPException(status_code=400, detail=f"Товар с ID {item.product_id} не найден")
             if product.is_countable and product.total_quantity < item.quantity:
                 raise HTTPException(status_code=400, detail=f"Недостаточно товара {product.name} на складе")
-            total_cost += product.price * item.quantity
+            total_cost += _resolve_sale_price(item, product) * item.quantity
 
     prepayment = reservation.prepayment or 0
     if prepayment < 0:
@@ -242,7 +256,7 @@ def create_reservation(
                         document_id=realization_doc.id,
                         product_id=item.product_id,
                         quantity=item.quantity,
-                        price=product.price
+                        price=_resolve_sale_price(item, product)
                     ))
 
     # 7. Сохраняем товары и списываем со склада (резервирование)
@@ -258,7 +272,8 @@ def create_reservation(
             db.add(models.ReservationProduct(
                 reservation_id=db_reservation.reservation_id,
                 product_id=item.product_id,
-                quantity=item.quantity
+                quantity=item.quantity,
+                sale_price=_resolve_sale_price(item, product),
             ))
 
     db.commit()
@@ -275,7 +290,7 @@ def create_reservation(
                         product_id=product.id,
                         name=product.name,
                         quantity=item.quantity,
-                        price=product.price,
+                        price=_resolve_sale_price(item, product),
                         unit_id=product.unit_id
                     )
                 )
@@ -290,7 +305,7 @@ def create_reservation(
                     products_for_email.append({
                         'name': product.name,
                         'quantity': item.quantity,
-                        'price': product.price
+                        'price': _resolve_sale_price(item, product)
                     })
         background_tasks.add_task(
             _send_booking_confirmation_email_task,
@@ -381,13 +396,9 @@ def get_reservation(
         raise HTTPException(status_code=404, detail="Бронь не найдена")
 
     reservation.products = [
-        schemas.ReservationProductResponse(
-            product_id=rp.product.id,
-            name=rp.product.name,
-            quantity=rp.quantity,
-            price=rp.product.price
-        )
+        _reservation_product_response(rp)
         for rp in reservation.reservation_products
+        if rp.product is not None
     ]
     reservation.status = reservation.status_rel.status_name
 
@@ -517,7 +528,7 @@ def update_reservation(
                         document_id=realization_doc.id,
                         product_id=rp.product_id,
                         quantity=rp.quantity,
-                        price=product.price
+                        price=_resolve_sale_price(rp, product)
                     )
                     db.add(doc_item)
 
@@ -601,11 +612,11 @@ def update_reservation(
                         if not product:
                             print(f"❌ Product {item.product_id} not found")
                             raise HTTPException(status_code=400, detail=f"Товар с ID {item.product_id} не найден")
-                        print(f"Product: {product.name}, Qty: {item.quantity}, Stock: {product.total_quantity}, Price: {product.price}")
+                        print(f"Product: {product.name}, Qty: {item.quantity}, Stock: {product.total_quantity}, Price: {_resolve_sale_price(item, product)}")
                         if product.is_countable and product.total_quantity < item.quantity:
                             print(f"❌ Insufficient stock for {product.name}")
                             raise HTTPException(status_code=400, detail=f"Недостаточно товара {product.name} на складе")
-                        product_cost = product.price * item.quantity
+                        product_cost = _resolve_sale_price(item, product) * item.quantity
                         total_cost += product_cost
                         print(f"Added product cost: {product_cost}")
 
@@ -631,7 +642,8 @@ def update_reservation(
                 db.add(models.ReservationProduct(
                     reservation_id=id,
                     product_id=item.product_id,
-                    quantity=item.quantity
+                    quantity=item.quantity,
+                    sale_price=_resolve_sale_price(item, product),
                 ))
                 print(f"Added product: {product.name} x {item.quantity}")
             print(f"✅ Products updated successfully")
@@ -652,15 +664,7 @@ def update_reservation(
         response_products = []
         for rp in db_reservation.reservation_products:
             if rp.product:
-                response_products.append(
-                    schemas.ReservationProductResponse(
-                        product_id=rp.product.id,
-                        name=rp.product.name,
-                        quantity=rp.quantity,
-                        price=rp.product.price,
-                        unit_id=rp.product.unit_id
-                    )
-                )
+                response_products.append(_reservation_product_response(rp))
 
         # === EMAIL ОБ ИЗМЕНЕНИИ (фон, не блокирует HTTP-ответ) ===
         if db_reservation.client_email and (reservation.start_datetime or reservation.end_datetime or
@@ -672,7 +676,7 @@ def update_reservation(
                     products_for_email.append({
                         'name': rp.product.name,
                         'quantity': rp.quantity,
-                        'price': rp.product.price
+                        'price': _resolve_sale_price(rp, rp.product)
                     })
             background_tasks.add_task(
                 _send_booking_confirmation_email_task,

@@ -249,6 +249,8 @@ class ReservationProduct(Base):
     reservation_id = Column(Integer, ForeignKey('reservations.reservation_id'), primary_key=True)
     product_id = Column(Integer, ForeignKey('products.id'), primary_key=True)
     quantity = Column(Integer, nullable=False, default=1)
+    # Цена продажи в этой брони (если null — берём текущую цену товара)
+    sale_price = Column(Float, nullable=True)
 
     reservation = relationship("Reservation", back_populates="reservation_products")
     product = relationship("Product")
