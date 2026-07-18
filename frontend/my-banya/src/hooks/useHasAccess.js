@@ -10,13 +10,19 @@ export function useHasAccess() {
   
   return (permission) => {
     if (!user) return false;
+
+    const required = Array.isArray(permission) ? permission : [permission];
+    if (required.length === 0) return false;
+
     // administrator:* permissions are admin-only
-    if (permission?.startsWith('administrator:')) return !!user.is_admin;
+    if (required.some((code) => code?.startsWith('administrator:'))) return !!user.is_admin;
     // Admin and director have access to all other permissions
     if (user.is_admin || user.is_director) return true;
-    // Check if user has the specific permission
+    // Check if user has any of the required permissions
     if (!user.permissions) return false;
-    return user.permissions.some((p) => (typeof p === 'string' ? p === permission : p.code === permission));
+    return required.some((code) =>
+      user.permissions.some((p) => (typeof p === 'string' ? p === code : p.code === code))
+    );
   };
 }
 

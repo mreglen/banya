@@ -12,7 +12,8 @@ import {
   Hotel, 
   FileText, 
   FilePlus2, 
-  FileMinus2, 
+  FileMinus2,
+  ClipboardList,
   Package, 
   Barcode, 
   Trash2, 
@@ -81,6 +82,7 @@ function MobileSidebar({ isOpen, onClose }) {
         </div>
 
         <nav className="p-4 space-y-2">
+            {user?.is_admin && (
             <NavLink
               to="/admin/administrator"
               className="flex items-center px-4 py-3 text-gray-700 hover:bg-purple-50 rounded-xl"
@@ -89,6 +91,7 @@ function MobileSidebar({ isOpen, onClose }) {
               <ShieldCheck className="w-5 h-5 mr-3" />
               Администратор
             </NavLink>
+            )}
 
             <NavLink
               to="/admin/reservations"
@@ -157,7 +160,8 @@ function MobileSidebar({ isOpen, onClose }) {
 
           {/* Документы */}
           {(hasAccess('/admin/documents/entrance') ||
-            hasAccess('/admin/documents/realization')) && (
+            hasAccess('/admin/documents/realization') ||
+            hasAccess('/admin/documents/product-requests')) && (
               <div>
                 <button
                   onClick={toggleDocuments}
@@ -182,6 +186,16 @@ function MobileSidebar({ isOpen, onClose }) {
                         >
                           <FilePlus2 className="w-4 h-4 mr-2" />
                           Поступление
+                        </NavLink>
+                    )}
+                    {hasAccess('/admin/documents/product-requests') && (
+                        <NavLink
+                          to="/admin/documents/product-requests"
+                          className="flex items-center px-4 py-2 text-sm text-gray-600 hover:bg-green-50 rounded-lg"
+                          onClick={onClose}
+                        >
+                          <ClipboardList className="w-4 h-4 mr-2" />
+                          Заявки на товар
                         </NavLink>
                     )}
                     {hasAccess('/admin/documents/realization') && (
@@ -275,7 +289,8 @@ function MobileSidebar({ isOpen, onClose }) {
               Финансы
             </NavLink>
 
-          {/* Настройки - только для директора и админа */}
+          {/* Настройки - только для администратора */}
+          {user?.is_admin && (
             <NavLink
               to="/admin/settings"
               className="flex items-center px-4 py-3 text-gray-700 hover:bg-blue-50 rounded-xl"
@@ -284,6 +299,7 @@ function MobileSidebar({ isOpen, onClose }) {
               <Settings className="w-5 h-5 mr-3" />
               Настройки
             </NavLink>
+          )}
 
           {/* Поддержка - доступно всем */}
           <NavLink

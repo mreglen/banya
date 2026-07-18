@@ -209,10 +209,10 @@ function BathsCard() {
                     <span className="font-medium">{bath.base_guests}</span>
                   </div>
                   <div className="flex justify-between py-2 border-b border-gray-200">
-                    <span className="text-gray-600">Цена за доп. гостя:</span>
+                    <span className="text-gray-600">Доп. гость за час:</span>
                     <span className="font-medium inline-flex items-baseline gap-1">
                       <span>{bath.extra_guest_price}</span>
-                      <span>₽</span>
+                      <span>₽/час</span>
                     </span>
                   </div>
                 </div>

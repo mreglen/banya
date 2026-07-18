@@ -26,6 +26,30 @@ const ProductSelectionModal = ({ isOpen, onClose, onSelect }) => {
   const [createCategory] = useCreateCategoryMutation();
   const [createProduct] = useCreateProductMutation();
 
+  const resetModalState = useCallback(() => {
+    setStep(1);
+    setSelectedCategory(null);
+    setNewProductName('');
+    setNewProductDescription('');
+    setNewProductCost('');
+    setContextMenu(null);
+    setIsCreatingCategory(false);
+    setNewCategoryName('');
+    setExpandedCategories(new Set());
+    setProductSearchTerm('');
+  }, []);
+
+  useEffect(() => {
+    if (isOpen) {
+      resetModalState();
+    }
+  }, [isOpen, resetModalState]);
+
+  const handleClose = useCallback(() => {
+    resetModalState();
+    onClose();
+  }, [onClose, resetModalState]);
+
   const findUnitName = (unitId) => {
     if (!unitId) return 'шт.';
     const unit = units.find(u => u.id === unitId);
@@ -183,6 +207,7 @@ const ProductSelectionModal = ({ isOpen, onClose, onSelect }) => {
       }).unwrap();
 
       onSelect(newProduct);
+      resetModalState();
       onClose();
     } catch (err) {
       console.error('Ошибка создания товара:', err);
@@ -192,6 +217,7 @@ const ProductSelectionModal = ({ isOpen, onClose, onSelect }) => {
 
   const handleSelectExistingProduct = (product) => {
     onSelect(product);
+    resetModalState();
     onClose();
   };
 
@@ -384,7 +410,7 @@ const ProductSelectionModal = ({ isOpen, onClose, onSelect }) => {
 
                 <div className="mt-4 flex flex-col sm:flex-row justify-between gap-2">
                   <button
-                    onClick={onClose}
+                    onClick={handleClose}
                     className="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400 text-sm"
                   >
                     Отмена

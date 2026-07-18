@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useSelector } from 'react-redux';
+import { Navigate } from 'react-router-dom';
 import {
   useGetSettingsQuery,
   useUpdateSettingsMutation,
@@ -21,15 +22,21 @@ const SERVER_BASE_URL = process.env.REACT_APP_API_URL
 
 function SettingsPage() {
   const currentUser = useSelector((state) => state.auth?.user);
-  const canManagePaymentQr = Boolean(currentUser?.is_admin || currentUser?.is_director);
+  const isSystemAdmin = Boolean(currentUser?.is_admin);
 
-  const { data: settings, isLoading, isError, refetch } = useGetSettingsQuery();
+  const { data: settings, isLoading, isError, refetch } = useGetSettingsQuery(undefined, {
+    skip: !isSystemAdmin,
+  });
   const [updateSettings, { isLoading: isUpdating }] = useUpdateSettingsMutation();
-  const { data: paymentQr, isLoading: isLoadingQr, refetch: refetchQr } = useGetPaymentQrCodeQuery();
+  const { data: paymentQr, isLoading: isLoadingQr, refetch: refetchQr } = useGetPaymentQrCodeQuery(undefined, {
+    skip: !isSystemAdmin,
+  });
   const [uploadPaymentQrCode, { isLoading: isUploadingQr }] = useUploadPaymentQrCodeMutation();
   const qrFileInputRef = useRef(null);
 
-  const { data: units = [], isLoading: isLoadingUnits, refetch: refetchUnits } = useGetUnitsOfMeasurementQuery();
+  const { data: units = [], isLoading: isLoadingUnits, refetch: refetchUnits } = useGetUnitsOfMeasurementQuery(undefined, {
+    skip: !isSystemAdmin,
+  });
   const [createUnit, { isLoading: isCreatingUnit }] = useCreateUnitMutation();
   const [updateUnit, { isLoading: isUpdatingUnit }] = useUpdateUnitMutation();
   const [deleteUnit, { isLoading: isDeletingUnit }] = useDeleteUnitMutation();
@@ -245,6 +252,10 @@ function SettingsPage() {
     }
   };
 
+  if (!isSystemAdmin) {
+    return <Navigate to="/admin/" replace />;
+  }
+
   if (isLoading) {
     return <SettingsSkeleton />;
   }
@@ -342,7 +353,7 @@ function SettingsPage() {
                 </div>
               )}
 
-              {canManagePaymentQr && (
+              {isSystemAdmin && (
                 <div>
                   <input
                     ref={qrFileInputRef}

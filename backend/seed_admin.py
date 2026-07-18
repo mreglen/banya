@@ -20,6 +20,7 @@ PERMISSIONS = [
     ("staff:view", "Просмотр сотрудников", "staff"),
     ("staff:manage", "Управление сотрудниками", "staff"),
     ("documents:view", "Просмотр документов", "documents"),
+    ("documents:edit", "Редактирование документов поступления", "documents"),
     ("documents:manage", "Управление документами", "documents"),
     ("promotions:view", "Просмотр акций", "promotions"),
     ("promotions:manage", "Управление акциями", "promotions"),

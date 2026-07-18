@@ -16,7 +16,7 @@ function KitchenPreview() {
   ];
 
   return (
-    <section id="kitchen" className="relative py-24 md:py-32 bg-white overflow-hidden">
+    <section id="kitchen" className="relative py-24 md:py-32 bg-white overflow-x-clip">
       {/* Decorative background elements */}
       <div className="absolute top-0 right-0 w-96 h-96 bg-amber-50 rounded-full blur-3xl opacity-50 -mr-48 -mt-48" />
       <div className="absolute bottom-0 left-0 w-96 h-96 bg-orange-50 rounded-full blur-3xl opacity-50 -ml-48 -mb-48" />

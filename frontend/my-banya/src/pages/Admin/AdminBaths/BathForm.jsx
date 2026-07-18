@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   useGetBathsQuery,
@@ -11,6 +11,7 @@ import {
 import { useGetPromotionsQuery } from '../../../redux/slices/promotionsApiSlice';
 import { prepareImageForUpload } from '../../../utils/imageProcessing';
 import { isVideoFile, isVideoUrl } from '../../../utils/mediaHelpers';
+import MediaLightbox from '../../../components/UI/MediaLightbox/MediaLightbox';
 import { toast } from 'react-hot-toast';
 
 const formatApiError = (detail, fallback = 'Ошибка при сохранении бани') => {
@@ -64,6 +65,16 @@ function BathForm() {
   const [isSaving, setIsSaving] = useState(false);
   const [selectedPromotionIds, setSelectedPromotionIds] = useState([]);
   const [uploadProgress, setUploadProgress] = useState(null); // Track upload progress
+  const [lightboxIndex, setLightboxIndex] = useState(null);
+
+  const lightboxItems = useMemo(() => {
+    if (!bath?.photos?.length) return [];
+    return bath.photos.map((photo, idx) => ({
+      url: `${SERVER_BASE_URL}${photo.image_url}`,
+      isVideo: isVideoUrl(photo.image_url),
+      alt: `${bath.name || 'Баня'} — медиа ${idx + 1}`,
+    }));
+  }, [bath, SERVER_BASE_URL]);
 
   // Заполняем форму данными при редактировании
   useEffect(() => {
@@ -371,7 +382,7 @@ function BathForm() {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Цена за доп. гостя (₽) *
+                Цена за доп. гостя за час (₽) *
               </label>
               <input
                 type="number"
@@ -547,26 +558,33 @@ function BathForm() {
                   const mediaUrl = `${SERVER_BASE_URL}${photo.image_url}`;
                   const isVideo = isVideoUrl(photo.image_url);
                   return (
-                  <div key={photo.photo_id} className="relative">
-                    {isVideo ? (
-                      <video
-                        src={mediaUrl}
-                        className="w-24 h-24 object-cover rounded-lg border border-gray-200 bg-black"
-                        muted
-                        playsInline
-                        controls
-                      />
-                    ) : (
-                      <img
-                        src={mediaUrl}
-                        alt={`Медиа ${idx + 1}`}
-                        className="w-24 h-24 object-cover rounded-lg border border-gray-200"
-                      />
-                    )}
+                  <div key={photo.photo_id} className="relative group">
+                    <button
+                      type="button"
+                      onClick={() => setLightboxIndex(idx)}
+                      className="block cursor-zoom-in focus:outline-none focus:ring-2 focus:ring-green-500 rounded-lg"
+                      title="Открыть крупно"
+                    >
+                      {isVideo ? (
+                        <video
+                          src={mediaUrl}
+                          className="w-24 h-24 object-cover rounded-lg border border-gray-200 bg-black"
+                          muted
+                          playsInline
+                        />
+                      ) : (
+                        <img
+                          src={mediaUrl}
+                          alt={`Медиа ${idx + 1}`}
+                          className="w-24 h-24 object-cover rounded-lg border border-gray-200"
+                        />
+                      )}
+                      <div className="absolute inset-0 rounded-lg bg-black/0 group-hover:bg-black/30 transition pointer-events-none" />
+                    </button>
                     <button
                       type="button"
                       onClick={() => handleDeletePhoto(photo.photo_id)}
-                      className="absolute top-1 right-1 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm shadow-md hover:bg-red-600 transition"
+                      className="absolute top-1 right-1 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm shadow-md hover:bg-red-600 transition z-10"
                       title="Удалить фото"
                     >
                       ×
@@ -602,6 +620,13 @@ function BathForm() {
           </div>
         </form>
       </div>
+
+      <MediaLightbox
+        items={lightboxItems}
+        index={lightboxIndex}
+        onClose={() => setLightboxIndex(null)}
+        onIndexChange={setLightboxIndex}
+      />
     </div>
   );
 }

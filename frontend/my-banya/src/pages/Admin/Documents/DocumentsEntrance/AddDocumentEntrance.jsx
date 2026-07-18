@@ -40,7 +40,6 @@ function AddDocumentEntrance() {
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
   const [pendingPayload, setPendingPayload] = useState(null);
   const [confirmMode, setConfirmMode] = useState('save'); // save | post
-  const [selectedProduct, setSelectedProduct] = useState(null);
   const [productSearch, setProductSearch] = useState('');
   const [isProductDropdownOpen, setIsProductDropdownOpen] = useState(false);
   const productSearchRef = useRef(null);
@@ -91,15 +90,6 @@ function AddDocumentEntrance() {
       .slice(0, 50);
   }, [productSearch, products, items]);
 
-  const selectedProductWithUnit = useMemo(() => {
-    if (!selectedProduct) return null;
-    const unit = units.find(u => u.id === selectedProduct.unit_id);
-    return {
-      ...selectedProduct,
-      unitName: unit ? unit.name : 'шт.'
-    };
-  }, [selectedProduct, units]);
-
   useEffect(() => {
     if (isEditing && documentData && !isLoadingUnits) {
       const parsedItems = documentData.items.map((item) => {
@@ -146,12 +136,6 @@ function AddDocumentEntrance() {
   }, [isEditing, documentData, dispatch, units, isLoadingUnits]);
 
   useEffect(() => {
-    if (selectedProductWithUnit) {
-      setProductSearch(`${selectedProductWithUnit.name} (${selectedProductWithUnit.unitName})`);
-    }
-  }, [selectedProductWithUnit]);
-
-  useEffect(() => {
     const handleClickOutside = (event) => {
       if (productSearchRef.current && !productSearchRef.current.contains(event.target)) {
         setIsProductDropdownOpen(false);
@@ -179,15 +163,15 @@ function AddDocumentEntrance() {
       id: Date.now() + Math.random(),
       productId: product.id,
       name: product.name,
-      quantity: 1,
-      purchasePrice: product.last_purchase_price || 0,
+      quantity: '',
+      purchasePrice: '',
+      lastPurchasePrice: product.last_purchase_price || null,
       unitId: product.unit_id || null,
       unitName: unit ? unit.name : 'шт.',
       minStock: product.min_stock || 0,
     };
     dispatch(addItem(newItem));
     setIsProductModalOpen(false);
-    setSelectedProduct(product);
     setProductSearch('');
     setIsProductDropdownOpen(false);
   };
@@ -296,6 +280,10 @@ function AddDocumentEntrance() {
       toast.error('Добавьте хотя бы один товар');
       return;
     }
+    if (items.some((item) => !Number(item.quantity))) {
+      toast.error('Укажите количество для всех товаров');
+      return;
+    }
     setConfirmMode('save');
     setPendingPayload(buildPayload());
     setIsConfirmModalOpen(true);
@@ -310,6 +298,10 @@ function AddDocumentEntrance() {
       toast.error('Добавьте хотя бы один товар');
       return;
     }
+    if (items.some((item) => !Number(item.quantity))) {
+      toast.error('Укажите количество для всех товаров');
+      return;
+    }
     setConfirmMode('post');
     setPendingPayload(buildPayload());
     setIsConfirmModalOpen(true);
@@ -322,6 +314,8 @@ function AddDocumentEntrance() {
 
   const currentUrl = window.location.pathname + window.location.search;
   const selectedPartner = partnersData.find((p) => p.partner_id === supplierId);
+  const getLineTotal = (item) => (Number(item.quantity) || 0) * (Number(item.purchasePrice) || 0);
+  const documentTotal = enhancedItems.reduce((sum, item) => sum + getLineTotal(item), 0);
 
   if (isLoading) {
     return (
@@ -553,8 +547,9 @@ function AddDocumentEntrance() {
                             type="text"
                             inputMode="numeric"
                             pattern="[0-9]*"
-                            value={item.quantity}
+                            value={item.quantity ?? ''}
                             onChange={(e) => updateItemInList(index, 'quantity', e.target.value)}
+                            placeholder="0"
                             className="w-16 sm:w-20 px-2 py-1 border border-gray-300 rounded"
                             disabled={isPostedLocked}
                           />
@@ -572,14 +567,15 @@ function AddDocumentEntrance() {
                           type="text"
                           inputMode="numeric"
                           pattern="[0-9]*"
-                          value={item.purchasePrice}
+                          value={item.purchasePrice ?? ''}
                           onChange={(e) => updateItemInList(index, 'purchasePrice', e.target.value)}
+                          placeholder={item.lastPurchasePrice != null ? String(item.lastPurchasePrice) : '0'}
                           className="w-20 sm:w-24 px-2 py-1 border border-gray-300 rounded"
                           disabled={isPostedLocked}
                         />
                       </td>
                       <td className="px-3 py-2 sm:px-6 sm:py-4 whitespace-nowrap text-xs sm:text-sm text-gray-900">
-                        {(item.quantity * item.purchasePrice).toFixed(2)} ₽
+                        {getLineTotal(item).toFixed(2)} ₽
                       </td>
                       <td className="px-3 py-2 sm:px-6 sm:py-4 whitespace-nowrap text-right text-xs sm:text-sm font-medium">
                         <button
@@ -613,7 +609,7 @@ function AddDocumentEntrance() {
                     </div>
                     <div className="text-right">
                       <div className="font-bold text-green-800 text-sm">
-                        {(item.quantity * item.purchasePrice).toFixed(2)} ₽
+                        {getLineTotal(item).toFixed(2)} ₽
                       </div>
                     </div>
                   </div>
@@ -649,8 +645,9 @@ function AddDocumentEntrance() {
                                 type="text"
                                 inputMode="numeric"
                                 pattern="[0-9]*"
-                                value={item.quantity}
+                                value={item.quantity ?? ''}
                                 onChange={(e) => updateItemInList(index, 'quantity', e.target.value)}
+                                placeholder="0"
                                 className="flex-grow px-2 py-1.5 border border-gray-300 rounded bg-white"
                                 disabled={isPostedLocked}
                               />
@@ -673,8 +670,9 @@ function AddDocumentEntrance() {
                               type="text"
                               inputMode="numeric"
                               pattern="[0-9]*"
-                              value={item.purchasePrice}
+                              value={item.purchasePrice ?? ''}
                               onChange={(e) => updateItemInList(index, 'purchasePrice', e.target.value)}
+                              placeholder={item.lastPurchasePrice != null ? String(item.lastPurchasePrice) : '0'}
                               className="w-full px-2 py-1.5 border border-gray-300 rounded bg-white"
                               disabled={isPostedLocked}
                             />
@@ -684,7 +682,7 @@ function AddDocumentEntrance() {
                           <div>
                             <label className="block font-medium mb-1">Сумма</label>
                             <div className="px-2 py-1.5 bg-gray-100 rounded text-gray-900">
-                              {(item.quantity * item.purchasePrice).toFixed(2)} ₽
+                              {getLineTotal(item).toFixed(2)} ₽
                             </div>
                           </div>
                         </div>
@@ -732,7 +730,7 @@ function AddDocumentEntrance() {
             <div className="bg-gray-50 p-3 sm:p-4 rounded-lg sm:rounded-xl w-full sm:w-auto">
               <div className="text-sm sm:text-base font-semibold text-center sm:text-right">
                 Итого: <span className="text-green-700">
-                  {enhancedItems.reduce((sum, item) => sum + item.quantity * item.purchasePrice, 0).toFixed(2)} ₽
+                  {documentTotal.toFixed(2)} ₽
                 </span>
               </div>
             </div>

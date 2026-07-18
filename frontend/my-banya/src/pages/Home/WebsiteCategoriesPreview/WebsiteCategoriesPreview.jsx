@@ -41,10 +41,10 @@ function CategoryProductCard({ product }) {
       <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent opacity-80 transition-opacity duration-500 group-hover:opacity-95" />
 
       {/* Content Container */}
-      <div className="absolute inset-0 p-6 flex flex-col justify-end transition-all duration-500 group-hover:pb-8">
+      <div className="absolute inset-0 p-6 flex flex-col justify-end overflow-hidden transition-all duration-500 group-hover:pb-8">
         {/* Title & Price (Always visible) */}
-        <div className="flex justify-between items-end mb-2">
-          <h3 className="text-xl sm:text-2xl font-bold text-white leading-tight drop-shadow-lg">
+        <div className="flex justify-between items-end gap-3 mb-2 min-w-0">
+          <h3 className="text-xl sm:text-2xl font-bold text-white leading-tight drop-shadow-lg min-w-0 break-words">
             {product.name}
           </h3>
           <div className="bg-amber-500 text-black px-3 py-1 rounded-lg font-bold text-sm sm:text-base whitespace-nowrap inline-flex items-baseline gap-1 shrink-0 transform transition-transform group-hover:scale-110">
@@ -102,13 +102,13 @@ function WebsiteCategoriesPreview() {
           <section
             key={category.id}
             id={sectionId}
-            className={`relative py-24 md:py-32 overflow-hidden ${isDark ? 'bg-zinc-950' : 'bg-white'
+            className={`relative py-24 md:py-32 overflow-x-clip ${isDark ? 'bg-zinc-950' : 'bg-white'
               }`}
           >
             {/* Background Image with Parallax-like feel */}
             {categoryBackground && (
               <div
-                className="absolute inset-0 z-0 opacity-40 mix-blend-overlay"
+                className="absolute inset-0 z-0 opacity-40 mix-blend-overlay pointer-events-none"
                 style={{
                   backgroundImage: `url("${categoryBackground}")`,
                   backgroundSize: 'cover',
@@ -118,7 +118,7 @@ function WebsiteCategoriesPreview() {
             )}
 
             {/* Overlay for better contrast */}
-            <div className={`absolute inset-0 z-0 ${isDark ? 'bg-zinc-950/80' : 'bg-white/90'}`} />
+            <div className={`absolute inset-0 z-0 pointer-events-none ${isDark ? 'bg-zinc-950/80' : 'bg-white/90'}`} />
 
             <div className="relative z-10 max-w-7xl mx-auto px-6 lg:px-8">
               {/* Category Header */}

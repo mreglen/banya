@@ -6,6 +6,7 @@ import {
   useApproveProductRequestItemsMutation,
   useRejectProductRequestItemsMutation,
 } from '../../../../redux/slices/productsApiSlice';
+import { useHasAccess } from '../../../../hooks/useHasAccess';
 import { toast } from 'react-hot-toast';
 
 const STATUS_LABELS = {
@@ -24,6 +25,8 @@ function ProductRequestReview() {
   const { id } = useParams();
   const navigate = useNavigate();
   const user = useSelector((state) => state.auth.user);
+  const hasAccess = useHasAccess();
+  const canManage = hasAccess('documents:manage');
   const canApprove = Boolean(user?.is_admin || user?.is_director);
 
   const { data: request, isLoading, isError, refetch } = useGetProductRequestByIdQuery(id);
@@ -118,7 +121,7 @@ function ProductRequestReview() {
             )}
           </div>
           <div className="flex flex-wrap gap-2">
-            {(request.pending_count || 0) > 0 && (
+            {canManage && (request.pending_count || 0) > 0 && (
               <button
                 onClick={() => navigate(`/admin/documents/product-requests/edit/${request.id}`)}
                 className="px-3 py-2 rounded-lg bg-gray-200 hover:bg-gray-300 text-sm"

@@ -7,6 +7,7 @@ from app.auth import get_current_user
 from app.email_service import send_booking_confirmation_email
 from app.audit_logger import log_action, get_client_ip
 from app.database import SessionLocal
+from app.promotion_utils import apply_promotion_to_reservation
 
 
 router = APIRouter(
@@ -174,37 +175,45 @@ def create_reservation(
     if start_dt >= end_dt:
         raise HTTPException(status_code=400, detail="Время окончания должно быть позже начала")
 
-    # 4. Проверяем пересечения
-    overlap = check_overlap(db, reservation.bath_id, start_dt, end_dt)
-    if overlap:
-        raise HTTPException(status_code=400, detail="Бронь пересекается с существующей")
-
-    # 5. Рассчитываем общую стоимость
-    total_cost = 0
-
-    # 5.1 Стоимость бани + гости
-    duration_hours = (end_dt - start_dt).total_seconds() / 3600
+    # 5. Рассчитываем стоимость бани по оплачиваемой длительности
+    paid_duration_hours = (end_dt - start_dt).total_seconds() / 3600
     min_booking_hours = max(1, int(getattr(bath, "min_booking_hours", 1) or 1))
-    if duration_hours < min_booking_hours:
+    if paid_duration_hours < min_booking_hours:
         raise HTTPException(
             status_code=400,
             detail=f"Минимальная длительность брони для бани \"{bath.name}\" — {min_booking_hours} ч."
         )
-    # Определяем день недели для начала бронирования (0=понедельник, 6=воскресенье)
     weekday = start_dt.weekday()
-    # пн=0, вт=1, ср=2, чт=3 → будни; пт=4, сб=5, вс=6 → выходные
     hourly_rate = bath.cost_weekend if weekday >= 4 else bath.cost_weekday
-    bath_base_cost = int(hourly_rate * duration_hours)
+    bath_base_cost = int(hourly_rate * paid_duration_hours)
     extra_guests = max(0, reservation.guests - bath.base_guests)
     extra_guest_cost = extra_guests * bath.extra_guest_price
-    total_cost += bath_base_cost + extra_guest_cost
+    bath_cost = bath_base_cost + extra_guest_cost
 
-    # 5.2 Стоимость товаров
-    if reservation.products:
-        product_ids = [p.product_id for p in reservation.products]
+    # 5.1 Применяем акцию: бонусное время + подарочные товары
+    end_dt, applied_promo, promo_snapshot, effective_products = apply_promotion_to_reservation(
+        db,
+        bath,
+        start_dt=start_dt,
+        end_dt=end_dt,
+        guests=reservation.guests,
+        bath_cost=bath_cost,
+        products=reservation.products or [],
+    )
+
+    # 4. Проверяем пересечения уже с учётом бонусного времени
+    overlap = check_overlap(db, reservation.bath_id, start_dt, end_dt)
+    if overlap:
+        raise HTTPException(status_code=400, detail="Бронь пересекается с существующей")
+
+    total_cost = bath_cost
+
+    # 5.2 Стоимость товаров (подарки по акции — 0 ₽)
+    if effective_products:
+        product_ids = [p.product_id for p in effective_products]
         products = db.query(models.Product).filter(models.Product.id.in_(product_ids)).all()
         product_map = {p.id: p for p in products}
-        for item in reservation.products:
+        for item in effective_products:
             product = product_map.get(item.product_id)
             if not product:
                 raise HTTPException(status_code=400, detail=f"Товар с ID {item.product_id} не найден")
@@ -229,9 +238,11 @@ def create_reservation(
         prepayment=prepayment,
         notes=reservation.notes,
         guests=reservation.guests,
-        total_cost=total_cost,
+        total_cost=int(total_cost),
         status_id=reservation.status_id,
         income_account_id=reservation.income_account_id,
+        applied_promotion_id=applied_promo.id if applied_promo else None,
+        promotion_snapshot=promo_snapshot,
     )
     db.add(db_reservation)
     db.flush()
@@ -248,8 +259,8 @@ def create_reservation(
         )
         db.add(realization_doc)
         db.flush()
-        if reservation.products:
-            for item in reservation.products:
+        if effective_products:
+            for item in effective_products:
                 product = db.query(models.Product).filter(models.Product.id == item.product_id).first()
                 if product:
                     db.add(models.RealizationDocumentItem(
@@ -260,8 +271,8 @@ def create_reservation(
                     ))
 
     # 7. Сохраняем товары и списываем со склада (резервирование)
-    if reservation.products:
-        for item in reservation.products:
+    if effective_products:
+        for item in effective_products:
             product = db.query(models.Product).filter(models.Product.id == item.product_id).first()
             if not product:
                 raise HTTPException(status_code=400, detail=f"Товар с ID {item.product_id} не найден")
@@ -281,8 +292,8 @@ def create_reservation(
 
     # === ФОРМИРУЕМ ОТВЕТ ВРУЧНУЮ ===
     response_products = []
-    if reservation.products:
-        for item in reservation.products:
+    if effective_products:
+        for item in effective_products:
             product = db.query(models.Product).filter(models.Product.id == item.product_id).first()
             if product:
                 response_products.append(
@@ -298,8 +309,8 @@ def create_reservation(
     # === EMAIL ПОДТВЕРЖДЕНИЯ (фон, не блокирует HTTP-ответ) ===
     if reservation.client_email:
         products_for_email = []
-        if reservation.products:
-            for item in reservation.products:
+        if effective_products:
+            for item in effective_products:
                 product = db.query(models.Product).filter(models.Product.id == item.product_id).first()
                 if product:
                     products_for_email.append({
@@ -326,8 +337,8 @@ def create_reservation(
     
     # Сформировать список товаров
     product_names = []
-    if reservation.products:
-        for item in reservation.products:
+    if effective_products:
+        for item in effective_products:
             product = db.query(models.Product).filter(models.Product.id == item.product_id).first()
             if product:
                 product_names.append(f"{product.name} x{item.quantity}")
@@ -339,6 +350,8 @@ def create_reservation(
     summary = f"Создал бронь на {start_dt.strftime('%d.%m.%Y %H:%M')}, баня: {bath.name if bath else 'Не указано'}, клиент: {reservation.client_name}"
     if product_list_str:
         summary += f", товары: {product_list_str}"
+    if promo_snapshot:
+        summary += f", акция: {promo_snapshot.get('name')}"
     
     from app.audit_logger import log_detailed_action
     background_tasks.add_task(
@@ -373,8 +386,9 @@ def create_reservation(
         status=status_obj.status_name,
         status_id=db_reservation.status_id,
         income_account_id=db_reservation.income_account_id,
+        applied_promotion_id=db_reservation.applied_promotion_id,
+        promotion_snapshot=db_reservation.promotion_snapshot,
         products=response_products,
-        # Поле `massages` отсутствует в схеме ReservationResponse (см. schemas.py)
     )
 
 
@@ -553,100 +567,114 @@ def update_reservation(
                 print(f"❌ Invalid end_datetime format: {reservation.end_datetime}")
                 raise HTTPException(status_code=400, detail="Неверный формат даты окончания")
 
+        should_recalc = bool(
+            reservation.start_datetime
+            or reservation.end_datetime
+            or reservation.guests is not None
+            or reservation.products is not None
+            or reservation.bath_id is not None
+        )
+
         # Проверяем даты только если они были изменены или это не обновление статуса
-        if reservation.start_datetime or reservation.end_datetime or not reservation.status_id:
+        if reservation.start_datetime or reservation.end_datetime or not reservation.status_id or should_recalc:
             print(f"Validating dates: {start_dt} < {end_dt}")
             if start_dt >= end_dt:
                 print(f"❌ End time must be after start time")
                 raise HTTPException(status_code=400, detail="Время окончания должно быть позже начала")
 
-            # Проверка пересечений только если изменились даты или баня
-            if (reservation.start_datetime or reservation.end_datetime or reservation.bath_id):
-                print(f"Checking for overlaps...")
+            bath = db.query(models.Bath).filter(models.Bath.bath_id == db_reservation.bath_id).first()
+            if not bath:
+                raise HTTPException(status_code=500, detail="Баня, связанная с бронью, не найдена")
+
+            paid_duration_hours = (end_dt - start_dt).total_seconds() / 3600
+            min_booking_hours = max(1, int(getattr(bath, "min_booking_hours", 1) or 1))
+            if paid_duration_hours < min_booking_hours:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Минимальная длительность брони для бани \"{bath.name}\" — {min_booking_hours} ч."
+                )
+
+            weekday = start_dt.weekday()
+            hourly_rate = bath.cost_weekend if weekday >= 4 else bath.cost_weekday
+            bath_base_cost = int(hourly_rate * paid_duration_hours)
+            extra_guests = max(0, current_guests - bath.base_guests)
+            extra_guest_cost = extra_guests * bath.extra_guest_price
+            bath_cost = bath_base_cost + extra_guest_cost
+
+            products_for_promo = reservation.products if reservation.products is not None else []
+            # Если товары не переданы — берём текущие из БД как «оплачиваемые»
+            if reservation.products is None:
+                products_for_promo = [
+                    type("P", (), {
+                        "product_id": rp.product_id,
+                        "quantity": rp.quantity,
+                        "price": rp.sale_price,
+                    })()
+                    for rp in db_reservation.reservation_products
+                    # Исключаем прошлые подарки: цена 0 и были в snapshot
+                ]
+                gift_ids = {
+                    int(g["product_id"])
+                    for g in (db_reservation.promotion_snapshot or {}).get("gift_products", [])
+                }
+                products_for_promo = [
+                    p for p in products_for_promo
+                    if p.product_id not in gift_ids or (p.price is not None and float(p.price) > 0)
+                ]
+
+            end_dt, applied_promo, promo_snapshot, effective_products = apply_promotion_to_reservation(
+                db,
+                bath,
+                start_dt=start_dt,
+                end_dt=end_dt,
+                guests=current_guests,
+                bath_cost=bath_cost,
+                products=products_for_promo,
+            )
+
+            if reservation.start_datetime or reservation.end_datetime or reservation.bath_id or applied_promo:
                 overlap = check_overlap(db, db_reservation.bath_id, start_dt, end_dt, exclude_id=id)
                 if overlap:
-                    print(f"❌ Overlap detected with reservation {overlap.reservation_id}")
                     raise HTTPException(status_code=400, detail="Бронь пересекается с существующей")
-                print(f"✅ No overlaps found")
 
             db_reservation.start_datetime = start_dt
             db_reservation.end_datetime = end_dt
-            print(f"Updated dates successfully")
+            db_reservation.applied_promotion_id = applied_promo.id if applied_promo else None
+            db_reservation.promotion_snapshot = promo_snapshot
 
-            # Пересчёт стоимости только если изменились даты, гости или товары
-            if reservation.start_datetime or reservation.end_datetime or reservation.guests or reservation.products:
-                print(f"\nRecalculating cost...")
-                bath = db.query(models.Bath).filter(models.Bath.bath_id == db_reservation.bath_id).first()
-                if not bath:
-                    print(f"❌ Bath {db_reservation.bath_id} not found")
-                    raise HTTPException(status_code=500, detail="Баня, связанная с бронью, не найдена")
-
-                duration_hours = (end_dt - start_dt).total_seconds() / 3600
-                min_booking_hours = max(1, int(getattr(bath, "min_booking_hours", 1) or 1))
-                if duration_hours < min_booking_hours:
-                    raise HTTPException(
-                        status_code=400,
-                        detail=f"Минимальная длительность брони для бани \"{bath.name}\" — {min_booking_hours} ч."
-                    )
-                print(f"Duration: {duration_hours} hours")
-                # Определяем день недели для начала бронирования (0=понедельник, 6=воскресенье)
-                weekday = start_dt.weekday()
-                print(f"Weekday: {weekday} (0=Mon, 6=Sun)")
-                # пн=0, вт=1, ср=2, чт=3 → будни; пт=4, сб=5, вс=6 → выходные
-                hourly_rate = bath.cost_weekend if weekday >= 4 else bath.cost_weekday
-                bath_base_cost = int(hourly_rate * duration_hours)
-                extra_guests = max(0, current_guests - bath.base_guests)
-                extra_guest_cost = extra_guests * bath.extra_guest_price
-                total_cost = bath_base_cost + extra_guest_cost
-                print(f"Bath cost: {bath_base_cost}, Extra guests: {extra_guests} x {bath.extra_guest_price} = {extra_guest_cost}")
-                print(f"Total before products: {total_cost}")
-
-                # Стоимость товаров
-                if reservation.products:
-                    print(f"\nProcessing {len(reservation.products)} products...")
-                    product_ids = [p.product_id for p in reservation.products]
+            if should_recalc:
+                total_cost = bath_cost
+                if effective_products:
+                    product_ids = [p.product_id for p in effective_products]
                     products = db.query(models.Product).filter(models.Product.id.in_(product_ids)).all()
                     product_map = {p.id: p for p in products}
-                    for item in reservation.products:
+                    for item in effective_products:
                         product = product_map.get(item.product_id)
                         if not product:
-                            print(f"❌ Product {item.product_id} not found")
                             raise HTTPException(status_code=400, detail=f"Товар с ID {item.product_id} не найден")
-                        print(f"Product: {product.name}, Qty: {item.quantity}, Stock: {product.total_quantity}, Price: {_resolve_sale_price(item, product)}")
                         if product.is_countable and product.total_quantity < item.quantity:
-                            print(f"❌ Insufficient stock for {product.name}")
                             raise HTTPException(status_code=400, detail=f"Недостаточно товара {product.name} на складе")
-                        product_cost = _resolve_sale_price(item, product) * item.quantity
-                        total_cost += product_cost
-                        print(f"Added product cost: {product_cost}")
+                        total_cost += _resolve_sale_price(item, product) * item.quantity
 
-                db_reservation.total_cost = total_cost
-                print(f"✅ Total cost: {total_cost}")
+                db_reservation.total_cost = int(total_cost)
 
-        # Обновляем товары только если они были переданы в запросе
-        if reservation.products is not None:
-            print(f"\nUpdating products...")
-            # Удаляем старые связи (только товары)
-            db.query(models.ReservationProduct).filter(models.ReservationProduct.reservation_id == id).delete()
-            print(f"Deleted old products")
+                # Обновляем товары (включая подарки акции)
+                db.query(models.ReservationProduct).filter(
+                    models.ReservationProduct.reservation_id == id
+                ).delete()
+                for item in effective_products:
+                    product = db.query(models.Product).filter(models.Product.id == item.product_id).first()
+                    if not product:
+                        raise HTTPException(status_code=400, detail=f"Товар с ID {item.product_id} не найден")
+                    db.add(models.ReservationProduct(
+                        reservation_id=id,
+                        product_id=item.product_id,
+                        quantity=item.quantity,
+                        sale_price=_resolve_sale_price(item, product),
+                    ))
+                print(f"✅ Products and promotion updated")
 
-            # Добавляем новые связи (без списания!)
-            for item in reservation.products:
-                product = db.query(models.Product).filter(models.Product.id == item.product_id).first()
-                if not product:
-                    print(f"❌ Product {item.product_id} not found")
-                    raise HTTPException(status_code=400, detail=f"Товар с ID {item.product_id} не найден")
-                if product.is_countable and product.total_quantity < item.quantity:
-                    print(f"❌ Insufficient stock for {product.name}: {product.total_quantity} < {item.quantity}")
-                    raise HTTPException(status_code=400, detail=f"Недостаточно товара {product.name} на складе")
-                db.add(models.ReservationProduct(
-                    reservation_id=id,
-                    product_id=item.product_id,
-                    quantity=item.quantity,
-                    sale_price=_resolve_sale_price(item, product),
-                ))
-                print(f"Added product: {product.name} x {item.quantity}")
-            print(f"✅ Products updated successfully")
+        # Старый блок обновления товаров без акций — пропущен (обработан выше)
 
         current_prepayment = db_reservation.prepayment or 0
         if current_prepayment < 0:
@@ -746,8 +774,9 @@ def update_reservation(
             status=status_name,
             status_id=db_reservation.status_id,
             income_account_id=db_reservation.income_account_id,
+            applied_promotion_id=db_reservation.applied_promotion_id,
+            promotion_snapshot=db_reservation.promotion_snapshot,
             products=response_products,
-            # Поле `massages` отсутствует
         )
     
     except HTTPException:

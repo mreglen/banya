@@ -47,6 +47,33 @@ const computeEndDateTime = (ymd, hm, durationHours) => {
   return { endDate: formatLocalYmd(end), endHm: formatLocalHm(end) };
 };
 
+const findApplicablePromotion = ({ bath, durationHours, guests, bathCost, startDate }) => {
+  const promos = (bath?.promotions || []).filter((p) => p && p.is_active !== false);
+  if (!promos.length || !startDate) return null;
+
+  const bookingDate = formatLocalYmd(startDate);
+  const weekday = ((startDate.getDay() + 6) % 7); // 0=пн … 6=вс
+
+  const matched = promos.filter((promo) => {
+    if (promo.valid_from && bookingDate < promo.valid_from) return false;
+    if (promo.valid_until && bookingDate > promo.valid_until) return false;
+    if (promo.min_hours != null && durationHours < Number(promo.min_hours)) return false;
+    if (promo.min_guests != null && guests < Number(promo.min_guests)) return false;
+    if (promo.min_amount != null && bathCost < Number(promo.min_amount)) return false;
+    if (Array.isArray(promo.applicable_weekdays) && promo.applicable_weekdays.length > 0) {
+      if (!promo.applicable_weekdays.includes(weekday)) return false;
+    }
+    return true;
+  });
+
+  if (!matched.length) return null;
+  matched.sort((a, b) => {
+    const score = (p) => (Number(p.bonus_minutes) || 0) * 1000 + (p.gift_products?.length || 0);
+    return score(b) - score(a);
+  });
+  return matched[0];
+};
+
 // Build ISO string with timezone offset (Python datetime.fromisoformat supports it)
 const toLocalIsoWithOffset = (ymd, hm) => {
   const dt = new Date(`${ymd}T${hm}:00`);
@@ -252,9 +279,22 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
       const date = formatLocalYmd(start);
       const start_time = start.toTimeString().slice(0, 5);
       const diffMs = end.getTime() - start.getTime();
-      const duration_hours = Math.max(0.5, Math.round((diffMs / (1000 * 60 * 60)) * 2) / 2);
+      const bonusMinutes = Number(booking.promotion_snapshot?.bonus_minutes) || 0;
+      const paidMs = Math.max(diffMs - bonusMinutes * 60 * 1000, 30 * 60 * 1000);
+      const duration_hours = Math.max(0.5, Math.round((paidMs / (1000 * 60 * 60)) * 2) / 2);
 
-      const selectedProducts = (booking.products || []).map((product) => {
+      const giftIds = new Set(
+        (booking.promotion_snapshot?.gift_products || []).map((g) => Number(g.product_id))
+      );
+      const selectedProducts = (booking.products || [])
+        .filter((product) => {
+          const pid = Number(product.product_id);
+          const price = Number(product.price ?? 0);
+          // Подарки акции подтянем в чеке отдельно; в форме оставляем оплачиваемые позиции
+          if (giftIds.has(pid) && price === 0) return false;
+          return true;
+        })
+        .map((product) => {
         const pid = Number(product.product_id);
         const stockItem = stockProducts.find((p) => Number(p.id) === pid);
         const unitName = findUnitName(stockItem?.unit_id);
@@ -780,10 +820,36 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
     const massageTotal = massageItems.reduce((sum, item) => sum + item.lineTotal, 0);
 
     const bathServiceCost = bathBaseCost + extraGuestCost;
+
+    const appliedPromotion = findApplicablePromotion({
+      bath: selectedBath,
+      durationHours,
+      guests: guestsNum,
+      bathCost: bathServiceCost,
+      startDate: start,
+    });
+    const bonusMinutes = Number(appliedPromotion?.bonus_minutes) || 0;
+    const giftItems = (appliedPromotion?.gift_products || []).map((gp) => ({
+      name: gp.product_name || `Товар #${gp.product_id}`,
+      quantity: gp.quantity || 1,
+      unitPrice: 0,
+      lineTotal: 0,
+      isGift: true,
+    }));
+
     const totalCost = bathServiceCost + productTotal + massageTotal;
 
-    const { endDate, endHm } = computeEndDateTime(formData.date, formData.start_time, durationHours);
+    const paidEnd = computeEndDateTime(formData.date, formData.start_time, durationHours);
+    const totalDurationHours = durationHours + bonusMinutes / 60;
+    const { endDate, endHm } = computeEndDateTime(formData.date, formData.start_time, totalDurationHours);
     const endLabel = new Date(`${endDate}T${endHm}:00`).toLocaleString('ru-RU', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+    const paidEndLabel = new Date(`${paidEnd.endDate}T${paidEnd.endHm}:00`).toLocaleString('ru-RU', {
       day: '2-digit',
       month: '2-digit',
       year: 'numeric',
@@ -806,9 +872,13 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
       bathServiceCost,
       productItems,
       productTotal,
+      giftItems,
       massageItems,
       massageTotal,
       totalCost,
+      appliedPromotion,
+      bonusMinutes,
+      paidEndLabel,
       startLabel: start.toLocaleString('ru-RU', {
         day: '2-digit',
         month: '2-digit',
@@ -863,14 +933,14 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
   return createPortal(
     !isOpen ? null : (
     <div
-      className="fixed inset-0 bg-black bg-opacity-50 flex items-start justify-center p-0 sm:p-4 z-50 overflow-y-auto"
+      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-0 sm:p-4 z-50 overflow-hidden"
     >
       <div
-        className="bg-white rounded-none sm:rounded-2xl shadow-2xl w-full max-w-6xl h-[100dvh] sm:max-h-[95vh] sm:h-auto flex flex-col"
+        className="bg-white rounded-none sm:rounded-2xl shadow-2xl w-full max-w-7xl h-[100dvh] sm:h-[95vh] sm:max-h-[95vh] flex flex-col"
         style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
       >
         <div className="p-4 sm:p-6 border-b border-gray-200 bg-gradient-to-r from-gray-50 to-gray-100 relative flex-shrink-0">
-          <h2 className="text-lg sm:text-xl font-semibold text-gray-800">
+          <h2 className="text-xl sm:text-2xl font-semibold text-gray-800">
             {isEditing ? 'Редактировать бронь' : 'Добавить бронь'}
           </h2>
           <button
@@ -882,20 +952,20 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="flex flex-col flex-grow min-h-0">
-          <div className="flex flex-col lg:flex-row flex-grow min-h-0 overflow-hidden">
-            <div className="flex-1 p-4 sm:p-6 space-y-5 sm:space-y-6 overflow-y-auto min-h-0">
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
+          <div className="flex flex-col lg:flex-row flex-1 min-h-0 overflow-hidden">
+            <div className="flex-1 p-4 sm:p-6 space-y-5 sm:space-y-6 overflow-y-auto min-h-0 overscroll-contain">
 
           {/* Статус (только при редактировании) */}
           {isEditing && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Статус</label>
+              <label className="block text-base font-medium text-gray-700 mb-2">Статус</label>
               {isLoadingStatuses ? (
-                <div className="w-full px-3 py-2.5 sm:px-4 sm:py-3 border border-gray-300 rounded-xl bg-gray-100 text-sm">
+                <div className="w-full px-3 py-2.5 sm:px-4 sm:py-3 border border-gray-300 rounded-xl bg-gray-100 text-base">
                   Загрузка статусов...
                 </div>
               ) : statusesError ? (
-                <div className="w-full px-3 py-2.5 sm:px-4 sm:py-3 border border-red-300 rounded-xl bg-red-50 text-red-800 text-sm">
+                <div className="w-full px-3 py-2.5 sm:px-4 sm:py-3 border border-red-300 rounded-xl bg-red-50 text-red-800 text-base">
                   Ошибка загрузки статусов
                 </div>
               ) : (
@@ -903,7 +973,7 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
                   <select
                     value={formData.status_id}
                     onChange={handleStatusChange}
-                    className={`w-full px-3 py-2.5 sm:px-4 sm:py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 text-sm sm:text-base ${
+                    className={`w-full px-3 py-2.5 sm:px-4 sm:py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 text-base sm:text-lg ${
                       lockStatus ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : ''
                     }`}
                     disabled={isLoadingStatuses || lockStatus}
@@ -932,9 +1002,9 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
 
           {/* Баня */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Баня *</label>
+            <label className="block text-base font-medium text-gray-700 mb-2">Баня *</label>
             {isLoadingBaths ? (
-              <div className="w-full px-3 py-2.5 sm:px-4 sm:py-3 border border-gray-300 rounded-xl bg-gray-100 text-sm">
+              <div className="w-full px-3 py-2.5 sm:px-4 sm:py-3 border border-gray-300 rounded-xl bg-gray-100 text-base">
                 Загрузка...
               </div>
             ) : (
@@ -943,7 +1013,7 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
                   name="bath_id"
                   value={formData.bath_id}
                   onChange={handleChange}
-                  className={`w-full px-3 py-2.5 sm:px-4 sm:py-3 border rounded-xl focus:ring-2 text-sm sm:text-base ${
+                  className={`w-full px-3 py-2.5 sm:px-4 sm:py-3 border rounded-xl focus:ring-2 text-base sm:text-lg ${
                     validationErrors.bath_id 
                       ? 'border-red-500 focus:ring-red-500 bg-red-50' 
                       : 'border-gray-300 focus:ring-blue-500'
@@ -980,7 +1050,7 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
               role="button"
               tabIndex={0}
             >
-              <label className="block text-sm font-medium text-gray-700 mb-2">Дата начала *</label>
+              <label className="block text-base font-medium text-gray-700 mb-2">Дата начала *</label>
               <input
                 ref={dateInputRef}
                 type="date"
@@ -988,7 +1058,7 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
                 onChange={(e) => {
                   setFormData((prev) => ({ ...prev, date: e.target.value }));
                 }}
-                className={`w-full px-3 py-2.5 sm:px-4 sm:py-3 border rounded-xl focus:ring-2 focus:ring-blue-500 text-sm ${
+                className={`w-full px-3 py-2.5 sm:px-4 sm:py-3 border rounded-xl focus:ring-2 focus:ring-blue-500 text-base sm:text-lg ${
                   validationErrors.date ? 'border-red-500 bg-red-50' : 'border-gray-300'
                 }`}
                 required
@@ -1000,11 +1070,11 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
               )}
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Время начала *</label>
+              <label className="block text-base font-medium text-gray-700 mb-2">Время начала *</label>
               <select
                 value={formData.start_time}
                 onChange={(e) => setFormData((prev) => ({ ...prev, start_time: e.target.value }))}
-                className={`w-full px-3 py-2.5 sm:px-4 sm:py-3 border rounded-xl focus:ring-2 text-sm sm:text-base ${
+                className={`w-full px-3 py-2.5 sm:px-4 sm:py-3 border rounded-xl focus:ring-2 text-base sm:text-lg ${
                   validationErrors.start_time
                     ? 'border-red-500 focus:ring-red-500 bg-red-50'
                     : 'border-gray-300 focus:ring-blue-500'
@@ -1029,11 +1099,11 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
               )}
             </div>
             <div className="sm:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-base font-medium text-gray-700 mb-2">
                 Количество часов * <span className="text-gray-500 font-normal">(шаг 0.5)</span>
               </label>
               {formData.bath_id && (
-                <p className="mb-2 text-xs text-gray-600">
+                <p className="mb-2 text-sm text-gray-600">
                   Минимально для этой бани: <strong>{minBookingHours}</strong> ч.
                 </p>
               )}
@@ -1050,7 +1120,7 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
                   const stepped = Math.round(n * 2) / 2;
                   setFormData((prev) => ({ ...prev, duration_hours: stepped }));
                 }}
-                className={`w-full max-w-[200px] px-3 py-2.5 sm:px-4 sm:py-3 border rounded-xl focus:ring-2 text-sm ${
+                className={`w-full max-w-[200px] px-3 py-2.5 sm:px-4 sm:py-3 border rounded-xl focus:ring-2 text-base sm:text-lg ${
                   validationErrors.duration_hours
                     ? 'border-red-500 focus:ring-red-500 bg-red-50'
                     : 'border-gray-300 focus:ring-blue-500'
@@ -1067,7 +1137,7 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
 
           {/* Подсказка о длительности */}
           <div
-            className={`text-xs px-3 py-2 rounded-lg ${
+            className={`text-sm px-3 py-2 rounded-lg ${
               typeof durationHint === 'object' && durationHint?.crosses
                 ? 'bg-purple-50 text-purple-700 border border-purple-200'
                 : 'bg-blue-50 text-gray-600'
@@ -1091,14 +1161,14 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
 
           {/* Имя клиента */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Имя клиента *</label>
+            <label className="block text-base font-medium text-gray-700 mb-2">Имя клиента *</label>
             <input
               type="text"
               name="client_name"
               value={formData.client_name}
               onChange={handleChange}
               placeholder="Иван Иванов"
-              className={`w-full px-3 py-2.5 sm:px-4 sm:py-3 border rounded-xl focus:ring-2 text-sm sm:text-base ${
+              className={`w-full px-3 py-2.5 sm:px-4 sm:py-3 border rounded-xl focus:ring-2 text-base sm:text-lg ${
                 validationErrors.client_name 
                   ? 'border-red-500 focus:ring-red-500 bg-red-50' 
                   : 'border-gray-300 focus:ring-blue-500'
@@ -1114,7 +1184,7 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
 
           {/* Гости */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Количество гостей *</label>
+            <label className="block text-base font-medium text-gray-700 mb-2">Количество гостей *</label>
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
               <input
                 type="text"
@@ -1125,14 +1195,14 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
                 placeholder="Например, 4"
                 value={formData.guests}
                 onChange={handleGuestsChange}
-                className={`w-full max-w-[120px] px-3 py-2.5 sm:px-4 sm:py-3 border rounded-xl focus:ring-2 text-sm ${
+                className={`w-full max-w-[120px] px-3 py-2.5 sm:px-4 sm:py-3 border rounded-xl focus:ring-2 text-base sm:text-lg ${
                   validationErrors.guests
                     ? 'border-red-500 focus:ring-red-500 bg-red-50'
                     : 'border-gray-300 focus:ring-blue-500'
                 }`}
               />
               {formData.bath_id && (
-                <div className="text-xs sm:text-sm text-gray-600 bg-blue-50 px-3 py-2 rounded-lg">
+                <div className="text-sm sm:text-base text-gray-600 bg-blue-50 px-3 py-2 rounded-lg">
                   {(() => {
                     // `select` возвращает строку, а `bath_id` в данных обычно число — приводим типы
                     const selectedBath = baths.find(
@@ -1169,16 +1239,16 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
           {/* Телефон и Email */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Телефон *</label>
+              <label className="block text-base font-medium text-gray-700 mb-2">Телефон *</label>
               <input
                 type="tel"
                 name="client_phone"
                 value={formData.client_phone}
                 onChange={handleChange}
                 placeholder="+7 (999) 123-45-67"
-                className={`w-full px-3 py-2.5 sm:px-4 sm:py-3 border rounded-xl focus:ring-2 text-sm ${
-                  validationErrors.client_phone 
-                    ? 'border-red-500 focus:ring-red-500 bg-red-50' 
+                className={`w-full px-3 py-2.5 sm:px-4 sm:py-3 border rounded-xl focus:ring-2 text-base sm:text-lg ${
+                  validationErrors.client_phone
+                    ? 'border-red-500 focus:ring-red-500 bg-red-50'
                     : 'border-gray-300 focus:ring-blue-500'
                 }`}
                 required
@@ -1190,7 +1260,7 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
               )}
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Предоплата</label>
+              <label className="block text-base font-medium text-gray-700 mb-2">Предоплата</label>
               <input
                 type="text"
                 inputMode="numeric"
@@ -1199,7 +1269,7 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
                 value={formData.prepayment}
                 onChange={handleChange}
                 placeholder="Сумма в рублях"
-                className={`w-full px-3 py-2.5 sm:px-4 sm:py-3 border rounded-xl focus:ring-2 text-sm ${
+                className={`w-full px-3 py-2.5 sm:px-4 sm:py-3 border rounded-xl focus:ring-2 text-base sm:text-lg ${
                   validationErrors.prepayment
                     ? 'border-red-500 focus:ring-red-500 bg-red-50'
                     : 'border-gray-300 focus:ring-blue-500'
@@ -1215,86 +1285,86 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
 
           {/* Комментарий */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Комментарий</label>
+            <label className="block text-base font-medium text-gray-700 mb-2">Комментарий</label>
             <textarea
               name="notes"
               value={formData.notes}
               onChange={handleChange}
               rows="2"
               placeholder="Пожелания клиента..."
-              className="w-full px-3 py-2.5 sm:px-4 sm:py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 text-sm"
+              className="w-full px-3 py-2.5 sm:px-4 sm:py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 text-base sm:text-lg"
             />
           </div>
 
           {/* ========== СЕКЦИЯ ТОВАРОВ ========== */}
           <div className="border-t pt-4 sm:pt-6">
-            <h3 className="text-base sm:text-lg font-medium text-gray-800 mb-3">Товары (опционально)</h3>
+            <h3 className="text-lg sm:text-xl font-medium text-gray-800 mb-3">Товары (опционально)</h3>
             <button
               type="button"
               onClick={() => setIsProductModalOpen(true)}
-              className="mb-3 px-3 py-1.5 sm:px-4 sm:py-2 bg-blue-600 text-white rounded text-sm sm:text-base hover:bg-blue-700"
+              className="mb-3 px-3 py-1.5 sm:px-4 sm:py-2 bg-blue-600 text-white rounded text-base sm:text-lg hover:bg-blue-700"
             >
               Добавить товар
             </button>
 
             {/* Список товаров со скроллом */}
             {formData.selectedProducts.length > 0 && (
-              <div className="max-h-60 overflow-y-auto space-y-3 mb-3 pr-1">
+              <div className="space-y-3 mb-3">
                 {formData.selectedProducts.map((item) => (
                   <div key={item.id} className="bg-gray-50 p-3 rounded-lg border border-gray-200">
-                    <div className="font-medium text-gray-800">{item.name}</div>
+                    <div className="font-medium text-base text-gray-800">{item.name}</div>
                     {item.is_countable !== false ? (
-                      <div className="text-xs text-gray-600 mt-1">
+                      <div className="text-sm text-gray-600 mt-1">
                         Доступно: {item.available} {item.unit_name}
                       </div>
                     ) : (
-                      <div className="text-xs text-gray-600 mt-1">
+                      <div className="text-sm text-gray-600 mt-1">
                         Услуга / неисчисляемая позиция — можно указать несколько штук; остаток на складе не ограничивает
                       </div>
                     )}
                     <div className="flex flex-wrap items-center justify-between gap-2 mt-2">
                       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
                         <div className="flex items-center space-x-2">
-                          <span className="text-sm text-gray-700">Кол-во:</span>
+                          <span className="text-base text-gray-700">Кол-во:</span>
                           <input
                             type="text"
                             inputMode="numeric"
                             pattern="\d*"
                             value={item.quantity}
                             onChange={(e) => updateProductQuantity(item.id, e.target.value)}
-                            className={`w-16 px-2 py-1 border rounded text-sm ${
+                            className={`w-16 px-2 py-1 border rounded text-base ${
                               validationErrors[`product_${item.id}`]
                                 ? 'border-red-500 bg-red-50'
                                 : 'border-gray-300'
                             }`}
                           />
-                          <span className="text-sm text-gray-600">{item.unit_name}</span>
+                          <span className="text-base text-gray-600">{item.unit_name}</span>
                         </div>
                         <div className="flex items-center space-x-2">
-                          <span className="text-sm text-gray-700">Цена:</span>
+                          <span className="text-base text-gray-700">Цена:</span>
                           <input
                             type="text"
                             inputMode="decimal"
                             value={item.price ?? ''}
                             onChange={(e) => updateProductPrice(item.id, e.target.value)}
-                            className="w-24 px-2 py-1 border border-gray-300 rounded text-sm"
+                            className="w-24 px-2 py-1 border border-gray-300 rounded text-base"
                             aria-label={`Цена продажи: ${item.name}`}
                           />
-                          <span className="text-sm text-gray-600">₽</span>
+                          <span className="text-base text-gray-600">₽</span>
                         </div>
                       </div>
                       <div className="text-right">
-                        <div className="text-sm font-medium">
+                        <div className="text-base font-medium">
                           {((parseInt(item.quantity, 10) || 0) * (parseFloat(String(item.price ?? item.purchase_price ?? 0).replace(',', '.')) || 0)).toFixed(2)} ₽
                         </div>
                         {/* Показывать ошибку валидации */}
                         {validationErrors[`product_${item.id}`] && (
-                          <p className="text-xs text-red-600 mt-1">{validationErrors[`product_${item.id}`]}</p>
+                          <p className="text-sm text-red-600 mt-1">{validationErrors[`product_${item.id}`]}</p>
                         )}
                         <button
                           type="button"
                           onClick={() => removeProduct(item.id)}
-                          className="text-red-600 text-xs hover:underline mt-1"
+                          className="text-red-600 text-sm hover:underline mt-1"
                         >
                           Удалить
                         </button>
@@ -1307,20 +1377,20 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
           </div>
           </div>
 
-            <aside className="lg:w-80 xl:w-96 border-t lg:border-t-0 lg:border-l border-gray-200 bg-gray-50 p-4 sm:p-5 overflow-y-auto flex-shrink-0 lg:sticky lg:top-0 lg:self-start lg:max-h-full">
-              <div className="bg-white border border-gray-300 rounded-xl shadow-sm p-4 text-xs text-gray-900">
+            <aside className="lg:w-[26rem] xl:w-[30rem] border-t lg:border-t-0 lg:border-l border-gray-200 bg-gray-50 p-4 sm:p-5 overflow-y-auto min-h-0 flex-shrink-0 max-h-[42vh] lg:max-h-none overscroll-contain">
+              <div className="bg-white border border-gray-300 rounded-xl shadow-sm p-4 text-base text-gray-900">
                 <header className="text-center border-b border-dashed border-gray-400 pb-3 mb-3">
-                  <h3 className="text-sm font-bold uppercase tracking-wide">Общий чек</h3>
-                  <p className="mt-1 text-gray-600">Предварительный расчёт</p>
+                  <h3 className="text-lg font-bold uppercase tracking-wide">Общий чек</h3>
+                  <p className="mt-1 text-sm text-gray-600">Предварительный расчёт</p>
                 </header>
 
                 {!receiptSummary.canCalculate ? (
-                  <p className="text-gray-500 text-center py-6">
+                  <p className="text-gray-500 text-center py-6 text-sm">
                     Выберите баню, дату, время и длительность — чек обновится автоматически
                   </p>
                 ) : (
                   <>
-                    <section className="space-y-1 mb-3">
+                    <section className="space-y-1.5 mb-3">
                       <div className="flex justify-between gap-3">
                         <span className="text-gray-600">Клиент</span>
                         <span className="text-right font-medium">{receiptSummary.clientName}</span>
@@ -1341,16 +1411,31 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
                         <span className="text-gray-600">Окончание</span>
                         <span className="text-right">{receiptSummary.endLabel}</span>
                       </div>
+                      {receiptSummary.bonusMinutes > 0 && (
+                        <div className="flex justify-between gap-3 text-green-700">
+                          <span>Бонусное время</span>
+                          <span className="text-right">+{receiptSummary.bonusMinutes} мин</span>
+                        </div>
+                      )}
                     </section>
 
-                    <section className="mb-3">
-                      <h4 className="font-semibold border-y border-dashed border-gray-400 py-1 mb-2">Позиции</h4>
+                    {receiptSummary.appliedPromotion && (
+                      <div className="mb-3 rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-800">
+                        Акция: <strong>{receiptSummary.appliedPromotion.name}</strong>
+                      </div>
+                    )}
 
-                      <div className="py-1 border-b border-dashed border-gray-300">
+                    <section className="mb-3">
+                      <h4 className="font-semibold border-y border-dashed border-gray-400 py-1.5 mb-2 text-base">Позиции</h4>
+
+                      <div className="py-1.5 border-b border-dashed border-gray-300">
                         <div className="font-medium">Услуга бани</div>
                         <div className="text-gray-600 mt-0.5">
                           {receiptSummary.durationHours} ч × {formatReceiptMoney(receiptSummary.hourlyRate)}
                           {receiptSummary.isWeekendRate ? ' (выходной)' : ' (будни)'}
+                          {receiptSummary.bonusMinutes > 0 && (
+                            <span className="text-green-700"> + {receiptSummary.bonusMinutes} мин в подарок</span>
+                          )}
                         </div>
                         <div className="flex justify-between text-gray-700 mt-1">
                           <span>Аренда</span>
@@ -1367,7 +1452,7 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
                       </div>
 
                       {receiptSummary.massageItems.map((item, idx) => (
-                        <div key={`massage-${idx}`} className="py-1 border-b border-dashed border-gray-300">
+                        <div key={`massage-${idx}`} className="py-1.5 border-b border-dashed border-gray-300">
                           <div className="font-medium">Массаж: {item.name}</div>
                           <div className="flex justify-between text-gray-700">
                             <span>{item.quantity} × {formatReceiptMoney(item.unitPrice)}</span>
@@ -1377,7 +1462,7 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
                       ))}
 
                       {receiptSummary.productItems.map((item, idx) => (
-                        <div key={`product-${idx}`} className="py-1 border-b border-dashed border-gray-300">
+                        <div key={`product-${idx}`} className="py-1.5 border-b border-dashed border-gray-300">
                           <div className="font-medium">Товар: {item.name}</div>
                           <div className="flex justify-between text-gray-700">
                             <span>{item.quantity} × {formatReceiptMoney(item.unitPrice)}</span>
@@ -1385,12 +1470,22 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
                           </div>
                         </div>
                       ))}
+
+                      {(receiptSummary.giftItems || []).map((item, idx) => (
+                        <div key={`gift-${idx}`} className="py-1.5 border-b border-dashed border-green-200">
+                          <div className="font-medium text-green-800">Подарок: {item.name}</div>
+                          <div className="flex justify-between text-green-700">
+                            <span>{item.quantity} × {formatReceiptMoney(0)}</span>
+                            <span>0 ₽</span>
+                          </div>
+                        </div>
+                      ))}
                     </section>
 
-                    <footer className="border-t border-dashed border-gray-400 pt-3 space-y-1">
-                      <div className="flex justify-between items-center text-sm font-bold">
+                    <footer className="border-t border-dashed border-gray-400 pt-3 space-y-1.5">
+                      <div className="flex justify-between items-center text-lg font-bold">
                         <span>ИТОГО</span>
-                        <span className="text-base">{formatReceiptMoney(receiptSummary.totalCost)}</span>
+                        <span className="text-xl">{formatReceiptMoney(receiptSummary.totalCost)}</span>
                       </div>
                       {prepaymentAmount > 0 && (
                         <>
@@ -1398,7 +1493,7 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
                             <span>Предоплата</span>
                             <span>{formatReceiptMoney(prepaymentAmount)}</span>
                           </div>
-                          <div className="flex justify-between font-semibold text-gray-800">
+                          <div className="flex justify-between font-semibold text-gray-800 text-base">
                             <span>К оплате</span>
                             <span>{formatReceiptMoney(Math.max(0, receiptSummary.totalCost - prepaymentAmount))}</span>
                           </div>
@@ -1420,7 +1515,7 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
               <button
                 type="button"
                 onClick={handleOpenPaymentModal}
-                className="flex-1 bg-indigo-600 text-white py-2.5 sm:py-3 px-4 rounded-xl font-medium text-sm sm:text-base hover:bg-indigo-700 transition"
+                className="flex-1 bg-indigo-600 text-white py-2.5 sm:py-3 px-4 rounded-xl font-medium text-base sm:text-lg hover:bg-indigo-700 transition"
               >
                 Оплата
               </button>
@@ -1428,7 +1523,7 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
             <button
               type="submit"
               disabled={isSubmitting || isLoadingUnits || !canManageReservation}
-              className="flex-1 bg-green-600 text-white py-2.5 sm:py-3 px-4 rounded-xl font-medium text-sm sm:text-base hover:bg-green-700 active:bg-green-800 transition disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex-1 bg-green-600 text-white py-2.5 sm:py-3 px-4 rounded-xl font-medium text-base sm:text-lg hover:bg-green-700 active:bg-green-800 transition disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {!canManageReservation
                 ? 'Недостаточно прав'
@@ -1437,7 +1532,7 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 bg-gray-200 text-gray-800 py-2.5 sm:py-3 px-4 rounded-xl font-medium text-sm sm:text-base hover:bg-gray-300 transition"
+              className="flex-1 bg-gray-200 text-gray-800 py-2.5 sm:py-3 px-4 rounded-xl font-medium text-base sm:text-lg hover:bg-gray-300 transition"
             >
               {isEditing ? 'Закрыть' : 'Отмена'}
             </button>

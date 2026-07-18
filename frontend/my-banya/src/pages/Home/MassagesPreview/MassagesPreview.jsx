@@ -34,7 +34,7 @@ function MassagesPreview() {
     ];
 
     return (
-        <section id="massages" className="relative py-24 md:py-32 bg-zinc-950 overflow-hidden">
+        <section id="massages" className="relative py-24 md:py-32 bg-zinc-950 overflow-x-clip">
             {/* Background decorations */}
             <div className="absolute top-1/4 left-0 w-80 h-80 bg-purple-600/10 rounded-full blur-3xl" />
             <div className="absolute bottom-1/4 right-0 w-80 h-80 bg-blue-600/10 rounded-full blur-3xl" />

@@ -143,9 +143,9 @@ function AppWithLayout() {
           {/* <Route index element={<div>Добро пожаловать в админ-панель</div>} /> */}
           <Route index element={withAdminSuspense(<AdminDashboard />)} />
 
-          <Route path="administrator" element={withAdminSuspense(<AdministratorHubPage />)} />
-          <Route path="administrator/audit" element={withAdminSuspense(<AdministratorAuditPage />)} />
-          <Route path="administrator/roles" element={withAdminSuspense(<Roles />)} />
+          <Route path="administrator" element={withAdminSuspense(<RoleBasedRoute adminOnly><AdministratorHubPage /></RoleBasedRoute>)} />
+          <Route path="administrator/audit" element={withAdminSuspense(<RoleBasedRoute adminOnly><AdministratorAuditPage /></RoleBasedRoute>)} />
+          <Route path="administrator/roles" element={withAdminSuspense(<RoleBasedRoute adminOnly><Roles /></RoleBasedRoute>)} />
           <Route path="reservations" element={withAdminSuspense(<RoleBasedRoute requiredPermission="reservations:view"><AdminReservations /></RoleBasedRoute>)} />
           <Route path="reservations/print/:id" element={withAdminSuspense(<RoleBasedRoute requiredPermission="reservations:view"><ReservationPrintDocument /></RoleBasedRoute>)} />
           <Route path="bookings" element={withAdminSuspense(<RoleBasedRoute requiredPermission="bookings:view"><AdminBookings /></RoleBasedRoute>)} />
@@ -156,7 +156,7 @@ function AppWithLayout() {
           <Route path="documents/entrance" element={withAdminSuspense(<RoleBasedRoute requiredPermission="documents:view"><DocumentEntrance /></RoleBasedRoute>)} />
           <Route path="documents/entrance/drafts" element={withAdminSuspense(<RoleBasedRoute requiredPermission="documents:view"><EntranceDrafts /></RoleBasedRoute>)} />
           <Route path="documents/entrance/add" element={withAdminSuspense(<RoleBasedRoute requiredPermission="documents:manage"><AddDocumentEntrance /></RoleBasedRoute>)} />
-          <Route path="documents/entrance/edit/:id" element={withAdminSuspense(<RoleBasedRoute requiredPermission="documents:manage"><AddDocumentEntrance /></RoleBasedRoute>)} />
+          <Route path="documents/entrance/edit/:id" element={withAdminSuspense(<RoleBasedRoute requiredPermission={['documents:edit', 'documents:manage']}><AddDocumentEntrance /></RoleBasedRoute>)} />
           <Route path="documents/product-requests" element={withAdminSuspense(<RoleBasedRoute requiredPermission="documents:view"><ProductRequestsList /></RoleBasedRoute>)} />
           <Route path="documents/product-requests/add" element={withAdminSuspense(<RoleBasedRoute requiredPermission="documents:manage"><AddProductRequest /></RoleBasedRoute>)} />
           <Route path="documents/product-requests/edit/:id" element={withAdminSuspense(<RoleBasedRoute requiredPermission="documents:manage"><AddProductRequest /></RoleBasedRoute>)} />
@@ -177,7 +177,7 @@ function AppWithLayout() {
           <Route path="storage/product/:id" element={withAdminSuspense(<RoleBasedRoute requiredPermission="storage:view"><Product /></RoleBasedRoute>)} />
           <Route path="deletion-requests" element={withAdminSuspense(<RoleBasedRoute requiredPermission="staff:manage"><DeletionRequestsPage /></RoleBasedRoute>)} />
           <Route path="add-product" element={withAdminSuspense(<RoleBasedRoute requiredPermission="storage:manage"><AddProduct /></RoleBasedRoute>)} />
-          <Route path="settings" element={withAdminSuspense(<SettingsPage />)} />
+          <Route path="settings" element={withAdminSuspense(<RoleBasedRoute adminOnly><SettingsPage /></RoleBasedRoute>)} />
           <Route path="finance" element={withAdminSuspense(<RoleBasedRoute requiredPermission="finance:view"><Finance /></RoleBasedRoute>)} />
           <Route path="support" element={withAdminSuspense(<SupportPage />)} />
           <Route path="support/create" element={withAdminSuspense(<CreateTicketForm />)} />

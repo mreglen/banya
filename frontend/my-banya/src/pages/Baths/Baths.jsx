@@ -59,13 +59,17 @@ function Baths() {
                 <div>
                   <h2 className="text-2xl font-light text-gray-800 mb-1">{bath.name}</h2>
                   <p className="text-green-600 text-sm font-medium mb-3">{bath.title}</p>
-                  <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center justify-between mb-2">
                     <div className="text-sm text-gray-500">
                       <span className="font-medium text-gray-700">{bath.cost_weekday}₽</span>/час (пн-чт)
                     </div>
                     <div className="text-sm text-gray-500">
                       <span className="font-medium text-gray-700">{bath.cost_weekend}₽</span>/час (пт-вс)
                     </div>
+                  </div>
+                  <div className="text-sm text-gray-500 mb-4">
+                    Доп. гость:{' '}
+                    <span className="font-medium text-gray-700">{bath.extra_guest_price}₽</span>/час
                   </div>
                   <p className="text-gray-600 text-sm leading-relaxed mb-6">
                     {bath.description && bath.description.length > 150

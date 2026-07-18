@@ -7,50 +7,17 @@ import uuid
 import hashlib
 from pathlib import Path
 from app.database import get_db
-from app.models import Bath, Photo, BathPromotion, Promotion
+from app.models import Bath, Photo, BathPromotion, Promotion, PromotionGiftProduct
 from app.schemas import BathOut, BathCreate, BathUpdate
 from app.image_utils import process_image_to_webp
 from app.slug_utils import generate_slug, make_unique_slug
+from app.promotion_utils import serialize_promotion_brief
 
 router = APIRouter(prefix="/baths", tags=["baths"])
 
 
-@router.get("/")
-def get_baths(db: Session = Depends(get_db)):
-
-    baths = db.query(Bath)\
-        .options(joinedload(Bath.photos))\
-        .all()
-
-    if not baths:
-        return []
-
-    return baths
-
-
-@router.get("/{slug_or_id}")
-def get_bath(slug_or_id: str, db: Session = Depends(get_db)):
-    bath = db.query(Bath)\
-        .options(joinedload(Bath.photos))\
-        .filter(Bath.slug == slug_or_id)\
-        .first()
-
-    # Поддержка /baths/1 для админки (по bath_id)
-    if not bath and slug_or_id.isdigit():
-        bath = db.query(Bath)\
-            .options(joinedload(Bath.photos))\
-            .filter(Bath.bath_id == int(slug_or_id))\
-            .first()
-
-    if not bath:
-        raise HTTPException(status_code=404, detail="Баня не найдена")
-    
-    # Load active promotions for this bath
-    bath.promotions = db.query(Promotion).join(BathPromotion).filter(
-        BathPromotion.bath_id == bath.bath_id,
-        Promotion.is_active == True
-    ).all()
-
+def _serialize_bath(bath: Bath) -> dict:
+    active_promos = [p for p in (bath.promotions or []) if p.is_active]
     return {
         "bath_id": bath.bath_id,
         "slug": bath.slug,
@@ -66,25 +33,60 @@ def get_bath(slug_or_id: str, db: Session = Depends(get_db)):
             {
                 "photo_id": p.photo_id,
                 "image_url": p.image_url,
-                "bath_id": p.bath_id
+                "bath_id": p.bath_id,
             }
             for p in bath.photos
         ],
-        "promotions": [
-            {
-                "id": p.id,
-                "name": p.name,
-                "description": p.description,
-                "min_hours": p.min_hours,
-                "min_guests": p.min_guests,
-                "min_amount": p.min_amount,
-                "bonus_minutes": p.bonus_minutes,
-                "valid_from": p.valid_from,
-                "valid_until": p.valid_until
-            }
-            for p in bath.promotions
-        ]
+        "promotions": [serialize_promotion_brief(p) for p in active_promos],
     }
+
+
+@router.get("/")
+def get_baths(db: Session = Depends(get_db)):
+
+    baths = db.query(Bath)\
+        .options(
+            joinedload(Bath.photos),
+            joinedload(Bath.promotions)
+            .joinedload(Promotion.gift_products)
+            .joinedload(PromotionGiftProduct.product),
+        )\
+        .all()
+
+    if not baths:
+        return []
+
+    return [_serialize_bath(bath) for bath in baths]
+
+
+@router.get("/{slug_or_id}")
+def get_bath(slug_or_id: str, db: Session = Depends(get_db)):
+    bath = db.query(Bath)\
+        .options(
+            joinedload(Bath.photos),
+            joinedload(Bath.promotions)
+            .joinedload(Promotion.gift_products)
+            .joinedload(PromotionGiftProduct.product),
+        )\
+        .filter(Bath.slug == slug_or_id)\
+        .first()
+
+    # Поддержка /baths/1 для админки (по bath_id)
+    if not bath and slug_or_id.isdigit():
+        bath = db.query(Bath)\
+            .options(
+                joinedload(Bath.photos),
+                joinedload(Bath.promotions)
+                .joinedload(Promotion.gift_products)
+                .joinedload(PromotionGiftProduct.product),
+            )\
+            .filter(Bath.bath_id == int(slug_or_id))\
+            .first()
+
+    if not bath:
+        raise HTTPException(status_code=404, detail="Баня не найдена")
+
+    return _serialize_bath(bath)
 
 # новые эндпоинты
 @router.post("/", response_model=BathOut, status_code=201)

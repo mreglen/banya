@@ -18,12 +18,12 @@ PAYMENT_QR_UPLOAD_DIR = BASE_DIR / "uploads" / "payment"
 PAYMENT_QR_FILENAME = "payment_qrcode.webp"
 
 
-def check_admin_or_director(current_user: models.User = Depends(get_current_user)):
-    """Check if user is admin or director"""
-    if not (current_user.is_admin or current_user.is_director):
+def check_admin(current_user: models.User = Depends(get_current_user)):
+    """Check if user is system admin"""
+    if not current_user.is_admin:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Доступ разрешен только администратору или директору"
+            detail="Доступ разрешен только администратору"
         )
     return current_user
 
@@ -48,9 +48,9 @@ def seed_default_settings(db: Session):
 @router.get("/", response_model=list[schemas.SettingsResponse])
 def get_settings(
     db: Session = Depends(database.get_db),
-    current_user: models.User = Depends(check_admin_or_director)
+    current_user: models.User = Depends(get_current_user),
 ):
-    """Get all settings"""
+    """Get all settings (read available to any authenticated staff)."""
     seed_default_settings(db)
     settings = db.query(models.Settings).all()
     return settings
@@ -62,7 +62,7 @@ def update_settings(
     background_tasks: BackgroundTasks,
     request: Request,
     db: Session = Depends(database.get_db),
-    current_user: models.User = Depends(check_admin_or_director)
+    current_user: models.User = Depends(check_admin)
 ):
     """Update settings"""
     seed_default_settings(db)
@@ -182,9 +182,9 @@ async def upload_payment_qrcode(
     request: Request,
     file: UploadFile = File(...),
     db: Session = Depends(database.get_db),
-    current_user: models.User = Depends(check_admin_or_director),
+    current_user: models.User = Depends(check_admin),
 ):
-    """Загрузить QR-код для оплаты (только администратор или директор)."""
+    """Загрузить QR-код для оплаты (только администратор)."""
     if not file.content_type or not file.content_type.startswith("image/"):
         raise HTTPException(status_code=400, detail="Файл должен быть изображением")
 

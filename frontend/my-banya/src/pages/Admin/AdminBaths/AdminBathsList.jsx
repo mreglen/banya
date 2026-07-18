@@ -1,8 +1,9 @@
 // src/pages/Admin/AdminBaths/AdminBathsList.jsx
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useGetBathsQuery, useDeleteBathMutation } from '../../../redux/slices/apiSlice';
 import AdminBathsSkeleton from './AdminBathsSkeleton';
+import MediaLightbox from '../../../components/UI/MediaLightbox/MediaLightbox';
 import { toast } from 'react-hot-toast';
 import { isVideoUrl } from '../../../utils/mediaHelpers';
 
@@ -11,10 +12,22 @@ function AdminBathsList() {
   const { data: baths, isLoading, error } = useGetBathsQuery();
   const [deleteBath, { isLoading: isDeleting }] = useDeleteBathMutation();
   const [deletingId, setDeletingId] = useState(null);
+  const [lightbox, setLightbox] = useState({ bathId: null, index: 0 });
 
   const SERVER_BASE_URL = process.env.REACT_APP_API_URL
     ? process.env.REACT_APP_API_URL.replace('/api', '')
     : (window.location.origin || 'http://127.0.0.1:8000');
+
+  const lightboxItems = useMemo(() => {
+    if (lightbox.bathId == null) return [];
+    const bath = baths?.find((b) => b.bath_id === lightbox.bathId);
+    if (!bath?.photos?.length) return [];
+    return bath.photos.map((photo, idx) => ({
+      url: `${SERVER_BASE_URL}${photo.image_url}`,
+      isVideo: isVideoUrl(photo.image_url),
+      alt: `${bath.name} — фото ${idx + 1}`,
+    }));
+  }, [baths, lightbox.bathId, SERVER_BASE_URL]);
 
   if (isLoading) return <AdminBathsSkeleton />;
   if (error) return <div className="p-8 text-red-500">Ошибка: {error.toString()}</div>;
@@ -25,6 +38,12 @@ function AdminBathsList() {
 
   const handleEditClick = (slug) => {
     navigate(`/admin/baths/edit/${slug}`);
+  };
+
+  const openGallery = (e, bath) => {
+    e.stopPropagation();
+    if (!bath.photos?.length) return;
+    setLightbox({ bathId: bath.bath_id, index: 0 });
   };
 
   const handleDeleteClick = async (e, bath) => {
@@ -70,6 +89,7 @@ function AdminBathsList() {
             ? `${SERVER_BASE_URL}${bath.photos[0].image_url}`
             : '/img/placeholder.svg';
           const coverIsVideo = bath.photos?.[0] && isVideoUrl(bath.photos[0].image_url);
+          const photoCount = bath.photos?.length || 0;
 
           return (
           <div
@@ -77,8 +97,12 @@ function AdminBathsList() {
             className="bg-white rounded-xl shadow-md overflow-hidden hover:shadow-lg transition transform hover:-translate-y-1 border border-gray-100"
           >
             <div
-              className="cursor-pointer"
-              onClick={() => handleEditClick(bath.slug)}
+              className={`relative group ${photoCount ? 'cursor-zoom-in' : 'cursor-pointer'}`}
+              onClick={(e) => {
+                if (photoCount) openGallery(e, bath);
+                else handleEditClick(bath.slug);
+              }}
+              title={photoCount ? 'Открыть фото' : 'Редактировать'}
             >
               {coverIsVideo ? (
                 <video
@@ -94,13 +118,23 @@ function AdminBathsList() {
                   className="w-full h-48 object-cover"
                 />
               )}
-              <div className="p-5">
-                <h3 className="font-bold text-gray-800 text-lg">{bath.name}</h3>
-                <p className="text-gray-600 text-sm mt-1">{bath.title}</p>
-                <p className="font-semibold text-green-600 mt-2">
-                  от {bath.cost_weekday} ₽/час
-                </p>
-              </div>
+              {photoCount > 0 && (
+                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/35 transition flex items-center justify-center">
+                  <span className="opacity-0 group-hover:opacity-100 transition text-white text-sm font-medium bg-black/50 px-3 py-1.5 rounded-full">
+                    {photoCount > 1 ? `Смотреть фото (${photoCount})` : 'Увеличить'}
+                  </span>
+                </div>
+              )}
+            </div>
+            <div
+              className="p-5 cursor-pointer"
+              onClick={() => handleEditClick(bath.slug)}
+            >
+              <h3 className="font-bold text-gray-800 text-lg">{bath.name}</h3>
+              <p className="text-gray-600 text-sm mt-1">{bath.title}</p>
+              <p className="font-semibold text-green-600 mt-2">
+                от {bath.cost_weekday} ₽/час
+              </p>
             </div>
             <div className="px-5 pb-5 flex gap-2">
               <button
@@ -127,6 +161,13 @@ function AdminBathsList() {
           );
         })}
       </div>
+
+      <MediaLightbox
+        items={lightboxItems}
+        index={lightbox.bathId != null ? lightbox.index : null}
+        onClose={() => setLightbox({ bathId: null, index: 0 })}
+        onIndexChange={(next) => setLightbox((prev) => ({ ...prev, index: next }))}
+      />
     </div>
   );
 }

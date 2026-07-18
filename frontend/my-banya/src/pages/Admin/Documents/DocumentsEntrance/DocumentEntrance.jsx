@@ -5,9 +5,13 @@ import {
 } from '../../../../redux/slices/productsApiSlice';
 import ActionDropdown from '../../../../components/UI/ActionDropdown/ActionDropdown';
 import DocumentsEntranceSkeleton from './DocumentsEntranceSkeleton';
+import { useHasAccess } from '../../../../hooks/useHasAccess';
 
 function DocumentEntrance() {
   const navigate = useNavigate();
+  const hasAccess = useHasAccess();
+  const canEdit = hasAccess(['documents:edit', 'documents:manage']);
+  const canManage = hasAccess('documents:manage');
 
   const {
     data: documents = [],
@@ -73,6 +77,7 @@ function DocumentEntrance() {
             >
               <span className="text-sm sm:text-base">Черновики</span>
             </button>
+            {canManage && (
             <button
               onClick={() => navigate('/admin/documents/entrance/add')}
               className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 sm:px-6 sm:py-3 rounded-lg sm:rounded-xl font-medium shadow transition flex items-center justify-center space-x-1 sm:space-x-2"
@@ -82,18 +87,21 @@ function DocumentEntrance() {
               </svg>
               <span className="text-sm sm:text-base">Новый документ</span>
             </button>
+            )}
           </div>
         </div>
 
         {sortedDocs.length === 0 ? (
           <div className="bg-white rounded-xl sm:rounded-2xl shadow p-6 sm:p-12 text-center">
             <p className="text-gray-500 text-base sm:text-lg">Нет документов поступления</p>
+            {canManage && (
             <button
               onClick={() => navigate('/admin/documents/entrance/add')}
               className="mt-4 text-green-600 hover:text-green-800 font-medium text-sm"
             >
               Создать первый документ
             </button>
+            )}
           </div>
         ) : (
           <>
@@ -114,8 +122,8 @@ function DocumentEntrance() {
                   {sortedDocs.map((doc) => (
                     <tr
                       key={doc.id}
-                      className="hover:bg-gray-50 cursor-pointer"
-                      onDoubleClick={() => handleEdit(doc.id)}
+                      className={`hover:bg-gray-50 ${canEdit ? 'cursor-pointer' : ''}`}
+                      onDoubleClick={() => canEdit && handleEdit(doc.id)}
                     >
                       <td className="px-4 sm:px-6 py-3 whitespace-nowrap text-sm text-gray-900">{doc.id}</td>
                       <td className="px-4 sm:px-6 py-3 whitespace-nowrap text-sm text-gray-900">
@@ -131,23 +139,25 @@ function DocumentEntrance() {
                         {doc.responsible_name || '—'}
                       </td>
                       <td className="px-4 sm:px-6 py-3 whitespace-nowrap text-right text-sm font-medium">
+                        {(canEdit || canManage) && (
                         <ActionDropdown
                           actions={[
-                            {
+                            canEdit && {
                               label: 'Редактировать',
                               icon: '✏️',
                               color: 'green',
                               onClick: () => handleEdit(doc.id),
                             },
-                            {
+                            canManage && {
                               label: isDeleting ? 'Удаление...' : 'Удалить',
                               icon: '🗑️',
                               color: 'red',
                               onClick: () => handleDelete(doc.id),
                               disabled: isDeleting,
                             },
-                          ]}
+                          ].filter(Boolean)}
                         />
+                        )}
                       </td>
                     </tr>
                   ))}
@@ -160,8 +170,8 @@ function DocumentEntrance() {
               {sortedDocs.map((doc) => (
                 <div
                   key={doc.id}
-                  className="bg-white rounded-xl shadow p-4 hover:shadow-md cursor-pointer"
-                  onDoubleClick={() => handleEdit(doc.id)}
+                  className={`bg-white rounded-xl shadow p-4 hover:shadow-md ${canEdit ? 'cursor-pointer' : ''}`}
+                  onDoubleClick={() => canEdit && handleEdit(doc.id)}
                 >
                   <div className="flex justify-between items-start">
                     <div>
@@ -182,7 +192,9 @@ function DocumentEntrance() {
                     <div><span className="font-medium">Ответственный:</span> {doc.responsible_name || '—'}</div>
                   </div>
 
+                  {(canEdit || canManage) && (
                   <div className="flex justify-end space-x-2 mt-3">
+                    {canEdit && (
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
@@ -192,6 +204,8 @@ function DocumentEntrance() {
                     >
                       Редактировать
                     </button>
+                    )}
+                    {canManage && (
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
@@ -204,7 +218,9 @@ function DocumentEntrance() {
                     >
                       {isDeleting ? 'Удаление...' : 'Удалить'}
                     </button>
+                    )}
                   </div>
+                  )}
                 </div>
               ))}
             </div>

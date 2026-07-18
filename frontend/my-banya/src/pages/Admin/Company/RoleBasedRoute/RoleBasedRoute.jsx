@@ -3,17 +3,32 @@ import { useSelector } from 'react-redux';
 import { Navigate } from 'react-router-dom';
 import { memo } from 'react';
 
-function RoleBasedRoute({ children, requiredPermission }) {
+function RoleBasedRoute({ children, requiredPermission, adminOnly = false }) {
   const { user } = useSelector((state) => state.auth);
 
   if (!user) {
     return <Navigate to="/admin/login" replace />;
   }
 
+  if (adminOnly && !user.is_admin) {
+    return (
+      <div className="p-8 text-red-600">
+        <h2 className="text-xl font-bold">Доступ запрещён</h2>
+        <p>Раздел доступен только администратору системы.</p>
+      </div>
+    );
+  }
+
+  const requiredPermissions = Array.isArray(requiredPermission)
+    ? requiredPermission
+    : requiredPermission
+      ? [requiredPermission]
+      : [];
+
   // Проверяем, есть ли у пользователя нужное право
-  if (requiredPermission) {
+  if (requiredPermissions.length > 0) {
     // Раздел администратора доступен только системному админу
-    if (requiredPermission.startsWith('administrator:') && !user.is_admin) {
+    if (requiredPermissions.some((code) => code.startsWith('administrator:')) && !user.is_admin) {
       return (
         <div className="p-8 text-red-600">
           <h2 className="text-xl font-bold">Доступ запрещён</h2>
@@ -27,10 +42,10 @@ function RoleBasedRoute({ children, requiredPermission }) {
       return children;
     }
 
-    const hasPermission = user.permissions?.some(
-      p => p.code === requiredPermission
+    const hasPermission = requiredPermissions.some((code) =>
+      user.permissions?.some((p) => p.code === code)
     );
-    
+
     if (!hasPermission) {
       return (
         <div className="p-8 text-red-600">

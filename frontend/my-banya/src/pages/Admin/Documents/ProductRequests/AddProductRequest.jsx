@@ -73,30 +73,35 @@ function AddProductRequest() {
   }, [productSearch, products, items]);
 
   useEffect(() => {
-    if (isEditing && requestData) {
-      const pendingItems = (requestData.items || [])
-        .filter((item) => item.status === 'pending')
-        .map((item) => ({
-          id: item.id,
-          productId: item.product_id,
-          name: item.product?.name || '—',
-          quantity: item.quantity,
-          purchasePrice: item.purchase_price,
-          unitId: item.product?.unit_id || null,
-          unitName: units.find((u) => u.id === item.product?.unit_id)?.name || 'шт.',
-        }));
-      dispatch(
-        setInitialState({
-          date: requestData.date,
-          comment: requestData.comment || '',
-          items: pendingItems,
-        })
-      );
-    } else if (!isEditing) {
+    if (!isEditing) {
       dispatch(setInitialState({}));
       setPrefillDone(false);
+      return;
     }
-  }, [isEditing, requestData, dispatch, units]);
+
+    if (!requestData) return;
+
+    const pendingItems = (requestData.items || [])
+      .filter((item) => item.status === 'pending')
+      .map((item) => ({
+        id: item.id,
+        productId: item.product_id,
+        name: item.product?.name || '—',
+        quantity: item.quantity,
+        purchasePrice: item.purchase_price,
+        unitId: item.product?.unit_id || null,
+        unitName: units.find((u) => u.id === item.product?.unit_id)?.name || 'шт.',
+      }));
+    dispatch(
+      setInitialState({
+        date: requestData.date,
+        comment: requestData.comment || '',
+        items: pendingItems,
+      })
+    );
+    // units used only for display labels at load time; do not re-init on every units change
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isEditing, requestData, dispatch]);
 
   useEffect(() => {
     if (isEditing || prefillDone || !prefillProduct) return;
@@ -105,8 +110,9 @@ function AddProductRequest() {
         id: Date.now() + Math.random(),
         productId: prefillProduct.id,
         name: prefillProduct.name,
-        quantity: 1,
-        purchasePrice: prefillProduct.last_purchase_price || 0,
+        quantity: '',
+        purchasePrice: '',
+        lastPurchasePrice: prefillProduct.last_purchase_price || null,
         unitId: prefillProduct.unit_id || null,
         unitName: units.find((u) => u.id === prefillProduct.unit_id)?.name || 'шт.',
       })
@@ -138,8 +144,9 @@ function AddProductRequest() {
         id: Date.now() + Math.random(),
         productId: product.id,
         name: product.name,
-        quantity: 1,
-        purchasePrice: product.last_purchase_price || 0,
+        quantity: '',
+        purchasePrice: '',
+        lastPurchasePrice: product.last_purchase_price || null,
         unitId: product.unit_id || null,
         unitName: units.find((u) => u.id === product.unit_id)?.name || 'шт.',
       })
@@ -194,7 +201,11 @@ function AddProductRequest() {
       dispatch(resetForm());
       navigate('/admin/documents/product-requests');
     } catch (err) {
-      toast.error(err?.data?.detail || 'Не удалось сохранить заявку');
+      const detail = err?.data?.detail;
+      const message = Array.isArray(detail)
+        ? detail.map((d) => d.msg || JSON.stringify(d)).join('; ')
+        : detail || 'Не удалось сохранить заявку';
+      toast.error(message);
     }
   };
 
@@ -308,16 +319,18 @@ function AddProductRequest() {
                         <td className="px-3 py-2">
                           <input
                             type="text"
-                            value={item.quantity}
+                            value={item.quantity ?? ''}
                             onChange={(e) => updateItemInList(index, 'quantity', e.target.value)}
+                            placeholder="0"
                             className="w-full p-1.5 border rounded"
                           />
                         </td>
                         <td className="px-3 py-2">
                           <input
                             type="text"
-                            value={item.purchasePrice}
+                            value={item.purchasePrice ?? ''}
                             onChange={(e) => updateItemInList(index, 'purchasePrice', e.target.value)}
+                            placeholder={item.lastPurchasePrice != null ? String(item.lastPurchasePrice) : '0'}
                             className="w-full p-1.5 border rounded"
                           />
                         </td>

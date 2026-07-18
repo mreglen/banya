@@ -372,9 +372,11 @@ function AdminDashboard() {
         <div className="bg-white rounded-3xl p-6 sm:p-8 shadow-sm border border-gray-100">
           <div className="flex items-center justify-between mb-8">
             <h2 className="text-xl font-bold text-gray-900">Последние действия</h2>
+            {user?.is_admin && (
             <NavLink to="/admin/administrator/audit" className="text-sm text-blue-600 hover:underline font-medium">
               Все логи
             </NavLink>
+            )}
           </div>
           <div className="space-y-6">
             {recentActivity?.map((activity) => (
@@ -412,8 +414,8 @@ function AdminDashboard() {
             { to: "/admin/baths", icon: HomeIcon, label: "Бани", color: "bg-blue-50 text-blue-600" },
             { to: "/admin/storage/nomenclature", icon: Package, label: "Склад", color: "bg-teal-50 text-teal-600" },
             { to: "/admin/documents/entrance", icon: ClipboardList, label: "Документы", color: "bg-purple-50 text-purple-600" },
-            { to: "/admin/administrator/audit", icon: History, label: "Логи", color: "bg-gray-50 text-gray-600" },
-          ].map((item, idx) => (
+            user?.is_admin && { to: "/admin/administrator/audit", icon: History, label: "Логи", color: "bg-gray-50 text-gray-600" },
+          ].filter(Boolean).map((item, idx) => (
             <NavLink
               key={idx}
               to={item.to}

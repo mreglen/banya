@@ -1,8 +1,11 @@
 import { useNavigate } from 'react-router-dom';
 import { useGetProductRequestsQuery } from '../../../../redux/slices/productsApiSlice';
+import { useHasAccess } from '../../../../hooks/useHasAccess';
 
 function ProductRequestsList() {
   const navigate = useNavigate();
+  const hasAccess = useHasAccess();
+  const canManage = hasAccess('documents:manage');
   const { data: requests = [], isLoading, isError, error, refetch } = useGetProductRequestsQuery();
 
   if (isLoading) {
@@ -38,23 +41,27 @@ function ProductRequestsList() {
       <div className="max-w-7xl mx-auto">
         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
           <h1 className="text-xl sm:text-2xl font-bold text-gray-800">Заявки на товар</h1>
-          <button
-            onClick={() => navigate('/admin/documents/product-requests/add')}
-            className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 sm:px-6 sm:py-3 rounded-lg font-medium shadow"
-          >
-            + Новая заявка
-          </button>
+          {canManage && (
+            <button
+              onClick={() => navigate('/admin/documents/product-requests/add')}
+              className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 sm:px-6 sm:py-3 rounded-lg font-medium shadow"
+            >
+              + Новая заявка
+            </button>
+          )}
         </div>
 
         {requests.length === 0 ? (
           <div className="bg-white rounded-xl shadow p-8 text-center">
             <p className="text-gray-500 mb-4">Нет заявок на товар</p>
-            <button
-              onClick={() => navigate('/admin/documents/product-requests/add')}
-              className="text-green-600 hover:text-green-800 font-medium"
-            >
-              Создать первую заявку
-            </button>
+            {canManage && (
+              <button
+                onClick={() => navigate('/admin/documents/product-requests/add')}
+                className="text-green-600 hover:text-green-800 font-medium"
+              >
+                Создать первую заявку
+              </button>
+            )}
           </div>
         ) : (
           <div className="bg-white rounded-xl shadow overflow-hidden">
@@ -90,7 +97,7 @@ function ProductRequestsList() {
                       >
                         Открыть
                       </button>
-                      {(req.pending_count || 0) > 0 && (
+                      {canManage && (req.pending_count || 0) > 0 && (
                         <button
                           onClick={() => navigate(`/admin/documents/product-requests/edit/${req.id}`)}
                           className="text-gray-600 hover:text-gray-900"
@@ -122,7 +129,7 @@ function ProductRequestsList() {
                     >
                       Открыть
                     </button>
-                    {(req.pending_count || 0) > 0 && (
+                    {canManage && (req.pending_count || 0) > 0 && (
                       <button
                         onClick={() => navigate(`/admin/documents/product-requests/edit/${req.id}`)}
                         className="text-gray-700 text-sm"

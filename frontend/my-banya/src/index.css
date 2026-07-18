@@ -4,6 +4,7 @@ html {
   /* отступ для фиксированного header */
   font-size: 12.8px;
   /* Уменьшаем интерфейс на 20% (16px * 0.8 = 12.8px) */
+  overflow-x: clip;
 }
 
 body {
@@ -11,6 +12,7 @@ body {
   font-family: "Sansation", sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  overflow-x: clip;
 }
 
 

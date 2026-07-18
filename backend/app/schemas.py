@@ -125,7 +125,7 @@ class ReservationUpdate(BaseModel):
     status_id: Optional[int] = None
     income_account_id: Optional[int] = None
     
-    products: List[ReservationProductCreate] = []   
+    products: Optional[List[ReservationProductCreate]] = None
 
     class Config:
         from_attributes = True
@@ -604,7 +604,7 @@ class ProductRequestItemRead(ProductRequestItemBase):
     processed_by_user_id: Optional[int] = None
     processed_at: Optional[datetime] = None
     entrance_document_id: Optional[int] = None
-    product: Product
+    product: Optional[Product] = None
 
     class Config:
         from_attributes = True

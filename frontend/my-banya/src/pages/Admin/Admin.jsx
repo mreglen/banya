@@ -15,7 +15,8 @@ import {
   Hotel, 
   FileText, 
   FilePlus2, 
-  FileMinus2, 
+  FileMinus2,
+  ClipboardList,
   Package, 
   Barcode, 
   Trash2, 
@@ -119,6 +120,7 @@ function Admin() {
       </div>
 
       <nav className="flex-1 p-4 space-y-2">
+        {user?.is_admin && (
           <NavLink
             to="/admin/administrator"
             className={({ isActive }) =>
@@ -131,6 +133,7 @@ function Admin() {
             <ShieldCheck className="w-5 h-5 mr-3" />
             Администратор
           </NavLink>
+        )}
 
         {hasAccess('/admin/reservations') && (
           <NavLink
@@ -220,7 +223,8 @@ function Admin() {
 
         {/* Документы */}
         {(hasAccess('/admin/documents/entrance') ||
-          hasAccess('/admin/documents/realization')) && (
+          hasAccess('/admin/documents/realization') ||
+          hasAccess('/admin/documents/product-requests')) && (
             <div>
               <button
                 onClick={toggleDocuments}
@@ -252,6 +256,20 @@ function Admin() {
                     >
                       <FilePlus2 className="w-4 h-4 mr-2" />
                       Поступление
+                    </NavLink>
+                  )}
+                  {hasAccess('/admin/documents/product-requests') && (
+                    <NavLink
+                      to="/admin/documents/product-requests"
+                      className={({ isActive }) =>
+                        `flex items-center px-4 py-2 rounded-lg text-sm transition ${isActive
+                          ? 'bg-green-100 text-green-800 font-medium'
+                          : 'text-gray-600 hover:bg-green-50 hover:text-green-700'
+                        }`
+                      }
+                    >
+                      <ClipboardList className="w-4 h-4 mr-2" />
+                      Заявки на товар
                     </NavLink>
                   )}
                   {hasAccess('/admin/documents/realization') && (
@@ -386,8 +404,8 @@ function Admin() {
           </NavLink>
         )}
 
-        {/* Настройки - только для директора и админа */}
-        {(user?.is_director || user?.is_admin) && (
+        {/* Настройки - только для администратора */}
+        {user?.is_admin && (
           <NavLink
             to="/admin/settings"
             className={({ isActive }) =>
