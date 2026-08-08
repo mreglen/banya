@@ -11,6 +11,7 @@ import {
 import {
   useCreateReservationMutation,
   useUpdateReservationMutation,
+  useDeleteReservationMutation,
   useGetReservationStatusesQuery,
   useGetReservationsByDateQuery,
 } from '../../../redux/slices/reservationSlice';
@@ -110,6 +111,17 @@ const SERVER_BASE_URL = process.env.REACT_APP_API_URL
 
 const toPythonWeekday = (date) => (date.getDay() + 6) % 7;
 
+const getDefaultHourlyRate = (bath, dateYmd) => {
+  if (!bath || !dateYmd) return '';
+  const start = new Date(`${dateYmd}T12:00:00`);
+  if (Number.isNaN(start.getTime())) return '';
+  const weekday = toPythonWeekday(start);
+  const rate = weekday >= 4
+    ? Number(bath.cost_weekend)
+    : Number(bath.cost_weekday);
+  return Number.isFinite(rate) ? rate : '';
+};
+
 /** API отдаёт status строкой; status_id может отсутствовать в старых ответах */
 const resolveBookingStatusId = (bookingData, statusOptionsList) => {
   if (!bookingData) return 1;
@@ -147,6 +159,7 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
   const lockStatus = (isClosedBooking && !canRevertClosed) || !canManageReservation;
   const [updateReservation, { isLoading: isUpdating }] = useUpdateReservationMutation();
   const [createReservation, { isLoading: isCreating }] = useCreateReservationMutation();
+  const [deleteReservation, { isLoading: isDeleting }] = useDeleteReservationMutation();
 
   let initialNewDate =
     selectedDate && String(selectedDate).trim() !== '' ? String(selectedDate) : today;
@@ -157,6 +170,7 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
     date: initialNewDate,
     start_time: initialNewStartTime,
     duration_hours: 1,
+    hourly_rate: '',
     client_name: '',
     client_phone: '',
     prepayment: '',
@@ -169,6 +183,7 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [paymentModalView, setPaymentModalView] = useState('choose');
+  const [showReceipt, setShowReceipt] = useState(false);
   const { data: paymentQr } = useGetPaymentQrCodeQuery(undefined, {
     skip: !isPaymentModalOpen,
   });
@@ -212,6 +227,10 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
     const justOpened = isOpen && !prevIsOpenRef.current;
     prevIsOpenRef.current = isOpen;
 
+    if (justOpened) {
+      setShowReceipt(false);
+    }
+
     if (!justOpened || !isOpen || isEditing) return;
 
     let date =
@@ -223,6 +242,7 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
       start_time,
       duration_hours: 1,
       bath_id: '',
+      hourly_rate: '',
       client_name: '',
       client_phone: '',
       prepayment: '',
@@ -235,19 +255,25 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
 
   useEffect(() => {
     if (!isOpen || isEditing || !prefillData) return;
-    setFormData((prev) => ({
-      ...prev,
-      bath_id: prefillData.bath_id ? String(prefillData.bath_id) : prev.bath_id,
-      date: prefillData.date || prev.date,
-      start_time: prefillData.start_time || prev.start_time,
-      duration_hours: prefillData.duration_hours || prev.duration_hours,
-      client_name: prefillData.client_name || prev.client_name,
-      client_phone: prefillData.client_phone || prev.client_phone,
-      notes: prefillData.notes || prev.notes,
-      guests: prefillData.guests ? String(prefillData.guests) : prev.guests,
-      selectedProducts: [],
-    }));
-  }, [isOpen, isEditing, prefillData]);
+    setFormData((prev) => {
+      const nextBathId = prefillData.bath_id ? String(prefillData.bath_id) : prev.bath_id;
+      const nextDate = prefillData.date || prev.date;
+      const bath = baths.find((b) => String(b.bath_id) === String(nextBathId));
+      return {
+        ...prev,
+        bath_id: nextBathId,
+        date: nextDate,
+        start_time: prefillData.start_time || prev.start_time,
+        duration_hours: prefillData.duration_hours || prev.duration_hours,
+        hourly_rate: bath ? getDefaultHourlyRate(bath, nextDate) : prev.hourly_rate,
+        client_name: prefillData.client_name || prev.client_name,
+        client_phone: prefillData.client_phone || prev.client_phone,
+        notes: prefillData.notes || prev.notes,
+        guests: prefillData.guests ? String(prefillData.guests) : prev.guests,
+        selectedProducts: [],
+      };
+    });
+  }, [isOpen, isEditing, prefillData, baths]);
 
   // Закрытие модалки по клавише Escape
   useEffect(() => {
@@ -313,12 +339,19 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
       const statusIdFromBooking = resolveBookingStatusId(booking, statusOptions);
       const guestsNorm =
         normalizeGuestsDigits(booking.guests ?? 1) || '1';
+      const bathId = booking.bath?.bath_id || booking.bath_id || '';
+      const bathForRate = baths.find((b) => String(b.bath_id) === String(bathId));
+      const hourlyRate =
+        booking.hourly_rate != null && booking.hourly_rate !== ''
+          ? Number(booking.hourly_rate)
+          : getDefaultHourlyRate(bathForRate, date);
 
       setFormData({
-        bath_id: booking.bath?.bath_id || booking.bath_id || '',
+        bath_id: bathId,
         date,
         start_time,
         duration_hours,
+        hourly_rate: hourlyRate === '' ? '' : hourlyRate,
         client_name: booking.client_name || '',
         client_phone: booking.client_phone || '',
         prepayment: booking.prepayment != null && booking.prepayment > 0 ? String(booking.prepayment) : '',
@@ -331,7 +364,18 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
       console.error('Ошибка загрузки данных брони:', error);
       showToast('Ошибка загрузки данных для редактирования', 'error');
     }
-  }, [isOpen, booking, statusOptions.length, stockProducts, findUnitName]);
+  }, [isOpen, booking, statusOptions.length, stockProducts, findUnitName, baths]);
+
+  // Если при открытии редактирования бани ещё не были загружены — подставим тариф позже
+  useEffect(() => {
+    if (!isOpen || !formData.bath_id || formData.hourly_rate !== '') return;
+    const bath = baths.find((b) => String(b.bath_id) === String(formData.bath_id));
+    if (!bath || !formData.date) return;
+    setFormData((prev) => ({
+      ...prev,
+      hourly_rate: getDefaultHourlyRate(bath, prev.date),
+    }));
+  }, [isOpen, baths, formData.bath_id, formData.date, formData.hourly_rate]);
 
   // Если после выбора бани/даты текущее время занято — ставим ближайшее свободное
   useEffect(() => {
@@ -370,9 +414,9 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
     if (name === 'client_phone') {
       const formatted = formatPhoneInput(value, formData.client_phone);
       setFormData((prev) => ({ ...prev, client_phone: formatted }));
-    } else if (name === 'prepayment') {
+    } else if (name === 'prepayment' || name === 'hourly_rate') {
       const digits = value.replace(/\D/g, '');
-      setFormData((prev) => ({ ...prev, prepayment: digits }));
+      setFormData((prev) => ({ ...prev, [name]: digits }));
     } else if (name === 'duration_hours') {
       if (value === '') {
         setFormData((prev) => ({ ...prev, duration_hours: '' }));
@@ -387,7 +431,17 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
         ...prev,
         bath_id: value,
         duration_hours: Number(prev.duration_hours) < minHours ? minHours : prev.duration_hours,
+        hourly_rate: selected ? getDefaultHourlyRate(selected, prev.date) : '',
       }));
+    } else if (name === 'date') {
+      setFormData((prev) => {
+        const selected = baths.find((bath) => String(bath.bath_id) === String(prev.bath_id));
+        return {
+          ...prev,
+          date: value,
+          hourly_rate: selected ? getDefaultHourlyRate(selected, value) : prev.hourly_rate,
+        };
+      });
     } else {
       setFormData((prev) => ({ ...prev, [name]: value }));
     }
@@ -690,6 +744,7 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
       notes: formData.notes && formData.notes.trim() !== '' ? formData.notes.trim() : null,
       guests: parseInt(formData.guests, 10) || 1,
       status_id: submitStatusId,
+      hourly_rate: formData.hourly_rate === '' ? null : parseInt(formData.hourly_rate, 10) || 0,
       products: formData.selectedProducts.map((p) => ({
         product_id: Number(p.id),
         quantity: parseInt(p.quantity, 10) || 1,
@@ -785,9 +840,13 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
 
     const start = new Date(`${formData.date}T${formData.start_time}:00`);
     const weekday = toPythonWeekday(start);
-    const hourlyRate = weekday >= 4
+    const defaultHourlyRate = weekday >= 4
       ? Number(selectedBath.cost_weekend) || 0
       : Number(selectedBath.cost_weekday) || 0;
+    const hourlyRateRaw = formData.hourly_rate;
+    const hourlyRate = hourlyRateRaw === '' || hourlyRateRaw == null
+      ? defaultHourlyRate
+      : Number(hourlyRateRaw) || 0;
     const bathBaseCost = Math.floor(hourlyRate * durationHours);
     const guestsNum = parseInt(formData.guests, 10) || 0;
     const baseGuests = Number(selectedBath.base_guests) || 0;
@@ -895,6 +954,7 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
     formData.date,
     formData.start_time,
     formData.duration_hours,
+    formData.hourly_rate,
     formData.guests,
     formData.selectedProducts,
     formData.client_name,
@@ -927,7 +987,28 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
   }
 
   const durationHint = calculateDurationHint();
-  const isSubmitting = isCreating || isUpdating;
+  const isSubmitting = isCreating || isUpdating || isDeleting;
+
+  const handleDeleteReservation = async () => {
+    if (!isEditing || !booking?.reservation_id || !canManageReservation) return;
+    const confirmed = window.confirm(
+      `Удалить бронь #${booking.reservation_id} полностью? Это действие нельзя отменить.`
+    );
+    if (!confirmed) return;
+
+    try {
+      await deleteReservation(booking.reservation_id).unwrap();
+      showToast('Бронь удалена', 'success');
+      if (onEditSuccess) {
+        onEditSuccess();
+      } else {
+        onClose();
+      }
+    } catch (error) {
+      console.error('Ошибка удаления брони:', error);
+      showToast(error?.data?.detail || 'Не удалось удалить бронь', 'error');
+    }
+  };
   const prepaymentAmount = formData.prepayment === '' ? 0 : parseInt(formData.prepayment, 10) || 0;
 
   return createPortal(
@@ -1036,6 +1117,27 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
             )}
           </div>
 
+          {formData.bath_id && (
+            <div>
+              <label className="block text-base font-medium text-gray-700 mb-2">Цена за час *</label>
+              <div className="relative">
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  name="hourly_rate"
+                  value={formData.hourly_rate}
+                  onChange={handleChange}
+                  placeholder="0"
+                  className="w-full px-3 py-2.5 sm:px-4 sm:py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 text-base sm:text-lg pr-10"
+                />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">₽</span>
+              </div>
+              <p className="mt-1 text-xs text-gray-500">
+                Подставляется из тарифа бани (будни/выходной), можно изменить
+              </p>
+            </div>
+          )}
+
           {/* Дата и время */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
             <div
@@ -1056,7 +1158,15 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
                 type="date"
                 value={formData.date}
                 onChange={(e) => {
-                  setFormData((prev) => ({ ...prev, date: e.target.value }));
+                  const value = e.target.value;
+                  setFormData((prev) => {
+                    const selected = baths.find((bath) => String(bath.bath_id) === String(prev.bath_id));
+                    return {
+                      ...prev,
+                      date: value,
+                      hourly_rate: selected ? getDefaultHourlyRate(selected, value) : prev.hourly_rate,
+                    };
+                  });
                 }}
                 className={`w-full px-3 py-2.5 sm:px-4 sm:py-3 border rounded-xl focus:ring-2 focus:ring-blue-500 text-base sm:text-lg ${
                   validationErrors.date ? 'border-red-500 bg-red-50' : 'border-gray-300'
@@ -1377,6 +1487,7 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
           </div>
           </div>
 
+            {showReceipt && (
             <aside className="lg:w-[26rem] xl:w-[30rem] border-t lg:border-t-0 lg:border-l border-gray-200 bg-gray-50 p-4 sm:p-5 overflow-y-auto min-h-0 flex-shrink-0 max-h-[42vh] lg:max-h-none overscroll-contain">
               <div className="bg-white border border-gray-300 rounded-xl shadow-sm p-4 text-base text-gray-900">
                 <header className="text-center border-b border-dashed border-gray-400 pb-3 mb-3">
@@ -1504,6 +1615,7 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
                 )}
               </div>
             </aside>
+            )}
           </div>
 
         <div
@@ -1511,15 +1623,14 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
           style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}
         >
           <div className="flex flex-col sm:flex-row gap-3">
-            {isEditing && (
-              <button
-                type="button"
-                onClick={handleOpenPaymentModal}
-                className="flex-1 bg-indigo-600 text-white py-2.5 sm:py-3 px-4 rounded-xl font-medium text-base sm:text-lg hover:bg-indigo-700 transition"
-              >
-                Оплата
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={handleOpenPaymentModal}
+              disabled={isSubmitting}
+              className="flex-1 bg-indigo-600 text-white py-2.5 sm:py-3 px-4 rounded-xl font-medium text-base sm:text-lg hover:bg-indigo-700 transition disabled:opacity-50"
+            >
+              Оплата
+            </button>
             <button
               type="submit"
               disabled={isSubmitting || isLoadingUnits || !canManageReservation}
@@ -1527,15 +1638,38 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
             >
               {!canManageReservation
                 ? 'Недостаточно прав'
-                : (isSubmitting ? 'Сохранение...' : isEditing ? 'Сохранить' : 'Создать бронь')}
+                : (isSubmitting && !isDeleting ? 'Сохранение...' : isEditing ? 'Сохранить' : 'Создать бронь')}
             </button>
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 bg-gray-200 text-gray-800 py-2.5 sm:py-3 px-4 rounded-xl font-medium text-base sm:text-lg hover:bg-gray-300 transition"
+              disabled={isSubmitting}
+              className="flex-1 bg-gray-200 text-gray-800 py-2.5 sm:py-3 px-4 rounded-xl font-medium text-base sm:text-lg hover:bg-gray-300 transition disabled:opacity-50"
             >
               {isEditing ? 'Закрыть' : 'Отмена'}
             </button>
+            <button
+              type="button"
+              onClick={() => setShowReceipt((prev) => !prev)}
+              disabled={isSubmitting}
+              className={`flex-1 py-2.5 sm:py-3 px-4 rounded-xl font-medium text-base sm:text-lg transition disabled:opacity-50 ${
+                showReceipt
+                  ? 'bg-amber-600 text-white hover:bg-amber-700'
+                  : 'bg-amber-100 text-amber-900 hover:bg-amber-200'
+              }`}
+            >
+              Чек
+            </button>
+            {isEditing && canManageReservation && (
+              <button
+                type="button"
+                onClick={handleDeleteReservation}
+                disabled={isSubmitting}
+                className="flex-1 bg-red-600 text-white py-2.5 sm:py-3 px-4 rounded-xl font-medium text-base sm:text-lg hover:bg-red-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isDeleting ? 'Удаление...' : 'Удалить'}
+              </button>
+            )}
           </div>
         </div>
         </form>

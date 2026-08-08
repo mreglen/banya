@@ -124,7 +124,20 @@ export const productsApiSlice = createApi({
             }),
             invalidatesTags: (result, error, arg) => [
                 { type: 'Product', id: 'LIST' },
+                { type: 'Product', id: 'STOCK_LIST' },
                 { type: 'Product', id: arg.id }
+            ],
+        }),
+        writeOffProduct: builder.mutation({
+            query: ({ id, quantity }) => ({
+                url: `/admin/products/${id}/write-off`,
+                method: 'POST',
+                body: { quantity },
+            }),
+            invalidatesTags: (result, error, arg) => [
+                { type: 'Product', id: 'LIST' },
+                { type: 'Product', id: 'STOCK_LIST' },
+                { type: 'Product', id: arg.id },
             ],
         }),
         uploadProductPhotos: builder.mutation({
@@ -317,6 +330,7 @@ export const {
     useGetProductByIdQuery,
     useGetStockProductsQuery,
     useUpdateProductMutation,
+    useWriteOffProductMutation,
     useUploadProductPhotosMutation,
     useDeleteProductPhotoMutation,
     useGetEntranceDocumentsQuery,

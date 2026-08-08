@@ -184,7 +184,13 @@ def create_reservation(
             detail=f"Минимальная длительность брони для бани \"{bath.name}\" — {min_booking_hours} ч."
         )
     weekday = start_dt.weekday()
-    hourly_rate = bath.cost_weekend if weekday >= 4 else bath.cost_weekday
+    default_hourly_rate = bath.cost_weekend if weekday >= 4 else bath.cost_weekday
+    if reservation.hourly_rate is not None:
+        if reservation.hourly_rate < 0:
+            raise HTTPException(status_code=400, detail="Цена за час не может быть отрицательной")
+        hourly_rate = int(reservation.hourly_rate)
+    else:
+        hourly_rate = default_hourly_rate
     bath_base_cost = int(hourly_rate * paid_duration_hours)
     extra_guests = max(0, reservation.guests - bath.base_guests)
     extra_guest_cost = extra_guests * bath.extra_guest_price
@@ -239,6 +245,7 @@ def create_reservation(
         notes=reservation.notes,
         guests=reservation.guests,
         total_cost=int(total_cost),
+        hourly_rate=int(hourly_rate),
         status_id=reservation.status_id,
         income_account_id=reservation.income_account_id,
         applied_promotion_id=applied_promo.id if applied_promo else None,
@@ -383,6 +390,7 @@ def create_reservation(
         notes=db_reservation.notes,
         guests=db_reservation.guests,
         total_cost=db_reservation.total_cost,
+        hourly_rate=db_reservation.hourly_rate,
         status=status_obj.status_name,
         status_id=db_reservation.status_id,
         income_account_id=db_reservation.income_account_id,
@@ -573,6 +581,7 @@ def update_reservation(
             or reservation.guests is not None
             or reservation.products is not None
             or reservation.bath_id is not None
+            or reservation.hourly_rate is not None
         )
 
         # Проверяем даты только если они были изменены или это не обновление статуса
@@ -595,7 +604,16 @@ def update_reservation(
                 )
 
             weekday = start_dt.weekday()
-            hourly_rate = bath.cost_weekend if weekday >= 4 else bath.cost_weekday
+            default_hourly_rate = bath.cost_weekend if weekday >= 4 else bath.cost_weekday
+            if reservation.hourly_rate is not None:
+                if reservation.hourly_rate < 0:
+                    raise HTTPException(status_code=400, detail="Цена за час не может быть отрицательной")
+                hourly_rate = int(reservation.hourly_rate)
+            elif db_reservation.hourly_rate is not None:
+                hourly_rate = int(db_reservation.hourly_rate)
+            else:
+                hourly_rate = default_hourly_rate
+            db_reservation.hourly_rate = int(hourly_rate)
             bath_base_cost = int(hourly_rate * paid_duration_hours)
             extra_guests = max(0, current_guests - bath.base_guests)
             extra_guest_cost = extra_guests * bath.extra_guest_price
@@ -771,6 +789,7 @@ def update_reservation(
             notes=db_reservation.notes,
             guests=db_reservation.guests,
             total_cost=db_reservation.total_cost,
+            hourly_rate=db_reservation.hourly_rate,
             status=status_name,
             status_id=db_reservation.status_id,
             income_account_id=db_reservation.income_account_id,
@@ -803,24 +822,35 @@ def delete_reservation(
     if not reservation:
         raise HTTPException(status_code=404, detail="Бронь не найдена")
 
+    bath = db.query(models.Bath).filter(models.Bath.bath_id == reservation.bath_id).first()
+    start_dt = reservation.start_datetime
+    end_dt = reservation.end_datetime
+    client_name = reservation.client_name
+    bath_name = bath.name if bath else None
+    bath_id = reservation.bath_id
+    summary = (
+        f"Удалил бронь #{id} на {start_dt.strftime('%d.%m.%Y %H:%M')}-"
+        f"{end_dt.strftime('%H:%M')}, баня: {bath_name or 'Не указано'}, клиент: {client_name}"
+    )
+    details = {
+        "reservation_id": id,
+        "client_name": client_name,
+        "bath_id": bath_id,
+        "bath_name": bath_name,
+        "start_datetime": start_dt.isoformat() if start_dt else None,
+        "end_datetime": end_dt.isoformat() if end_dt else None,
+        "status_id": reservation.status_id,
+    }
+
     # === ВОЗВРАТ ТОВАРОВ НА СКЛАД ДО УДАЛЕНИЯ (только исчисляемые) ===
     for rp in reservation.reservation_products:
         product = db.query(models.Product).filter(models.Product.id == rp.product_id).first()
         if product and product.is_countable:
             product.total_quantity += rp.quantity
 
-    # Теперь можно безопасно удалить
     db.delete(reservation)
     db.commit()
 
-    # Асинхронное логирование удаления бронирования с детальной информацией
-    bath = db.query(models.Bath).filter(models.Bath.bath_id == reservation.bath_id).first()
-    
-    # Человеко-читаемое описание
-    start_dt = reservation.start_datetime
-    end_dt = reservation.end_datetime
-    summary = f"Удалил бронь #{id} на {start_dt.strftime('%d.%m.%Y %H:%M')}-{end_dt.strftime('%H:%M')}, баня: {bath.name if bath else 'Не указано'}, клиент: {reservation.client_name}"
-    
     from app.audit_logger import log_detailed_action
     background_tasks.add_task(
         log_detailed_action,
@@ -829,10 +859,10 @@ def delete_reservation(
         action="DELETE",
         entity_type="reservation",
         entity_id=id,
-        details={"client_name": reservation.client_name},
+        details=details,
         summary=summary,
-        bath_name=bath.name if bath else None,
-        client_name=reservation.client_name,
+        bath_name=bath_name,
+        client_name=client_name,
         event_datetime=start_dt,
         ip_address=get_client_ip(request),
         user_agent=request.headers.get("user-agent")

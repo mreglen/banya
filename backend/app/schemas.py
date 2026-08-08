@@ -106,7 +106,8 @@ class ReservationCreate(BaseModel):
     guests: int = 1
     status_id: int = 1
     income_account_id: Optional[int] = None
-    
+    hourly_rate: Optional[int] = None
+
     products: List[ReservationProductCreate] = []
 
     class Config:
@@ -124,7 +125,8 @@ class ReservationUpdate(BaseModel):
     guests: Optional[int] = None
     status_id: Optional[int] = None
     income_account_id: Optional[int] = None
-    
+    hourly_rate: Optional[int] = None
+
     products: Optional[List[ReservationProductCreate]] = None
 
     class Config:
@@ -152,6 +154,7 @@ class ReservationResponse(BaseModel):
     notes: Optional[str]
     guests: int
     total_cost: int
+    hourly_rate: Optional[int] = None
     status: str
     status_id: int
     income_account_id: Optional[int] = None
@@ -475,6 +478,10 @@ class ProductBase(BaseModel):
 
 class ProductCreate(ProductBase):
     unit_id: Optional[int] = None
+
+
+class ProductWriteOff(BaseModel):
+    quantity: float
 
 class ProductPhotoOut(BaseModel):
     photo_id: int

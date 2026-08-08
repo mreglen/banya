@@ -1,11 +1,15 @@
 // src/pages/Admin/Storage/ProductList.jsx
-import React from 'react';
+import React, { useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
-import { useGetUnitsOfMeasurementQuery } from '../../../redux/slices/productsApiSlice';
+import {
+    useGetUnitsOfMeasurementQuery,
+    useWriteOffProductMutation,
+} from '../../../redux/slices/productsApiSlice';
 import { markForDeletion, unmarkForDeletion } from '../../../redux/slices/deletionRequestsSlice';
 import ActionDropdown from '../../../components/UI/ActionDropdown/ActionDropdown';
 import { useHasAccess } from '../../../hooks/useHasAccess';
+import { toast } from 'react-hot-toast';
 
 const truncateDescription = (str, maxLength = 50) => {
     if (!str) return '—';
@@ -18,17 +22,6 @@ const findCategoryName = (categories, categoryId) => {
         if (cat.id === categoryId) return cat.name;
         if (cat.children?.length) {
             const found = findCategoryName(cat.children, categoryId);
-            if (found) return found;
-        }
-    }
-    return null;
-};
-
-const findCategoryById = (categories, categoryId) => {
-    for (const cat of categories) {
-        if (cat.id === categoryId) return cat;
-        if (cat.children?.length) {
-            const found = findCategoryById(cat.children, categoryId);
             if (found) return found;
         }
     }
@@ -81,8 +74,13 @@ const ProductList = ({
     const navigate = useNavigate();
     const hasAccess = useHasAccess();
     const canCreateRequest = hasAccess('documents:manage');
+    const canManageStorage = hasAccess('storage:manage');
     const deletionArray = useSelector(state => state.deletionRequests);
     const { data: units = [] } = useGetUnitsOfMeasurementQuery();
+    const [writeOffProduct, { isLoading: isWritingOff }] = useWriteOffProductMutation();
+
+    const [writeOffProductItem, setWriteOffProductItem] = useState(null);
+    const [writeOffQty, setWriteOffQty] = useState('');
 
     const findUnitName = (unitId) => {
         if (!unitId) return 'шт.';
@@ -96,7 +94,6 @@ const ProductList = ({
         storageData
     );
 
-    // Применить фильтр
     const lowStockFilteredProducts = filterType === 'min_stock'
         ? filteredProducts.filter(p => p.is_countable && (p.total_quantity || 0) < (p.min_stock || 0))
         : filteredProducts;
@@ -115,27 +112,110 @@ const ProductList = ({
         })
         : lowStockFilteredProducts;
 
+    const openWriteOff = (product) => {
+        setWriteOffProductItem(product);
+        setWriteOffQty('');
+    };
+
+    const closeWriteOff = () => {
+        setWriteOffProductItem(null);
+        setWriteOffQty('');
+    };
+
+    const handleWriteOffSubmit = async (e) => {
+        e.preventDefault();
+        if (!writeOffProductItem) return;
+        const qty = Number(writeOffQty);
+        const stock = Number(writeOffProductItem.total_quantity) || 0;
+        if (!qty || qty <= 0) {
+            toast.error('Укажите количество');
+            return;
+        }
+        if (qty > stock) {
+            toast.error(`Нельзя списать больше остатка (${stock})`);
+            return;
+        }
+        try {
+            await writeOffProduct({ id: writeOffProductItem.id, quantity: qty }).unwrap();
+            toast.success('Списано');
+            closeWriteOff();
+        } catch (err) {
+            toast.error(err?.data?.detail || 'Не удалось списать');
+        }
+    };
+
+    const buildActions = (product, markedForDeletion) => [
+        {
+            label: 'Редактировать',
+            icon: '',
+            color: 'blue',
+            onClick: (e) => {
+                e?.stopPropagation?.();
+                handleEdit(product.id);
+            },
+        },
+        ...(canManageStorage
+            ? [
+                {
+                    label: 'Списать',
+                    icon: '',
+                    color: 'orange',
+                    onClick: (e) => {
+                        e?.stopPropagation?.();
+                        openWriteOff(product);
+                    },
+                },
+            ]
+            : []),
+        ...(canCreateRequest
+            ? [
+                {
+                    label: 'Создать заявку',
+                    icon: '',
+                    color: 'green',
+                    onClick: (e) => {
+                        e?.stopPropagation?.();
+                        navigate(`/admin/documents/product-requests/add?productId=${product.id}`);
+                    },
+                },
+            ]
+            : []),
+        {
+            label: markedForDeletion ? 'Снять с удаления' : 'Пометить на удаление',
+            icon: markedForDeletion ? '✓' : '',
+            color: markedForDeletion ? 'green' : 'red',
+            onClick: (e) => {
+                e?.stopPropagation?.();
+                if (markedForDeletion) {
+                    dispatch(unmarkForDeletion(product.id));
+                } else {
+                    dispatch(markForDeletion(product.id));
+                    navigate('/admin/deletion-requests');
+                }
+            },
+        },
+    ];
+
+    const writeOffUnit = writeOffProductItem
+        ? findUnitName(writeOffProductItem.unit_id)
+        : 'шт.';
+
     return (
         <div className="bg-white rounded-xl shadow-md">
             <div className="p-4 border-b">
-                <h2 className="text-base sm:text-lg font-semibold">
+                <h2 className="text-lg font-semibold text-gray-800">
                     {selectedCategoryPath.length > 0
-                        ? `Товары в: ${selectedCategoryPath.map(c => c.name).join(' → ')}`
+                        ? selectedCategoryPath[selectedCategoryPath.length - 1].name
                         : 'Все товары'}
                 </h2>
             </div>
 
             {finalProducts.length === 0 ? (
-                <div className="p-6 sm:p-8 text-center">
-                    <p className="text-gray-500">
-                        {searchQuery.trim() ? 'По запросу ничего не найдено' : 'Нет товаров в выбранной категории'}
-                    </p>
-                </div>
+                <div className="p-8 text-center text-gray-500">Нет товаров</div>
             ) : (
-                <div className="overflow-x-auto">
-                    {/* Desktop Table */}
-                    <table className="hidden md:table md:table-auto w-full">
-                        <thead className="bg-gray-50 text-left text-xs sm:text-sm text-gray-600 uppercase tracking-wider">
+                <div>
+                    <table className="hidden md:table w-full table-fixed">
+                        <thead className="bg-gray-50 text-left text-xs text-gray-600 uppercase">
                             <tr>
                                 <th className="px-4 py-3 w-[25%]">Наименование</th>
                                 <th className="px-4 py-3 w-[20%]">Категория</th>
@@ -177,44 +257,7 @@ const ProductList = ({
                                         <td className="px-4 py-3 w-[10%] text-center overflow-visible">
                                             <ActionDropdown
                                                 buttonText="⋮"
-                                                actions={[
-                                                    {
-                                                        label: 'Редактировать',
-                                                        icon: '',
-                                                        color: 'blue',
-                                                        onClick: (e) => {
-                                                            e.stopPropagation();
-                                                            handleEdit(product.id);
-                                                        },
-                                                    },
-                                                    ...(canCreateRequest
-                                                        ? [
-                                                            {
-                                                                label: 'Создать заявку',
-                                                                icon: '',
-                                                                color: 'green',
-                                                                onClick: (e) => {
-                                                                    e.stopPropagation();
-                                                                    navigate(`/admin/documents/product-requests/add?productId=${product.id}`);
-                                                                },
-                                                            },
-                                                        ]
-                                                        : []),
-                                                    {
-                                                        label: markedForDeletion ? 'Снять с удаления' : 'Пометить на удаление',
-                                                        icon: markedForDeletion ? '✓' : '',
-                                                        color: markedForDeletion ? 'green' : 'red',
-                                                        onClick: (e) => {
-                                                            e.stopPropagation();
-                                                            if (markedForDeletion) {
-                                                                dispatch(unmarkForDeletion(product.id));
-                                                            } else {
-                                                                dispatch(markForDeletion(product.id));
-                                                                navigate('/admin/deletion-requests');
-                                                            }
-                                                        },
-                                                    },
-                                                ]}
+                                                actions={buildActions(product, markedForDeletion)}
                                             />
                                         </td>
                                     </tr>
@@ -223,7 +266,6 @@ const ProductList = ({
                         </tbody>
                     </table>
 
-                    {/* Mobile Cards */}
                     <div className="md:hidden p-2">
                         {finalProducts.map((product) => {
                             const categoryName = findCategoryName(categoriesTree, product.category_id);
@@ -261,44 +303,59 @@ const ProductList = ({
                                     <div className="flex justify-end items-center mt-2">
                                         <ActionDropdown
                                             buttonText="Действия"
-                                            actions={[
-                                                {
-                                                    label: 'Редактировать',
-                                                    icon: '',
-                                                    color: 'blue',
-                                                    onClick: () => handleEdit(product.id),
-                                                },
-                                                ...(canCreateRequest
-                                                    ? [
-                                                        {
-                                                            label: 'Создать заявку',
-                                                            icon: '',
-                                                            color: 'green',
-                                                            onClick: () =>
-                                                                navigate(`/admin/documents/product-requests/add?productId=${product.id}`),
-                                                        },
-                                                    ]
-                                                    : []),
-                                                {
-                                                    label: markedForDeletion ? 'Снять с удаления' : 'Пометить на удаление',
-                                                    icon: markedForDeletion ? '✓' : '',
-                                                    color: markedForDeletion ? 'green' : 'red',
-                                                    onClick: () => {
-                                                        if (markedForDeletion) {
-                                                            dispatch(unmarkForDeletion(product.id));
-                                                        } else {
-                                                            dispatch(markForDeletion(product.id));
-                                                            navigate('/admin/deletion-requests');
-                                                        }
-                                                    },
-                                                },
-                                            ]}
+                                            actions={buildActions(product, markedForDeletion)}
                                         />
                                     </div>
                                 </div>
                             );
                         })}
                     </div>
+                </div>
+            )}
+
+            {writeOffProductItem && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+                    <form
+                        onSubmit={handleWriteOffSubmit}
+                        className="bg-white rounded-xl shadow-xl w-full max-w-sm p-5 space-y-4"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <h3 className="text-lg font-semibold text-gray-900">Списать</h3>
+                        <div className="text-sm text-gray-800">
+                            <div className="font-medium">{writeOffProductItem.name}</div>
+                            <div className="text-gray-600 mt-1">
+                                Сейчас: {Number(writeOffProductItem.total_quantity) || 0} {writeOffUnit}
+                            </div>
+                        </div>
+                        <div>
+                            <label className="block text-sm text-gray-700 mb-1">Списать</label>
+                            <input
+                                type="text"
+                                inputMode="numeric"
+                                value={writeOffQty}
+                                onChange={(e) => setWriteOffQty(e.target.value.replace(/\D/g, ''))}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                                placeholder="0"
+                                autoFocus
+                            />
+                        </div>
+                        <div className="flex gap-2 justify-end">
+                            <button
+                                type="button"
+                                onClick={closeWriteOff}
+                                className="px-4 py-2 rounded-lg bg-gray-200 text-gray-800"
+                            >
+                                Отмена
+                            </button>
+                            <button
+                                type="submit"
+                                disabled={isWritingOff}
+                                className="px-4 py-2 rounded-lg bg-orange-600 text-white disabled:opacity-50"
+                            >
+                                {isWritingOff ? '...' : 'Списать'}
+                            </button>
+                        </div>
+                    </form>
                 </div>
             )}
         </div>

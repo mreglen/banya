@@ -217,6 +217,14 @@ with engine.begin() as connection:
     connection.execute(
         text(
             """
+            ALTER TABLE reservations
+            ADD COLUMN IF NOT EXISTS hourly_rate INTEGER
+            """
+        )
+    )
+    connection.execute(
+        text(
+            """
             UPDATE realization_documents rd
             SET bath_id = r.bath_id
             FROM reservations r

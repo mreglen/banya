@@ -257,13 +257,11 @@ function DocumentsRealization() {
                         actions={[
                           {
                             label: 'Открыть бронь',
-                            icon: '📋',
                             color: 'blue',
                             onClick: () => handleOpenBooking(res),
                           },
                           {
                             label: 'Удалить',
-                            icon: '🗑️',
                             color: 'red',
                             onClick: () => handleDelete(res.reservation_id),
                           },

@@ -86,6 +86,7 @@ class Reservation(Base):
     prepayment = Column(Integer, nullable=False, default=0)
     notes = Column(Text)
     total_cost = Column(Integer, nullable=False, default=0)
+    hourly_rate = Column(Integer, nullable=True)
     guests = Column(Integer, nullable=False)
     status_id = Column(Integer, ForeignKey('reservation_status.id'), nullable=False, default=1)
     income_account_id = Column(Integer, ForeignKey("organization_accounts.id"), nullable=True)

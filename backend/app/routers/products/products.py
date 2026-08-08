@@ -7,7 +7,7 @@ import hashlib
 from app.database import get_db
 from app.database import SessionLocal
 from app.models import Product as ProductModel, Category, Photo, UnitOfMeasurement, User
-from app.schemas import Product, ProductCreate, UnitOfMeasurementResponse, StockProduct, UnitOfMeasurementBase
+from app.schemas import Product, ProductCreate, ProductWriteOff, UnitOfMeasurementResponse, StockProduct, UnitOfMeasurementBase
 from app.auth import get_current_user
 from app.audit_logger import log_detailed_action, get_client_ip
 from app.image_utils import process_image_to_webp
@@ -142,6 +142,55 @@ def update_product(
 
     db.commit()
     db.refresh(db_product)
+    return db_product
+
+
+@router.post("/{product_id}/write-off", response_model=Product)
+def write_off_product(
+    product_id: int,
+    payload: ProductWriteOff,
+    background_tasks: BackgroundTasks,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    db_product = db.query(ProductModel).filter(ProductModel.id == product_id).first()
+    if not db_product:
+        raise HTTPException(status_code=404, detail="Product not found")
+
+    quantity = float(payload.quantity or 0)
+    if quantity <= 0:
+        raise HTTPException(status_code=400, detail="Количество должно быть больше 0")
+
+    current_qty = float(db_product.total_quantity or 0)
+    if quantity > current_qty:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Нельзя списать больше остатка ({current_qty})",
+        )
+
+    db_product.total_quantity = current_qty - quantity
+    db.commit()
+    db.refresh(db_product)
+
+    background_tasks.add_task(
+        log_detailed_action,
+        db=SessionLocal(),
+        user_id=current_user.user_id,
+        action="UPDATE",
+        entity_type="product",
+        entity_id=product_id,
+        details={
+            "name": db_product.name,
+            "write_off_quantity": quantity,
+            "old_quantity": current_qty,
+            "new_quantity": db_product.total_quantity,
+        },
+        summary=f"Списал {quantity} ед. товара '{db_product.name}' (было {current_qty})",
+        ip_address=get_client_ip(request),
+        user_agent=request.headers.get("user-agent"),
+    )
+
     return db_product
 
 

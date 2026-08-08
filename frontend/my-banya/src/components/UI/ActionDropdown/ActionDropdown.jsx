@@ -95,6 +95,7 @@ function ActionDropdown({ actions, buttonText = 'Действия' }) {
       red: 'text-red-600 hover:bg-red-50',
       blue: 'text-blue-600 hover:bg-blue-50',
       yellow: 'text-yellow-600 hover:bg-yellow-50',
+      orange: 'text-orange-600 hover:bg-orange-50',
       purple: 'text-purple-600 hover:bg-purple-50',
       gray: 'text-gray-600 hover:bg-gray-50',
     };
