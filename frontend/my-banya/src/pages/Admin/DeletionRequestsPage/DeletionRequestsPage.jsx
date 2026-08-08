@@ -12,11 +12,10 @@ import ActionDropdown from '../../../components/UI/ActionDropdown/ActionDropdown
 const DeletionRequestsPage = () => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
-  const markedIds = useSelector(state => state.deletionRequests); // это массив!
+  const markedIds = useSelector(state => state.deletionRequests);
   const { data: products = [] } = useGetProductsQuery();
   const [deleteProduct] = useDeleteProductMutation();
 
-  // ✅ Используем .includes(), а не .has()
   const requests = products.filter(p => markedIds.includes(p.id));
 
   const handleConfirmDelete = async (productId) => {
@@ -39,19 +38,20 @@ const DeletionRequestsPage = () => {
 
   if (requests.length === 0) {
     return (
-      <div className="p-8">
-        <h1 className="text-2xl font-bold mb-6">Запросы на удаление</h1>
-        <div className="bg-white rounded-2xl shadow p-12 text-center">
-          <p className="text-gray-500">Нет запросов на удаление</p>
+      <div className="p-4 md:p-8">
+        <h1 className="text-xl md:text-2xl font-bold mb-4 md:mb-6">Запросы на удаление</h1>
+        <div className="bg-white rounded-2xl shadow p-10 md:p-12 text-center">
+          <p className="text-gray-500 text-sm">Нет запросов</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="p-8">
-      <h1 className="text-2xl font-bold mb-6">Запросы на удаление</h1>
-      <div className="bg-white rounded-2xl shadow">
+    <div className="p-4 md:p-8">
+      <h1 className="text-xl md:text-2xl font-bold mb-4 md:mb-6">Запросы на удаление</h1>
+
+      <div className="hidden md:block bg-white rounded-2xl shadow overflow-hidden">
         <table className="table-auto w-full">
           <thead className="bg-gray-50">
             <tr>
@@ -68,24 +68,9 @@ const DeletionRequestsPage = () => {
                 <td className="px-6 py-4">
                   <ActionDropdown
                     actions={[
-                      {
-                        label: 'Редактировать',
-                        icon: '✏️',
-                        color: 'blue',
-                        onClick: () => handleEdit(product.id),
-                      },
-                      {
-                        label: 'Удалить',
-                        icon: '🗑️',
-                        color: 'red',
-                        onClick: () => handleConfirmDelete(product.id),
-                      },
-                      {
-                        label: 'Отменить запрос',
-                        icon: '❌',
-                        color: 'gray',
-                        onClick: () => handleCancelRequest(product.id),
-                      },
+                      { label: 'Редактировать', color: 'blue', onClick: () => handleEdit(product.id) },
+                      { label: 'Удалить', color: 'red', onClick: () => handleConfirmDelete(product.id) },
+                      { label: 'Отменить запрос', color: 'gray', onClick: () => handleCancelRequest(product.id) },
                     ]}
                   />
                 </td>
@@ -93,6 +78,38 @@ const DeletionRequestsPage = () => {
             ))}
           </tbody>
         </table>
+      </div>
+
+      <div className="md:hidden space-y-3">
+        {requests.map((product) => (
+          <div key={product.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
+            <p className="font-semibold text-gray-900">{product.name}</p>
+            <p className="text-xs text-gray-500 mt-1 line-clamp-2">{product.description || '—'}</p>
+            <div className="grid grid-cols-1 gap-2 mt-4">
+              <button
+                type="button"
+                onClick={() => handleEdit(product.id)}
+                className="min-h-[44px] rounded-xl bg-blue-50 text-blue-700 text-sm font-medium"
+              >
+                Редактировать
+              </button>
+              <button
+                type="button"
+                onClick={() => handleConfirmDelete(product.id)}
+                className="min-h-[44px] rounded-xl bg-red-50 text-red-700 text-sm font-medium"
+              >
+                Удалить
+              </button>
+              <button
+                type="button"
+                onClick={() => handleCancelRequest(product.id)}
+                className="min-h-[44px] rounded-xl bg-gray-100 text-gray-700 text-sm font-medium"
+              >
+                Отменить
+              </button>
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );

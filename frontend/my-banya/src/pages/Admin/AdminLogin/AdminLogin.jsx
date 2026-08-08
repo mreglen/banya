@@ -6,6 +6,7 @@ import { setCredentials } from '../../../redux/slices/authSlice';
 import { login, getProfile } from '../../../redux/slices/adminApi'; // ← getProfile
 import { toast } from 'react-hot-toast';
 import SeoHead from '../../../components/Seo/SeoHead';
+import { MOBILE_HOME_PATH } from '../../../config/adminNavConfig';
 
 function AdminLogin() {
   const navigate = useNavigate();
@@ -58,7 +59,8 @@ function AdminLogin() {
       
       console.log('\n✅ Navigation to admin panel...\n');
       toast.success(`Добро пожаловать, ${user.first_name || 'Администратор'}!`);
-      navigate('/admin');
+      const isMobile = window.matchMedia('(max-width: 767px)').matches;
+      navigate(isMobile ? MOBILE_HOME_PATH : '/admin');
     } catch (err) {
       console.error('❌ Login error:', err);
       console.error('Response:', err.response?.data);

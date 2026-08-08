@@ -42,6 +42,7 @@ import {
   Info
 } from 'lucide-react';
 import AdminDashboardSkeleton from './AdminDashboardSkeleton';
+import MobileAdminSummary from './MobileAdminSummary';
 
 const COLORS = ['#10b981', '#3b82f6', '#8b5cf6', '#f59e0b', '#ef4444'];
 
@@ -110,6 +111,14 @@ function AdminDashboard() {
 
   return (
     <div className="p-4 sm:p-8 space-y-8 bg-gray-50/50 min-h-screen">
+      <MobileAdminSummary
+        stats={stats}
+        recentActivity={recentActivity}
+        userName={userName}
+        greeting={greeting}
+      />
+
+      <div className="hidden md:block space-y-8">
       {/* Welcome Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
@@ -428,6 +437,7 @@ function AdminDashboard() {
             </NavLink>
           ))}
         </div>
+      </div>
       </div>
     </div>
   );

@@ -3,7 +3,9 @@ import { useState, useEffect } from 'react';
 import { Outlet, useLocation, NavLink } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { useGetPermissionsQuery } from '../../redux/slices/apiSlice';
-import MobileSidebar from './MobileSidebar';
+import { useUnreadBookingsCount } from '../../hooks/useUnreadBookingsCount';
+import { getAdminPageTitle } from '../../config/adminNavConfig';
+import AdminMobileEntryRedirect from '../../components/Admin/AdminMobileEntryRedirect';
 import MobileBottomNav from '../../components/Admin/MobileBottomNav';
 import SeoHead from '../../components/Seo/SeoHead';
 import { 
@@ -35,50 +37,11 @@ function Admin() {
   const { user } = useSelector((state) => state.auth);
   const { permissions = [] } = useGetPermissionsQuery();
 
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isCompanyOpen, setIsCompanyOpen] = useState(false);
   const [isDocumentsOpen, setIsDocumentsOpen] = useState(false);
   const [isStorageOpen, setIsStorageOpen] = useState(false);
 
-  // Map of routes to page titles
-  const getPageTitle = () => {
-    const path = location.pathname;
-    
-    const pageTitles = {
-      '/admin/': 'Главная',
-      '/admin/administrator': 'Администратор',
-      '/admin/reservations': 'Бронирование',
-      '/admin/company/user': 'Сотрудники',
-      '/admin/company/partner': 'Поставщики',
-      '/admin/company/organization': 'Организация',
-      '/admin/documents/entrance': 'Поступление',
-      '/admin/documents/entrance/drafts': 'Черновики поступления',
-      '/admin/documents/realization': 'Реализация',
-      '/admin/documents/product-requests': 'Заявки на товар',
-      '/admin/storage/nomenclature': 'Номенклатура',
-      '/admin/settings': 'Настройки',
-      '/admin/support': 'Поддержка',
-      '/admin/deletion-requests': 'Запросы на удаление',
-      '/admin/bookings': 'Заявки с сайта',
-      '/admin/baths': 'Бани',
-      '/admin/promotions': 'Акции',
-      '/admin/finance': 'Финансы',
-    };
-
-    // Check for exact match first
-    if (pageTitles[path]) {
-      return pageTitles[path];
-    }
-
-    // Check for partial matches
-    for (const [route, title] of Object.entries(pageTitles)) {
-      if (path.startsWith(route)) {
-        return title;
-      }
-    }
-
-    return 'Админ панель';
-  };
+  const pageTitle = getAdminPageTitle(location.pathname);
 
   // Автооткрытие секций при навигации (десктоп)
   useEffect(() => {
@@ -86,8 +49,6 @@ function Admin() {
     setIsDocumentsOpen(location.pathname.startsWith('/admin/documents'));
     setIsStorageOpen(location.pathname.startsWith('/admin/storage'));
   }, [location.pathname]);
-
-  const toggleMobileMenu = () => setMobileMenuOpen(!mobileMenuOpen);
 
   const handleLogout = () => {
     localStorage.removeItem('access_token');
@@ -106,6 +67,10 @@ function Admin() {
     if (!perm) return true;
     return perm.allowed_roles.includes(user.role_id);
   };
+
+  const unreadBookingsCount = useUnreadBookingsCount({
+    skip: !hasAccess('/admin/bookings'),
+  });
 
   // Десктопный сайдбар (виден только на md+)
   const DesktopSidebar = () => (
@@ -354,8 +319,13 @@ function Admin() {
               }`
             }
           >
-            <Globe className="w-5 h-5 mr-3" />
-            Заявки с сайта
+            <Globe className="w-5 h-5 mr-3 flex-shrink-0" />
+            <span className="flex-1">Заявки с сайта</span>
+            {unreadBookingsCount > 0 && (
+              <span className="ml-2 min-w-[1.25rem] h-5 px-1.5 rounded-full bg-red-500 text-white text-xs font-semibold flex items-center justify-center">
+                {unreadBookingsCount > 99 ? '99+' : unreadBookingsCount}
+              </span>
+            )}
           </NavLink>
         )}
 
@@ -451,38 +421,18 @@ function Admin() {
   return (
     <div className="min-h-screen bg-gray-50 flex">
       <SeoHead title="Админ-панель" noindex />
-      {/* Desktop Sidebar */}
+      <AdminMobileEntryRedirect />
       <DesktopSidebar />
 
-      {/* Mobile Header */}
-      <header className="md:hidden fixed top-0 left-0 right-0 z-40 bg-white shadow-sm p-4 flex items-center">
-        <button
-          onClick={toggleMobileMenu}
-          className="text-gray-700 focus:outline-none"
-        >
-          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
-          </svg>
-        </button>
-        <h1 className="ml-4 text-lg font-bold">{getPageTitle()}</h1>
+      <header className="md:hidden fixed top-0 left-0 right-0 z-30 bg-white/95 backdrop-blur border-b border-gray-100 px-4 py-3 flex items-center justify-center"
+        style={{ paddingTop: 'max(0.75rem, env(safe-area-inset-top))' }}>
+        <h1 className="text-base font-bold text-gray-900 truncate">{pageTitle}</h1>
       </header>
 
-      {/* Main Content */}
-      <main className="flex-1 md:ml-0 ml-0 pt-16 md:pt-0 p-4 md:p-8 pb-20 md:pb-8">
+      <main className="flex-1 md:ml-0 ml-0 pt-14 md:pt-0 px-3 md:px-8 py-3 md:py-8 pb-20 md:pb-8">
         <Outlet />
       </main>
 
-      {/* Mobile Sidebar */}
-      <MobileSidebar
-        isOpen={mobileMenuOpen}
-        onClose={() => setMobileMenuOpen(false)}
-        // Передаём данные в мобильное меню, если оно использует hasAccess и т.д.
-        user={user}
-        permissions={permissions}
-        location={location}
-      />
-
-      {/* Mobile Bottom Navigation */}
       <MobileBottomNav />
     </div>
   );

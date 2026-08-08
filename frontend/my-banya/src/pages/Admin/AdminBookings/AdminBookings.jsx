@@ -9,7 +9,6 @@ import AddBookingModal from '../Reservations/AddBookingModal';
 function AdminBookings() {
   const navigate = useNavigate();
   const [markAsRead] = useMarkBookingAsReadMutation();
-  const [expandedNotes, setExpandedNotes] = useState(new Set());
   const [showReadBookings, setShowReadBookings] = useState(false);
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
   const [bookingToConfirm, setBookingToConfirm] = useState(null);
@@ -24,24 +23,6 @@ function AdminBookings() {
     } catch (err) {
       console.error('Ошибка при отметке заявки как прочитанной:', err);
     }
-  };
-
-  const toggleNote = (bookingId) => {
-    setExpandedNotes(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(bookingId)) {
-        newSet.delete(bookingId);
-      } else {
-        newSet.add(bookingId);
-      }
-      return newSet;
-    });
-  };
-
-  // Функция для обрезки текста до 100 символов
-  const truncateText = (text, maxLength = 100) => {
-    if (text.length <= maxLength) return text;
-    return text.substring(0, maxLength) + '...';
   };
 
   if (isLoading) {
@@ -62,90 +43,62 @@ function AdminBookings() {
   const renderBookingCard = (booking, extraClassName = '') => (
     <div
       key={booking.booking_id}
-      className={`border rounded-lg md:rounded-xl p-4 md:p-6 transition-all ${extraClassName} ${
+      className={`rounded-2xl p-4 transition-all ${extraClassName} ${
         booking.isUnread
-          ? 'border-blue-300 bg-blue-50 shadow-md'
-          : 'border-gray-200 bg-white'
+          ? 'border-2 border-blue-200 bg-blue-50/50 shadow-sm'
+          : 'border border-gray-200 bg-white shadow-sm'
       }`}
     >
-      <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-3 mb-4">
-        <div className="flex-1">
-          <div className="flex items-center gap-2 mb-2">
-            {booking.isUnread && (
-              <span className="w-3 h-3 bg-blue-500 rounded-full flex-shrink-0"></span>
-            )}
-            <h3 className="font-medium text-gray-800 text-sm md:text-base">
-              {booking.name} — {booking.formattedDate}
-            </h3>
-          </div>
-          <p className="text-xs md:text-sm text-gray-600 mb-1">
-            {booking.phone} | {booking.email || '—'}
-          </p>
-          <p className="text-xs md:text-sm text-gray-600 mb-1">
-            Баня: {booking.bath?.name || '—'} | {booking.duration_hours} ч. | {booking.guests} гостей
-          </p>
-          {booking.notes && (
-            <div className="mt-2">
-              <p
-                className="text-sm text-gray-700 italic"
-                style={{
-                  whiteSpace: 'pre-wrap',
-                  wordBreak: 'break-word',
-                  overflowWrap: 'break-word',
-                  hyphens: 'auto'
-                }}
-              >
-                <strong>Примечание:</strong>{' '}
-                {expandedNotes.has(booking.booking_id)
-                  ? booking.notes
-                  : truncateText(booking.notes)
-                }
-              </p>
-              {booking.notes.length > 100 && (
-                <button
-                  onClick={() => toggleNote(booking.booking_id)}
-                  className="text-blue-600 hover:text-blue-800 text-xs mt-1 underline"
-                >
-                  {expandedNotes.has(booking.booking_id) ? 'Свернуть' : 'Показать полностью'}
-                </button>
-              )}
-            </div>
-          )}
+      <div className="flex items-start justify-between gap-2 mb-2">
+        <div className="min-w-0 flex-1">
+          <p className="font-semibold text-gray-900 truncate">{booking.name}</p>
+          <p className="text-xs text-gray-500 mt-0.5">{booking.formattedDate}</p>
         </div>
-        <div className="flex items-center gap-2 mt-3 md:mt-0">
-          <button
-            onClick={() => {
-              setBookingToConfirm(booking);
-              setIsConfirmModalOpen(true);
-            }}
-            className="w-full md:w-auto px-4 py-2 rounded-lg text-xs md:text-sm font-medium transition min-h-[44px] bg-blue-100 text-blue-700 hover:bg-blue-200"
-          >
-            Подтвердить бронь
-          </button>
-          <button
-            onClick={() => handleMarkAsRead(booking.booking_id)}
-            disabled={booking.is_read}
-            className={`w-full md:w-auto px-4 py-2 rounded-lg text-xs md:text-sm font-medium transition min-h-[44px] ${
-              booking.is_read
-                ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
-                : 'bg-green-100 text-green-700 hover:bg-green-200'
-            }`}
-          >
-            {booking.is_read ? 'Прочитано' : 'Отметить как прочитанное'}
-          </button>
-        </div>
+        {booking.isUnread && (
+          <span className="flex-shrink-0 px-2 py-0.5 rounded-full bg-blue-500 text-white text-[10px] font-bold">
+            NEW
+          </span>
+        )}
       </div>
-      <div className="text-xs text-gray-500">
-        Отправлено: {booking.formattedTime}
+      <div className="text-xs text-gray-600 space-y-1 mb-3">
+        <p>{booking.phone}</p>
+        <p>{booking.bath?.name || '—'} · {booking.duration_hours} ч · {booking.guests} гост.</p>
+      </div>
+      {booking.notes && (
+        <p className="text-xs text-gray-500 mb-3 line-clamp-2">{booking.notes}</p>
+      )}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+        <button
+          type="button"
+          onClick={() => {
+            setBookingToConfirm(booking);
+            setIsConfirmModalOpen(true);
+          }}
+          className="min-h-[44px] rounded-xl bg-blue-600 text-white text-sm font-medium"
+        >
+          Подтвердить
+        </button>
+        <button
+          type="button"
+          onClick={() => handleMarkAsRead(booking.booking_id)}
+          disabled={booking.is_read}
+          className={`min-h-[44px] rounded-xl text-sm font-medium ${
+            booking.is_read
+              ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+              : 'bg-green-50 text-green-700'
+          }`}
+        >
+          {booking.is_read ? 'Прочитано' : 'Прочитать'}
+        </button>
       </div>
     </div>
   );
 
   return (
-    <div className="p-2 md:p-8">
-      <div className="bg-white rounded-xl md:rounded-2xl shadow-md border border-gray-200 p-4 md:p-8">
-        <h2 className="text-lg md:text-2xl font-semibold text-gray-800 mb-4 md:mb-6">Заявки с сайта</h2>
-        <div className="space-y-4">
+    <div className="md:p-8">
+      <div className="md:bg-white md:rounded-2xl md:shadow-md md:border md:border-gray-200 md:p-8">
+        <h2 className="hidden md:block text-lg md:text-2xl font-semibold text-gray-800 mb-4 md:mb-6">Заявки с сайта</h2>
+        <div className="space-y-3 md:space-y-4">
           {bookings.length === 0 ? (
             <div className="text-gray-500 text-center py-8">
               Нет заявок

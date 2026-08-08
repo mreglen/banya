@@ -14,6 +14,7 @@ import BathsCard from './pages/Baths/BathsCard/BathsCard';
 import AdminLogin from './pages/Admin/AdminLogin/AdminLogin';
 import PrivateRoute from './components/PrivateRoute';
 import Admin from './pages/Admin/Admin';
+import AdminMobileHomeRedirect from './components/Admin/AdminMobileHomeRedirect';
 import RoleBasedRoute from './pages/Admin/Company/RoleBasedRoute/RoleBasedRoute';
 import { Toaster } from 'react-hot-toast';
 
@@ -77,7 +78,7 @@ function AppWithLayout() {
 
   useEffect(() => {
     if (isPwaStandalone() && location.pathname === '/') {
-      navigate('/admin', { replace: true });
+      navigate('/admin/documents/realization', { replace: true });
     }
   }, [location.pathname, navigate]);
 
@@ -140,8 +141,12 @@ function AppWithLayout() {
             <Admin />
           </PrivateRoute>
         }>
-          {/* <Route index element={<div>Добро пожаловать в админ-панель</div>} /> */}
-          <Route index element={withAdminSuspense(<AdminDashboard />)} />
+          <Route index element={withAdminSuspense(
+            <AdminMobileHomeRedirect>
+              <AdminDashboard />
+            </AdminMobileHomeRedirect>
+          )} />
+          <Route path="summary" element={withAdminSuspense(<AdminDashboard />)} />
 
           <Route path="administrator" element={withAdminSuspense(<RoleBasedRoute adminOnly><AdministratorHubPage /></RoleBasedRoute>)} />
           <Route path="administrator/audit" element={withAdminSuspense(<RoleBasedRoute adminOnly><AdministratorAuditPage /></RoleBasedRoute>)} />

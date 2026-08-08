@@ -19,6 +19,14 @@ const STATUS_STYLES = {
   'отменено': 'bg-gray-50 text-gray-800 border-gray-200',
 };
 
+const QUICK_FILTERS = [
+  { id: 'all', label: 'Все' },
+  { id: 'today', label: 'Сегодня' },
+  { id: 'waiting', label: 'Ожидают', status: 'в ожидании' },
+  { id: 'active', label: 'В работе', status: 'в работе' },
+  { id: 'closed', label: 'Закрыты', status: 'закрыт' },
+];
+
 function getStatusStyle(status) {
   const key = String(status || '').trim().toLowerCase();
   return STATUS_STYLES[key] || 'bg-gray-100 text-gray-800 border-gray-300';
@@ -44,9 +52,28 @@ function formatDateTimeRange(startIso, endIso) {
   return `${datePart}, ${start.toLocaleTimeString('ru-RU', timeOpts)} – ${end.toLocaleTimeString('ru-RU', timeOpts)}`;
 }
 
+function formatMobileTime(startIso, endIso) {
+  if (!startIso) return '—';
+  const start = new Date(startIso);
+  const end = endIso ? new Date(endIso) : null;
+  const datePart = start.toLocaleDateString('ru-RU', { day: '2-digit', month: 'short' });
+  const startTime = start.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+  const endTime = end ? end.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) : '';
+  return endTime ? `${datePart} · ${startTime}–${endTime}` : `${datePart} · ${startTime}`;
+}
+
 function formatPrice(price) {
   if (price == null || Number.isNaN(Number(price))) return '—';
   return `${Number(price).toLocaleString('ru-RU')} ₽`;
+}
+
+function normalizeStatus(status) {
+  return String(status || '').trim().toLowerCase();
+}
+
+function isSameDay(dateIso, ymd) {
+  if (!dateIso) return false;
+  return formatLocalYmd(new Date(dateIso)) === ymd;
 }
 
 function DocumentsRealization() {
@@ -62,12 +89,16 @@ function DocumentsRealization() {
   const [deleteReservation] = useDeleteReservationMutation();
 
   const [editingBooking, setEditingBooking] = useState(null);
+  const [quickFilter, setQuickFilter] = useState('all');
+  const [mobileSearch, setMobileSearch] = useState('');
   const [searchFilters, setSearchFilters] = useState({
     reservation_id: '',
     client_name: '',
     bath_name: '',
     status: '',
   });
+
+  const todayYmd = formatLocalYmd(new Date());
 
   const bathNameById = useMemo(() => {
     const map = new Map();
@@ -83,6 +114,7 @@ function DocumentsRealization() {
       reservations.map((res) => ({
         ...res,
         bath_name: bathNameById.get(Number(res.bath_id)) || '—',
+        statusKey: normalizeStatus(res.status),
       })),
     [reservations, bathNameById]
   );
@@ -108,8 +140,20 @@ function DocumentsRealization() {
       refetch();
     } catch (err) {
       console.error('Ошибка удаления:', err);
-      alert('❌ Не удалось удалить бронь');
+      alert('Не удалось удалить бронь');
     }
+  };
+
+  const applyQuickFilter = (list, filterId) => {
+    const filter = QUICK_FILTERS.find((f) => f.id === filterId);
+    if (!filter || filter.id === 'all') return list;
+    if (filter.id === 'today') {
+      return list.filter((res) => isSameDay(res.start_datetime, todayYmd));
+    }
+    if (filter.status) {
+      return list.filter((res) => res.statusKey === filter.status);
+    }
+    return list;
   };
 
   const filteredReservations = enrichedReservations.filter((res) => {
@@ -124,9 +168,43 @@ function DocumentsRealization() {
     );
   });
 
+  const mobileFiltered = applyQuickFilter(
+    filteredReservations.filter((res) => {
+      if (!mobileSearch.trim()) return true;
+      const q = mobileSearch.trim().toLowerCase();
+      return (
+        String(res.reservation_id).includes(q) ||
+        (res.client_name || '').toLowerCase().includes(q) ||
+        (res.bath_name || '').toLowerCase().includes(q)
+      );
+    }),
+    quickFilter
+  );
+
   const sortedReservations = [...filteredReservations].sort(
     (a, b) => new Date(b.start_datetime) - new Date(a.start_datetime)
   );
+
+  const sortedMobileReservations = [...mobileFiltered].sort(
+    (a, b) => new Date(b.start_datetime) - new Date(a.start_datetime)
+  );
+
+  const filterCounts = useMemo(() => {
+    const counts = { all: filteredReservations.length };
+    QUICK_FILTERS.forEach((f) => {
+      if (f.id === 'all') return;
+      if (f.id === 'today') {
+        counts[f.id] = filteredReservations.filter((res) =>
+          isSameDay(res.start_datetime, todayYmd)
+        ).length;
+      } else if (f.status) {
+        counts[f.id] = filteredReservations.filter(
+          (res) => res.statusKey === f.status
+        ).length;
+      }
+    });
+    return counts;
+  }, [filteredReservations, todayYmd]);
 
   const selectedDateForModal = editingBooking?.start_datetime
     ? formatLocalYmd(new Date(editingBooking.start_datetime))
@@ -141,7 +219,7 @@ function DocumentsRealization() {
       <div className="min-h-screen bg-gray-50 p-4 md:p-8">
         <div className="max-w-3xl mx-auto">
           <div className="bg-white rounded-xl sm:rounded-2xl shadow p-6 border border-red-100">
-            <h1 className="text-2xl md:text-3xl font-bold text-gray-800 mb-3">Документы реализации</h1>
+            <h1 className="text-2xl md:text-3xl font-bold text-gray-800 mb-3">Реализация</h1>
             <p className="text-red-700 mb-3">Не удалось загрузить брони.</p>
             <p className="text-sm text-gray-600 mb-4">
               {error?.data?.detail || error?.error || 'Проверьте доступность backend API.'}
@@ -160,13 +238,43 @@ function DocumentsRealization() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4 md:p-8">
+    <div className="min-h-screen bg-gray-50 md:p-8">
       <div className="max-w-7xl mx-auto">
-        <div className="mb-6 md:mb-8">
+        <div className="hidden md:block mb-6 md:mb-8">
           <h1 className="text-2xl md:text-3xl font-bold text-gray-800">Документы реализации</h1>
           <p className="text-gray-600 mt-1 md:mt-2">
             Все брони — нажмите на строку, чтобы открыть и отредактировать
           </p>
+        </div>
+
+        {/* Mobile toolbar */}
+        <div className="md:hidden sticky top-14 z-20 bg-gray-50 pb-2 -mx-3 px-3 pt-1 space-y-2">
+          <input
+            type="search"
+            value={mobileSearch}
+            onChange={(e) => setMobileSearch(e.target.value)}
+            placeholder="Поиск..."
+            className="w-full min-h-[44px] px-4 rounded-xl border border-gray-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-green-500/30"
+          />
+          <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+            {QUICK_FILTERS.map((filter) => (
+              <button
+                key={filter.id}
+                type="button"
+                onClick={() => setQuickFilter(filter.id)}
+                className={`flex-shrink-0 min-h-[36px] px-3 rounded-full text-xs font-semibold border transition ${
+                  quickFilter === filter.id
+                    ? 'bg-green-600 text-white border-green-600'
+                    : 'bg-white text-gray-700 border-gray-200'
+                }`}
+              >
+                {filter.label}
+                {filterCounts[filter.id] != null && (
+                  <span className="ml-1 opacity-80">{filterCounts[filter.id]}</span>
+                )}
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Desktop Table */}
@@ -282,51 +390,40 @@ function DocumentsRealization() {
         </div>
 
         {/* Mobile Cards */}
-        <div className="md:hidden space-y-4">
-          {sortedReservations.length > 0 ? (
-            sortedReservations.map((res) => (
-              <div
+        <div className="md:hidden space-y-3 pb-2">
+          {sortedMobileReservations.length > 0 ? (
+            sortedMobileReservations.map((res) => (
+              <button
                 key={res.reservation_id}
-                role="button"
-                tabIndex={0}
-                className="bg-white rounded-xl shadow p-4 border border-gray-100 cursor-pointer"
+                type="button"
+                className="w-full text-left bg-white rounded-2xl shadow-sm p-4 border border-gray-100 active:scale-[0.99] transition"
                 onClick={() => handleOpenBooking(res)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    handleOpenBooking(res);
-                  }
-                }}
               >
-                <div className="font-bold text-gray-900 text-lg mb-1">Бронь #{res.reservation_id}</div>
-                <div className="text-sm text-gray-600 mb-2 space-y-1">
-                  <div>👤 {res.client_name || '—'}</div>
-                  <div>🛁 {res.bath_name || '—'}</div>
-                  <div>📅 {formatDateTimeRange(res.start_datetime, res.end_datetime)}</div>
-                  <div>💰 {formatPrice(res.total_cost)}</div>
-                </div>
-                <div className="flex items-center justify-between gap-2">
+                <div className="flex items-start justify-between gap-2 mb-2">
                   <span
-                    className={`px-2 py-1 rounded-full text-xs font-medium border ${getStatusStyle(res.status)}`}
+                    className={`px-2.5 py-1 rounded-full text-xs font-semibold border ${getStatusStyle(res.status)}`}
                   >
                     {res.status || '—'}
                   </span>
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleDelete(res.reservation_id);
-                    }}
-                    className="px-3 py-1.5 bg-red-100 text-red-800 rounded-lg text-sm font-medium hover:bg-red-200 transition"
-                  >
-                    Удалить
-                  </button>
+                  <span className="text-base font-bold text-gray-900">
+                    {formatPrice(res.total_cost)}
+                  </span>
                 </div>
-              </div>
+                <p className="text-sm font-semibold text-gray-900 truncate">
+                  {res.client_name || '—'}
+                </p>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  {formatMobileTime(res.start_datetime, res.end_datetime)}
+                </p>
+                <div className="flex items-center justify-between mt-3 pt-3 border-t border-gray-100">
+                  <span className="text-xs text-gray-600 truncate">{res.bath_name}</span>
+                  <span className="text-xs text-gray-400">#{res.reservation_id}</span>
+                </div>
+              </button>
             ))
           ) : (
-            <div className="bg-white rounded-xl shadow p-8 text-center text-gray-500">
-              Брони не найдены.
+            <div className="bg-white rounded-2xl shadow-sm p-10 text-center text-gray-500 text-sm">
+              Брони не найдены
             </div>
           )}
         </div>

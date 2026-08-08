@@ -4,7 +4,7 @@ import baseQuery from '../../utils/baseQuery';
 export const apiSlice = createApi({
   reducerPath: 'api',
   baseQuery,
-  tagTypes: ['Baths', 'Partners', 'Clients', 'Users', 'Roles', 'Reservations', 'Bookings', 'ReservationStatus', 'Permissions', 'Promotions', 'AuditLogs', 'Organization', 'Finance'],
+  tagTypes: ['Baths', 'Partners', 'Clients', 'Users', 'Roles', 'Reservations', 'Bookings', 'ReservationStatus', 'Permissions', 'Promotions', 'AuditLogs', 'Organization', 'Finance', 'Dashboard'],
 
   endpoints: (builder) => ({
     // ========================
@@ -139,7 +139,10 @@ export const apiSlice = createApi({
         url: `/bookings/${id}/mark-read`,
         method: 'PUT',
       }),
-      invalidatesTags: [{ type: 'Bookings', id: 'LIST' }],
+      invalidatesTags: [
+        { type: 'Bookings', id: 'LIST' },
+        { type: 'Dashboard', id: 'statistics' },
+      ],
     }),
 
     createBooking: builder.mutation({
@@ -148,7 +151,10 @@ export const apiSlice = createApi({
         method: 'POST',
         body: bookingData,
       }),
-      invalidatesTags: [{ type: 'Bookings', id: 'LIST' }],
+      invalidatesTags: [
+        { type: 'Bookings', id: 'LIST' },
+        { type: 'Dashboard', id: 'statistics' },
+      ],
     }),
     getBookingAvailability: builder.query({
       query: ({ date, bath_id, days = 2 }) =>

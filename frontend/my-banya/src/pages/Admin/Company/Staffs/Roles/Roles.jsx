@@ -170,7 +170,8 @@ function Roles() {
           ) : roles.length === 0 ? (
             <div className="p-6 text-gray-500">Роли не найдены</div>
           ) : (
-            <table className="w-full">
+            <>
+            <table className="hidden md:table w-full">
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
                   <th className="px-6 py-4 text-left text-sm font-medium text-gray-700 uppercase">Название роли</th>
@@ -192,13 +193,11 @@ function Roles() {
                         actions={[
                           {
                             label: 'Редактировать',
-                            icon: '✏️',
                             color: 'blue',
                             onClick: () => openEditModal(role),
                           },
                           {
                             label: 'Удалить',
-                            icon: '🗑️',
                             color: 'red',
                             onClick: () => setDeleteConfirmId(role.id),
                           },
@@ -209,6 +208,28 @@ function Roles() {
                 ))}
               </tbody>
             </table>
+
+            <div className="md:hidden divide-y divide-gray-100">
+              {roles.map((role) => (
+                <div key={role.id} className="p-4 flex items-center justify-between gap-3">
+                  <button
+                    type="button"
+                    className="flex-1 text-left min-h-[44px]"
+                    onClick={() => openEditModal(role)}
+                  >
+                    <p className="font-semibold text-gray-900">{role.name}</p>
+                    <p className="text-xs text-gray-500">{(role.permissions || []).length} прав</p>
+                  </button>
+                  <ActionDropdown
+                    actions={[
+                      { label: 'Редактировать', color: 'blue', onClick: () => openEditModal(role) },
+                      { label: 'Удалить', color: 'red', onClick: () => setDeleteConfirmId(role.id) },
+                    ]}
+                  />
+                </div>
+              ))}
+            </div>
+            </>
           )}
         </div>
       </div>

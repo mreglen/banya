@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { NavLink } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { useGetPermissionsQuery } from '../../redux/slices/apiSlice';
+import { useUnreadBookingsCount } from '../../hooks/useUnreadBookingsCount';
 import { 
   ShieldCheck, 
   CalendarDays, 
@@ -30,6 +31,7 @@ import {
 function MobileSidebar({ isOpen, onClose }) {
   const { user } = useSelector((state) => state.auth);
   const { permissions = [] } = useGetPermissionsQuery();
+  const unreadBookingsCount = useUnreadBookingsCount();
 
   const [isCompanyOpen, setIsCompanyOpen] = useState(false);
   const [isDocumentsOpen, setIsDocumentsOpen] = useState(false);
@@ -258,8 +260,13 @@ function MobileSidebar({ isOpen, onClose }) {
               className="flex items-center px-4 py-3 text-gray-700 hover:bg-green-50 rounded-xl"
               onClick={onClose}
             >
-              <Globe className="w-5 h-5 mr-3" />
-              Заявки с сайта
+              <Globe className="w-5 h-5 mr-3 flex-shrink-0" />
+              <span className="flex-1">Заявки с сайта</span>
+              {unreadBookingsCount > 0 && (
+                <span className="ml-2 min-w-[1.25rem] h-5 px-1.5 rounded-full bg-red-500 text-white text-xs font-semibold flex items-center justify-center">
+                  {unreadBookingsCount > 99 ? '99+' : unreadBookingsCount}
+                </span>
+              )}
             </NavLink>
 
             <NavLink
