@@ -1487,8 +1487,7 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
           </div>
           </div>
 
-            {showReceipt && (
-            <aside className="lg:w-[26rem] xl:w-[30rem] border-t lg:border-t-0 lg:border-l border-gray-200 bg-gray-50 p-4 sm:p-5 overflow-y-auto min-h-0 flex-shrink-0 max-h-[42vh] lg:max-h-none overscroll-contain">
+            <aside className={`lg:w-[26rem] xl:w-[30rem] border-t lg:border-t-0 lg:border-l border-gray-200 bg-gray-50 p-4 sm:p-5 overflow-y-auto min-h-0 flex-shrink-0 max-h-[42vh] lg:max-h-none overscroll-contain ${showReceipt ? 'block' : 'hidden'} lg:block`}>
               <div className="bg-white border border-gray-300 rounded-xl shadow-sm p-4 text-base text-gray-900">
                 <header className="text-center border-b border-dashed border-gray-400 pb-3 mb-3">
                   <h3 className="text-lg font-bold uppercase tracking-wide">Общий чек</h3>
@@ -1615,7 +1614,6 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
                 )}
               </div>
             </aside>
-            )}
           </div>
 
         <div
@@ -1652,7 +1650,7 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
               type="button"
               onClick={() => setShowReceipt((prev) => !prev)}
               disabled={isSubmitting}
-              className={`flex-1 py-2.5 sm:py-3 px-4 rounded-xl font-medium text-base sm:text-lg transition disabled:opacity-50 ${
+              className={`lg:hidden flex-1 py-2.5 sm:py-3 px-4 rounded-xl font-medium text-base sm:text-lg transition disabled:opacity-50 ${
                 showReceipt
                   ? 'bg-amber-600 text-white hover:bg-amber-700'
                   : 'bg-amber-100 text-amber-900 hover:bg-amber-200'
