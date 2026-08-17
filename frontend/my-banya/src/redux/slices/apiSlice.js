@@ -1,5 +1,6 @@
 import { createApi } from '@reduxjs/toolkit/query/react';
 import baseQuery from '../../utils/baseQuery';
+import { formatYmdToRu } from '../../utils/dateLocal';
 
 export const apiSlice = createApi({
   reducerPath: 'api',
@@ -124,8 +125,8 @@ export const apiSlice = createApi({
         return response.map(booking => ({
           ...booking,
           isUnread: !booking.is_read,
-          formattedDate: new Date(booking.date).toLocaleDateString('ru-RU'),
-          formattedTime: new Date(booking.created_at).toLocaleTimeString('ru-RU', {
+          formattedDate: formatYmdToRu(booking.date),
+          formattedTime: booking.start_time || new Date(booking.created_at).toLocaleTimeString('ru-RU', {
             hour: '2-digit',
             minute: '2-digit'
           }),

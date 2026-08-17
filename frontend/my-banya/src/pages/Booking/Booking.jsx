@@ -8,6 +8,7 @@ import {
 } from '../../redux/slices/apiSlice';
 import SeoHead from '../../components/Seo/SeoHead';
 import SEO from '../../config/seo';
+import { formatLocalYmd, formatLocalHm } from '../../utils/dateLocal';
 
 function Booking() {
   const [createBooking, { isLoading, isError, error }] = useCreateBookingMutation();
@@ -220,7 +221,8 @@ function Booking() {
 
       await createBooking({
         ...formData,
-        date: selectedStartSlot.slotStart.toISOString().slice(0, 10),
+        date: formatLocalYmd(selectedStartSlot.slotStart),
+        start_time: formatLocalHm(selectedStartSlot.slotStart),
         duration_hours: Math.round(selectedDurationHours),
         phone: normalizedPhone,
       }).unwrap();

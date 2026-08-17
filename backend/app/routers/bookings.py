@@ -70,6 +70,7 @@ def create_booking(booking: schemas.BookingCreate, db: Session = Depends(databas
     db_booking = models.Booking(
         bath_id=booking.bath_id,
         date=booking_date,
+        start_time=booking.start_time,
         duration_hours=booking.duration_hours,
         guests=booking.guests,
         name=booking.name,
@@ -87,6 +88,7 @@ def create_booking(booking: schemas.BookingCreate, db: Session = Depends(databas
         "booking_id": db_booking.booking_id,
         "bath_id": db_booking.bath_id,
         "date": db_booking.date.strftime("%Y-%m-%d"),
+        "start_time": db_booking.start_time,
         "duration_hours": db_booking.duration_hours,
         "guests": db_booking.guests,
         "name": db_booking.name,
@@ -121,6 +123,7 @@ def get_all_bookings(db: Session = Depends(database.get_db)):
             "booking_id": booking.booking_id,
             "bath_id": booking.bath_id,
             "date": booking.date.strftime("%Y-%m-%d"),
+            "start_time": booking.start_time,
             "duration_hours": booking.duration_hours,
             "guests": booking.guests,
             "name": booking.name,

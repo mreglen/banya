@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { useGetBookingsQuery, useMarkBookingAsReadMutation } from '../../../redux/slices/apiSlice';
 import AdminBookingsSkeleton from './AdminBookingsSkeleton';
 import AddBookingModal from '../Reservations/AddBookingModal';
+import { toYmd } from '../../../utils/dateLocal';
 
 function AdminBookings() {
   const navigate = useNavigate();
@@ -52,7 +53,10 @@ function AdminBookings() {
       <div className="flex items-start justify-between gap-2 mb-2">
         <div className="min-w-0 flex-1">
           <p className="font-semibold text-gray-900 truncate">{booking.name}</p>
-          <p className="text-xs text-gray-500 mt-0.5">{booking.formattedDate}</p>
+          <p className="text-xs text-gray-500 mt-0.5">
+            {booking.formattedDate}
+            {booking.start_time ? ` · ${booking.start_time}` : ''}
+          </p>
         </div>
         {booking.isUnread && (
           <span className="flex-shrink-0 px-2 py-0.5 rounded-full bg-blue-500 text-white text-[10px] font-bold">
@@ -141,11 +145,11 @@ function AdminBookings() {
             setIsConfirmModalOpen(false);
             setBookingToConfirm(null);
           }}
-          selectedDate={bookingToConfirm.date}
+          selectedDate={toYmd(bookingToConfirm.date)}
           prefillData={{
             bath_id: bookingToConfirm.bath_id,
-            date: bookingToConfirm.date,
-            start_time: '12:00',
+            date: toYmd(bookingToConfirm.date),
+            start_time: bookingToConfirm.start_time || '12:00',
             duration_hours: bookingToConfirm.duration_hours || 1,
             client_name: bookingToConfirm.name,
             client_phone: bookingToConfirm.phone,
@@ -157,7 +161,10 @@ function AdminBookings() {
             setIsConfirmModalOpen(false);
             setBookingToConfirm(null);
             navigate('/admin/reservations', {
-              state: { selectedDate: createdReservation?.selected_date || bookingToConfirm.date },
+              state: {
+                selectedDate:
+                  createdReservation?.selected_date || toYmd(bookingToConfirm.date),
+              },
             });
           }}
         />

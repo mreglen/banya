@@ -48,6 +48,7 @@ class Booking(Base):
     booking_id = Column(Integer, primary_key=True, index=True)
     bath_id = Column(Integer, ForeignKey("baths.bath_id"), nullable=False)
     date = Column(Date, nullable=False)
+    start_time = Column(String(5), nullable=True)
     duration_hours = Column(Integer, nullable=False)
     guests = Column(Integer, nullable=False)
     name = Column(String(100), nullable=False)

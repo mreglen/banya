@@ -171,6 +171,7 @@ class ReservationResponse(BaseModel):
 class BookingBase(BaseModel):
     bath_id: int
     date: str
+    start_time: Optional[str] = None
     duration_hours: int
     guests: int
     name: str
