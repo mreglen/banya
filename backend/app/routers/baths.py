@@ -12,6 +12,7 @@ from app.schemas import BathOut, BathCreate, BathUpdate
 from app.image_utils import process_image_to_webp
 from app.slug_utils import generate_slug, make_unique_slug
 from app.promotion_utils import serialize_promotion_brief
+from app.pricing_utils import validate_time_tariffs, sync_flat_costs_from_tariffs
 
 router = APIRouter(prefix="/baths", tags=["baths"])
 
@@ -25,6 +26,7 @@ def _serialize_bath(bath: Bath) -> dict:
         "title": bath.title,
         "cost_weekday": bath.cost_weekday,
         "cost_weekend": bath.cost_weekend,
+        "time_tariffs": bath.time_tariffs,
         "min_booking_hours": bath.min_booking_hours,
         "description": bath.description,
         "base_guests": bath.base_guests,
@@ -102,12 +104,23 @@ def create_bath(
     slug = make_unique_slug(base_slug, existing_slugs)
     
     # Создаём баню
+    try:
+        if bath.time_tariffs is not None:
+            validate_time_tariffs(bath.time_tariffs)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+    cost_weekday, cost_weekend = sync_flat_costs_from_tariffs(
+        bath.time_tariffs, bath.cost_weekday, bath.cost_weekend
+    )
+
     db_bath = Bath(
         slug=slug,
         name=bath.name,
         title=bath.title,
-        cost_weekday=bath.cost_weekday,
-        cost_weekend=bath.cost_weekend,
+        cost_weekday=cost_weekday,
+        cost_weekend=cost_weekend,
+        time_tariffs=bath.time_tariffs,
         min_booking_hours=bath.min_booking_hours,
         description=bath.description,
         base_guests=bath.base_guests,
@@ -147,6 +160,24 @@ def update_bath(
     # Обновляем основные поля
     update_data = bath_update.model_dump(exclude_unset=True)
     promotion_ids = update_data.pop('promotion_ids', None)
+    time_tariffs = update_data.pop('time_tariffs', None)
+    photo_urls = update_data.pop('photo_urls', None)
+
+    if time_tariffs is not None:
+        try:
+            validate_time_tariffs(time_tariffs)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc))
+        db_bath.time_tariffs = time_tariffs or None
+        wd, we = sync_flat_costs_from_tariffs(
+            db_bath.time_tariffs,
+            update_data.get('cost_weekday', db_bath.cost_weekday),
+            update_data.get('cost_weekend', db_bath.cost_weekend),
+        )
+        db_bath.cost_weekday = wd
+        db_bath.cost_weekend = we
+        update_data.pop('cost_weekday', None)
+        update_data.pop('cost_weekend', None)
     
     # Если обновляется name, перегенерируем slug
     if 'name' in update_data and update_data['name'] != db_bath.name:
@@ -155,15 +186,14 @@ def update_bath(
         update_data['slug'] = make_unique_slug(base_slug, existing_slugs)
     
     for key, value in update_data.items():
-        if key not in ["photo_urls"]:
-            setattr(db_bath, key, value)
+        setattr(db_bath, key, value)
 
     # Обработка фото: если передано — заменяем все
-    if bath_update.photo_urls is not None:
+    if photo_urls is not None:
         # Удаляем старые
         db.query(Photo).filter(Photo.bath_id == bath_id).delete()
         # Добавляем новые
-        for url in bath_update.photo_urls:
+        for url in photo_urls:
             db_photo = Photo(image_url=url, bath=db_bath)
             db.add(db_photo)
     

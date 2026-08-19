@@ -5,6 +5,7 @@ import { useState, useEffect } from 'react';
 import SeoHead from '../../../components/Seo/SeoHead';
 import { absoluteUrl } from '../../../config/seo';
 import { isVideoUrl } from '../../../utils/mediaHelpers';
+import { getPriceRangeLabel, hasTimeTariffs } from '../../../utils/bathPricing';
 
 function BathMedia({ url, alt, className, controls = false, muted = false }) {
   if (isVideoUrl(url)) {
@@ -193,14 +194,22 @@ function BathsCard() {
                   <div className="flex justify-between py-2 border-b border-gray-200">
                     <span className="text-gray-600">Цена с пн-чт:</span>
                     <span className="font-medium inline-flex items-baseline gap-1">
-                      <span>{bath.cost_weekday}</span>
+                      <span>
+                        {hasTimeTariffs(bath)
+                          ? `${getPriceRangeLabel(bath, 'weekday')} `
+                          : bath.cost_weekday}
+                      </span>
                       <span>₽/час</span>
                     </span>
                   </div>
                   <div className="flex justify-between py-2 border-b border-gray-200">
                     <span className="text-gray-600">Цена с пт-вс:</span>
                     <span className="font-medium inline-flex items-baseline gap-1">
-                      <span>{bath.cost_weekend}</span>
+                      <span>
+                        {hasTimeTariffs(bath)
+                          ? `${getPriceRangeLabel(bath, 'weekend')} `
+                          : bath.cost_weekend}
+                      </span>
                       <span>₽/час</span>
                     </span>
                   </div>

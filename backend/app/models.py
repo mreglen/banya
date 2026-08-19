@@ -14,6 +14,7 @@ class Bath(Base):
     title = Column(String(200), nullable=False)
     cost_weekday = Column(Integer, nullable=False)
     cost_weekend = Column(Integer, nullable=False)
+    time_tariffs = Column(JSON, nullable=True)
     min_booking_hours = Column(Integer, nullable=False, default=1)
     description = Column(Text, nullable=True)
     base_guests = Column(Integer, nullable=False)

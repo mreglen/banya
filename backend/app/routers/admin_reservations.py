@@ -8,6 +8,7 @@ from app.email_service import send_booking_confirmation_email
 from app.audit_logger import log_action, get_client_ip
 from app.database import SessionLocal
 from app.promotion_utils import apply_promotion_to_reservation
+from app.pricing_utils import calculate_bath_base_cost
 
 
 router = APIRouter(
@@ -184,14 +185,14 @@ def create_reservation(
             detail=f"Минимальная длительность брони для бани \"{bath.name}\" — {min_booking_hours} ч."
         )
     weekday = start_dt.weekday()
-    default_hourly_rate = bath.cost_weekend if weekday >= 4 else bath.cost_weekday
+    hourly_rate_override = None
     if reservation.hourly_rate is not None:
         if reservation.hourly_rate < 0:
             raise HTTPException(status_code=400, detail="Цена за час не может быть отрицательной")
-        hourly_rate = int(reservation.hourly_rate)
-    else:
-        hourly_rate = default_hourly_rate
-    bath_base_cost = int(hourly_rate * paid_duration_hours)
+        hourly_rate_override = int(reservation.hourly_rate)
+    bath_base_cost, hourly_rate = calculate_bath_base_cost(
+        bath, start_dt, end_dt, hourly_rate_override=hourly_rate_override
+    )
     extra_guests = max(0, reservation.guests - bath.base_guests)
     extra_guest_cost = extra_guests * bath.extra_guest_price
     bath_cost = bath_base_cost + extra_guest_cost
@@ -604,17 +605,30 @@ def update_reservation(
                 )
 
             weekday = start_dt.weekday()
-            default_hourly_rate = bath.cost_weekend if weekday >= 4 else bath.cost_weekday
+            time_or_bath_changed = bool(
+                reservation.start_datetime
+                or reservation.end_datetime
+                or reservation.bath_id is not None
+            )
+            hourly_rate_override = None
             if reservation.hourly_rate is not None:
                 if reservation.hourly_rate < 0:
                     raise HTTPException(status_code=400, detail="Цена за час не может быть отрицательной")
-                hourly_rate = int(reservation.hourly_rate)
-            elif db_reservation.hourly_rate is not None:
-                hourly_rate = int(db_reservation.hourly_rate)
+                hourly_rate_override = int(reservation.hourly_rate)
+
+            if hourly_rate_override is not None:
+                bath_base_cost, hourly_rate = calculate_bath_base_cost(
+                    bath, start_dt, end_dt, hourly_rate_override=hourly_rate_override
+                )
+            elif time_or_bath_changed or db_reservation.hourly_rate is None:
+                bath_base_cost, hourly_rate = calculate_bath_base_cost(
+                    bath, start_dt, end_dt, hourly_rate_override=None
+                )
             else:
-                hourly_rate = default_hourly_rate
+                hourly_rate = int(db_reservation.hourly_rate)
+                bath_base_cost = int(hourly_rate * paid_duration_hours)
+
             db_reservation.hourly_rate = int(hourly_rate)
-            bath_base_cost = int(hourly_rate * paid_duration_hours)
             extra_guests = max(0, current_guests - bath.base_guests)
             extra_guest_cost = extra_guests * bath.extra_guest_price
             bath_cost = bath_base_cost + extra_guest_cost

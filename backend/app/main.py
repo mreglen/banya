@@ -225,6 +225,28 @@ with engine.begin() as connection:
     connection.execute(
         text(
             """
+            ALTER TABLE baths
+            ADD COLUMN IF NOT EXISTS time_tariffs JSONB
+            """
+        )
+    )
+    connection.execute(
+        text(
+            """
+            UPDATE reservations r
+            SET hourly_rate = CASE
+                WHEN EXTRACT(DOW FROM r.start_datetime) IN (0, 5, 6) THEN b.cost_weekend
+                ELSE b.cost_weekday
+            END
+            FROM baths b
+            WHERE r.bath_id = b.bath_id
+              AND r.hourly_rate IS NULL
+            """
+        )
+    )
+    connection.execute(
+        text(
+            """
             ALTER TABLE bookings
             ADD COLUMN IF NOT EXISTS start_time VARCHAR(5)
             """

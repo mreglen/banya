@@ -13,6 +13,111 @@ import { prepareImageForUpload } from '../../../utils/imageProcessing';
 import { isVideoFile, isVideoUrl } from '../../../utils/mediaHelpers';
 import MediaLightbox from '../../../components/UI/MediaLightbox/MediaLightbox';
 import { toast } from 'react-hot-toast';
+import {
+  DEFAULT_TIME_TARIFFS,
+  buildTimeTariffsFromFlatCosts,
+} from '../../../utils/bathPricing';
+
+const cloneTariffs = (tariffs) => ({
+  weekday: (tariffs?.weekday || []).map((slot) => ({ ...slot })),
+  weekend: (tariffs?.weekend || []).map((slot) => ({ ...slot })),
+});
+
+const resolveInitialTariffs = (bath) => {
+  if (bath?.time_tariffs?.weekday?.length || bath?.time_tariffs?.weekend?.length) {
+    return cloneTariffs(bath.time_tariffs);
+  }
+  if (bath?.cost_weekday || bath?.cost_weekend) {
+    return buildTimeTariffsFromFlatCosts(bath.cost_weekday || 2000, bath.cost_weekend || 2500);
+  }
+  return cloneTariffs(DEFAULT_TIME_TARIFFS);
+};
+
+const daytimePrice = (slots) => {
+  const daytime = (slots || []).find((s) => s.from === '08:00' && s.to === '17:00');
+  if (daytime) return Number(daytime.price) || 0;
+  const regular = (slots || []).find((s) => s.from < s.to);
+  return regular ? Number(regular.price) || 0 : 0;
+};
+
+function TimeTariffEditor({ title, slots, onChange }) {
+  const updateSlot = (index, field, value) => {
+    const next = slots.map((slot, idx) => (
+      idx === index ? { ...slot, [field]: value } : slot
+    ));
+    onChange(next);
+  };
+
+  const addSlot = () => {
+    onChange([...slots, { from: '00:00', to: '00:00', price: 0 }]);
+  };
+
+  const removeSlot = (index) => {
+    if (slots.length <= 1) return;
+    onChange(slots.filter((_, idx) => idx !== index));
+  };
+
+  return (
+    <div className="border border-gray-200 rounded-xl p-4 space-y-3">
+      <div className="flex items-center justify-between">
+        <h3 className="text-sm font-semibold text-gray-800">{title}</h3>
+        <button
+          type="button"
+          onClick={addSlot}
+          className="text-sm text-green-600 hover:text-green-700 font-medium"
+        >
+          + интервал
+        </button>
+      </div>
+      {slots.map((slot, index) => (
+        <div key={`${title}-${index}`} className="grid grid-cols-1 sm:grid-cols-4 gap-3 items-end">
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">С</label>
+            <input
+              type="time"
+              value={slot.from}
+              onChange={(e) => updateSlot(index, 'from', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">До</label>
+            <input
+              type="time"
+              value={slot.to}
+              onChange={(e) => updateSlot(index, 'to', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">₽/ч</label>
+            <input
+              type="number"
+              min="1"
+              value={slot.price}
+              onChange={(e) => updateSlot(index, 'price', Number(e.target.value))}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
+              required
+            />
+          </div>
+          <div>
+            {slots.length > 1 && (
+              <button
+                type="button"
+                onClick={() => removeSlot(index)}
+                className="w-full px-3 py-2 text-sm text-red-600 border border-red-200 rounded-lg hover:bg-red-50"
+              >
+                Удалить
+              </button>
+            )}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 const formatApiError = (detail, fallback = 'Ошибка при сохранении бани') => {
   if (!detail) return fallback;
@@ -53,13 +158,12 @@ function BathForm() {
   const [formData, setFormData] = useState({
     name: '',
     title: '',
-    cost_weekday: '',
-    cost_weekend: '',
     min_booking_hours: 1,
     description: '',
     base_guests: 4,
     extra_guest_price: 500,
   });
+  const [timeTariffs, setTimeTariffs] = useState(() => cloneTariffs(DEFAULT_TIME_TARIFFS));
 
   const [selectedFiles, setSelectedFiles] = useState([]);
   const [isSaving, setIsSaving] = useState(false);
@@ -82,13 +186,12 @@ function BathForm() {
     setFormData({
       name: bath.name || '',
       title: bath.title || '',
-      cost_weekday: bath.cost_weekday ?? '',
-      cost_weekend: bath.cost_weekend ?? '',
       min_booking_hours: bath.min_booking_hours || 1,
       description: bath.description || '',
       base_guests: bath.base_guests ?? 4,
       extra_guest_price: bath.extra_guest_price ?? 500,
     });
+    setTimeTariffs(resolveInitialTariffs(bath));
   }, [bath]);
 
   // Акции инициализируем только при открытии другой бани, не при каждом refetch
@@ -125,12 +228,21 @@ function BathForm() {
       toast.error('Введите заголовок');
       return;
     }
-    if (!formData.cost_weekday || Number(formData.cost_weekday) <= 0) {
-      toast.error('Введите корректную цену за будни');
+    const costWeekday = daytimePrice(timeTariffs.weekday);
+    const costWeekend = daytimePrice(timeTariffs.weekend);
+    if (!costWeekday || costWeekday <= 0) {
+      toast.error('Укажите корректную дневную цену для будней');
       return;
     }
-    if (!formData.cost_weekend || Number(formData.cost_weekend) <= 0) {
-      toast.error('Введите корректную цену за выходные');
+    if (!costWeekend || costWeekend <= 0) {
+      toast.error('Укажите корректную дневную цену для выходных');
+      return;
+    }
+    const hasInvalidSlot = [...timeTariffs.weekday, ...timeTariffs.weekend].some(
+      (slot) => !slot.from || !slot.to || !slot.price || Number(slot.price) <= 0
+    );
+    if (hasInvalidSlot) {
+      toast.error('Заполните все интервалы тарифов и укажите цену больше 0');
       return;
     }
     if (!formData.min_booking_hours || Number(formData.min_booking_hours) < 1) {
@@ -154,8 +266,9 @@ function BathForm() {
           bath_id: bathId,
           name: formData.name,
           title: formData.title,
-          cost_weekday: Number(formData.cost_weekday),
-          cost_weekend: Number(formData.cost_weekend),
+          cost_weekday: costWeekday,
+          cost_weekend: costWeekend,
+          time_tariffs: timeTariffs,
           min_booking_hours: Number(formData.min_booking_hours),
           description: formData.description || null,
           base_guests: Number(formData.base_guests),
@@ -167,8 +280,9 @@ function BathForm() {
         const result = await createBath({
           name: formData.name,
           title: formData.title,
-          cost_weekday: Number(formData.cost_weekday),
-          cost_weekend: Number(formData.cost_weekend),
+          cost_weekday: costWeekday,
+          cost_weekend: costWeekend,
+          time_tariffs: timeTariffs,
           min_booking_hours: Number(formData.min_booking_hours),
           description: formData.description || null,
           base_guests: Number(formData.base_guests),
@@ -340,34 +454,6 @@ function BathForm() {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Цена с пн-чт (₽) *
-              </label>
-              <input
-                type="number"
-                value={formData.cost_weekday}
-                onChange={(e) => setFormData({ ...formData, cost_weekday: Number(e.target.value) })}
-                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500"
-                placeholder="3000"
-                required
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Цена с пт-вс (₽) *
-              </label>
-              <input
-                type="number"
-                value={formData.cost_weekend}
-                onChange={(e) => setFormData({ ...formData, cost_weekend: Number(e.target.value) })}
-                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500"
-                placeholder="3500"
-                required
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
                 Базовое кол-во гостей *
               </label>
               <input
@@ -409,6 +495,23 @@ function BathForm() {
                 required
               />
             </div>
+          </div>
+
+          <div className="space-y-4">
+            <TimeTariffEditor
+              title="Тарифы по времени — будни (пн–чт)"
+              slots={timeTariffs.weekday}
+              onChange={(weekday) => setTimeTariffs((prev) => ({ ...prev, weekday }))}
+            />
+            <TimeTariffEditor
+              title="Тарифы по времени — выходные (пт–вс)"
+              slots={timeTariffs.weekend}
+              onChange={(weekend) => setTimeTariffs((prev) => ({ ...prev, weekend }))}
+            />
+            <p className="text-xs text-gray-500">
+              Дневные цены для карточек на сайте синхронизируются с интервалом 08:00–17:00.
+              Если тарифы не заданы, используются поля cost_weekday / cost_weekend как резерв.
+            </p>
           </div>
 
           <div>

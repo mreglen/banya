@@ -18,6 +18,11 @@ import {
 import { useGetPaymentQrCodeQuery } from '../../../redux/slices/settingsApiSlice';
 
 import ProductSelectionModal from '../../Admin/Documents/DocumentsEntrance/ProductSelectionModal';
+import {
+  calculateBathBaseCost,
+  getEffectiveHourlyRate,
+  formatSegmentBreakdown,
+} from '../../../utils/bathPricing';
 
 const generateTimeOptions = () => {
   const options = [];
@@ -111,16 +116,8 @@ const SERVER_BASE_URL = process.env.REACT_APP_API_URL
 
 const toPythonWeekday = (date) => (date.getDay() + 6) % 7;
 
-const getDefaultHourlyRate = (bath, dateYmd) => {
-  if (!bath || !dateYmd) return '';
-  const start = new Date(`${dateYmd}T12:00:00`);
-  if (Number.isNaN(start.getTime())) return '';
-  const weekday = toPythonWeekday(start);
-  const rate = weekday >= 4
-    ? Number(bath.cost_weekend)
-    : Number(bath.cost_weekday);
-  return Number.isFinite(rate) ? rate : '';
-};
+const getAutoHourlyRate = (bath, dateYmd, startTime = '12:00', durationHours = 1) =>
+  getEffectiveHourlyRate(bath, dateYmd, startTime, durationHours);
 
 /** API отдаёт status строкой; status_id может отсутствовать в старых ответах */
 const resolveBookingStatusId = (bookingData, statusOptionsList) => {
@@ -193,6 +190,7 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
   const dateInputRef = useRef(null);
   /** Чтобы при редактировании не сбрасывать форму при догрузке stock/units */
   const editFormHydratedForRef = useRef(null);
+  const hourlyRateManualRef = useRef(false);
 
   const { data: baths = [], isLoading: isLoadingBaths } = useGetBathsQuery();
   const { data: stockProducts = [] } = useGetStockProductsQuery();
@@ -229,6 +227,7 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
 
     if (justOpened) {
       setShowReceipt(false);
+      hourlyRateManualRef.current = false;
     }
 
     if (!justOpened || !isOpen || isEditing) return;
@@ -265,7 +264,9 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
         date: nextDate,
         start_time: prefillData.start_time || prev.start_time,
         duration_hours: prefillData.duration_hours || prev.duration_hours,
-        hourly_rate: bath ? getDefaultHourlyRate(bath, nextDate) : prev.hourly_rate,
+        hourly_rate: bath
+          ? getAutoHourlyRate(bath, nextDate, prefillData.start_time || '12:00', prefillData.duration_hours || 1)
+          : prev.hourly_rate,
         client_name: prefillData.client_name || prev.client_name,
         client_phone: prefillData.client_phone || prev.client_phone,
         notes: prefillData.notes || prev.notes,
@@ -344,7 +345,9 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
       const hourlyRate =
         booking.hourly_rate != null && booking.hourly_rate !== ''
           ? Number(booking.hourly_rate)
-          : getDefaultHourlyRate(bathForRate, date);
+          : getAutoHourlyRate(bathForRate, date, start_time, duration_hours);
+
+      hourlyRateManualRef.current = booking.hourly_rate != null && booking.hourly_rate !== '';
 
       setFormData({
         bath_id: bathId,
@@ -366,16 +369,31 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
     }
   }, [isOpen, booking, statusOptions.length, stockProducts, findUnitName, baths]);
 
-  // Если при открытии редактирования бани ещё не были загружены — подставим тариф позже
+  // Автоподстановка тарифа при смене бани/даты/времени, если ставка не задана вручную
   useEffect(() => {
-    if (!isOpen || !formData.bath_id || formData.hourly_rate !== '') return;
+    if (!isOpen || !formData.bath_id || hourlyRateManualRef.current) return;
     const bath = baths.find((b) => String(b.bath_id) === String(formData.bath_id));
-    if (!bath || !formData.date) return;
-    setFormData((prev) => ({
-      ...prev,
-      hourly_rate: getDefaultHourlyRate(bath, prev.date),
-    }));
-  }, [isOpen, baths, formData.bath_id, formData.date, formData.hourly_rate]);
+    if (!bath || !formData.date || !formData.start_time) return;
+    const nextRate = getAutoHourlyRate(
+      bath,
+      formData.date,
+      formData.start_time,
+      formData.duration_hours || minBookingHours
+    );
+    setFormData((prev) => (
+      String(prev.hourly_rate) === String(nextRate)
+        ? prev
+        : { ...prev, hourly_rate: nextRate === '' ? '' : nextRate }
+    ));
+  }, [
+    isOpen,
+    baths,
+    formData.bath_id,
+    formData.date,
+    formData.start_time,
+    formData.duration_hours,
+    minBookingHours,
+  ]);
 
   // Если после выбора бани/даты текущее время занято — ставим ближайшее свободное
   useEffect(() => {
@@ -416,30 +434,53 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
       setFormData((prev) => ({ ...prev, client_phone: formatted }));
     } else if (name === 'prepayment' || name === 'hourly_rate') {
       const digits = value.replace(/\D/g, '');
+      if (name === 'hourly_rate') {
+        hourlyRateManualRef.current = digits !== '';
+      }
       setFormData((prev) => ({ ...prev, [name]: digits }));
     } else if (name === 'duration_hours') {
       if (value === '') {
+        hourlyRateManualRef.current = false;
         setFormData((prev) => ({ ...prev, duration_hours: '' }));
       } else {
         const n = parseFloat(value);
+        hourlyRateManualRef.current = false;
         setFormData((prev) => ({ ...prev, duration_hours: Number.isNaN(n) ? prev.duration_hours : n }));
       }
     } else if (name === 'bath_id') {
       const selected = baths.find((bath) => String(bath.bath_id) === String(value));
       const minHours = Math.max(1, Number(selected?.min_booking_hours) || 1);
+      hourlyRateManualRef.current = false;
       setFormData((prev) => ({
         ...prev,
         bath_id: value,
         duration_hours: Number(prev.duration_hours) < minHours ? minHours : prev.duration_hours,
-        hourly_rate: selected ? getDefaultHourlyRate(selected, prev.date) : '',
+        hourly_rate: selected
+          ? getAutoHourlyRate(selected, prev.date, prev.start_time, prev.duration_hours || minHours)
+          : '',
       }));
     } else if (name === 'date') {
+      hourlyRateManualRef.current = false;
       setFormData((prev) => {
         const selected = baths.find((bath) => String(bath.bath_id) === String(prev.bath_id));
         return {
           ...prev,
           date: value,
-          hourly_rate: selected ? getDefaultHourlyRate(selected, value) : prev.hourly_rate,
+          hourly_rate: selected
+            ? getAutoHourlyRate(selected, value, prev.start_time, prev.duration_hours || minBookingHours)
+            : prev.hourly_rate,
+        };
+      });
+    } else if (name === 'start_time') {
+      hourlyRateManualRef.current = false;
+      setFormData((prev) => {
+        const selected = baths.find((bath) => String(bath.bath_id) === String(prev.bath_id));
+        return {
+          ...prev,
+          start_time: value,
+          hourly_rate: selected
+            ? getAutoHourlyRate(selected, prev.date, value, prev.duration_hours || minBookingHours)
+            : prev.hourly_rate,
         };
       });
     } else {
@@ -744,7 +785,9 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
       notes: formData.notes && formData.notes.trim() !== '' ? formData.notes.trim() : null,
       guests: parseInt(formData.guests, 10) || 1,
       status_id: submitStatusId,
-      hourly_rate: formData.hourly_rate === '' ? null : parseInt(formData.hourly_rate, 10) || 0,
+      hourly_rate: hourlyRateManualRef.current && formData.hourly_rate !== ''
+        ? parseInt(formData.hourly_rate, 10) || 0
+        : null,
       products: formData.selectedProducts.map((p) => ({
         product_id: Number(p.id),
         quantity: parseInt(p.quantity, 10) || 1,
@@ -839,15 +882,13 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
     }
 
     const start = new Date(`${formData.date}T${formData.start_time}:00`);
-    const weekday = toPythonWeekday(start);
-    const defaultHourlyRate = weekday >= 4
-      ? Number(selectedBath.cost_weekend) || 0
-      : Number(selectedBath.cost_weekday) || 0;
-    const hourlyRateRaw = formData.hourly_rate;
-    const hourlyRate = hourlyRateRaw === '' || hourlyRateRaw == null
-      ? defaultHourlyRate
-      : Number(hourlyRateRaw) || 0;
-    const bathBaseCost = Math.floor(hourlyRate * durationHours);
+    const end = new Date(start.getTime() + durationHours * 3600 * 1000);
+    const manualOverride = hourlyRateManualRef.current && formData.hourly_rate !== ''
+      ? Number(formData.hourly_rate)
+      : null;
+    const pricing = calculateBathBaseCost(selectedBath, start, end, manualOverride);
+    const hourlyRate = pricing.effectiveHourlyRate;
+    const bathBaseCost = pricing.bathBaseCost;
     const guestsNum = parseInt(formData.guests, 10) || 0;
     const baseGuests = Number(selectedBath.base_guests) || 0;
     const extraGuests = Math.max(0, guestsNum - baseGuests);
@@ -921,8 +962,11 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
       bathName: selectedBath.name,
       durationHours,
       hourlyRate,
-      isWeekendRate: weekday >= 4,
+      isWeekendRate: toPythonWeekday(start) >= 4,
       bathBaseCost,
+      pricingSegments: pricing.segments,
+      usesTariffBreakdown: pricing.usesTariffs && pricing.segments.length > 1 && !pricing.isManualOverride,
+      segmentBreakdown: formatSegmentBreakdown(pricing.segments, formatReceiptMoney),
       guestsNum,
       baseGuests,
       extraGuests,
@@ -1157,17 +1201,7 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
                 ref={dateInputRef}
                 type="date"
                 value={formData.date}
-                onChange={(e) => {
-                  const value = e.target.value;
-                  setFormData((prev) => {
-                    const selected = baths.find((bath) => String(bath.bath_id) === String(prev.bath_id));
-                    return {
-                      ...prev,
-                      date: value,
-                      hourly_rate: selected ? getDefaultHourlyRate(selected, value) : prev.hourly_rate,
-                    };
-                  });
-                }}
+                onChange={(e) => handleChange({ target: { name: 'date', value: e.target.value } })}
                 className={`w-full px-3 py-2.5 sm:px-4 sm:py-3 border rounded-xl focus:ring-2 focus:ring-blue-500 text-base sm:text-lg ${
                   validationErrors.date ? 'border-red-500 bg-red-50' : 'border-gray-300'
                 }`}
@@ -1541,10 +1575,21 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
                       <div className="py-1.5 border-b border-dashed border-gray-300">
                         <div className="font-medium">Услуга бани</div>
                         <div className="text-gray-600 mt-0.5">
-                          {receiptSummary.durationHours} ч × {formatReceiptMoney(receiptSummary.hourlyRate)}
-                          {receiptSummary.isWeekendRate ? ' (выходной)' : ' (будни)'}
-                          {receiptSummary.bonusMinutes > 0 && (
-                            <span className="text-green-700"> + {receiptSummary.bonusMinutes} мин в подарок</span>
+                          {receiptSummary.usesTariffBreakdown ? (
+                            <>
+                              {receiptSummary.segmentBreakdown}
+                              {receiptSummary.bonusMinutes > 0 && (
+                                <span className="text-green-700"> + {receiptSummary.bonusMinutes} мин в подарок</span>
+                              )}
+                            </>
+                          ) : (
+                            <>
+                              {receiptSummary.durationHours} ч × {formatReceiptMoney(receiptSummary.hourlyRate)}
+                              {receiptSummary.isWeekendRate ? ' (выходной)' : ' (будни)'}
+                              {receiptSummary.bonusMinutes > 0 && (
+                                <span className="text-green-700"> + {receiptSummary.bonusMinutes} мин в подарок</span>
+                              )}
+                            </>
                           )}
                         </div>
                         <div className="flex justify-between text-gray-700 mt-1">

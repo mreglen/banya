@@ -1,6 +1,6 @@
 from pydantic import BaseModel, field_validator
 from datetime import datetime
-from typing import Optional, List, Literal
+from typing import Optional, List, Literal, Dict, Any
 from datetime import date
 
 
@@ -36,6 +36,7 @@ class BathBase(BaseModel):
     title: str
     cost_weekday: int
     cost_weekend: int
+    time_tariffs: Optional[Dict[str, Any]] = None
     min_booking_hours: int = 1
     description: Optional[str] = None
     base_guests: int
@@ -46,6 +47,7 @@ class BathCreate(BaseModel):
     title: str
     cost_weekday: int
     cost_weekend: int
+    time_tariffs: Optional[Dict[str, Any]] = None
     min_booking_hours: int = 1
     description: Optional[str] = None
     base_guests: int
@@ -59,6 +61,7 @@ class BathUpdate(BaseModel):
     title: Optional[str] = None
     cost_weekday: Optional[int] = None
     cost_weekend: Optional[int] = None
+    time_tariffs: Optional[Dict[str, Any]] = None
     min_booking_hours: Optional[int] = None
     description: Optional[str] = None
     base_guests: Optional[int] = None

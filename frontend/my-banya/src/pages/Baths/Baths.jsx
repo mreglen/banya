@@ -1,6 +1,7 @@
 import { useGetBathsQuery } from '../../redux/slices/apiSlice';
 import CustomButton from '../../components/UI/CustomButton/CustomButton';
 import SeoHead from '../../components/Seo/SeoHead';
+import { getPriceRangeLabel, hasTimeTariffs } from '../../utils/bathPricing';
 
 function Baths() {
   const { data: baths = [], isLoading, error } = useGetBathsQuery();
@@ -61,10 +62,26 @@ function Baths() {
                   <p className="text-green-600 text-sm font-medium mb-3">{bath.title}</p>
                   <div className="flex items-center justify-between mb-2">
                     <div className="text-sm text-gray-500">
-                      <span className="font-medium text-gray-700">{bath.cost_weekday}₽</span>/час (пн-чт)
+                      {hasTimeTariffs(bath) ? (
+                        <>
+                          <span className="font-medium text-gray-700">{getPriceRangeLabel(bath, 'weekday')}₽</span>/час (пн-чт)
+                        </>
+                      ) : (
+                        <>
+                          <span className="font-medium text-gray-700">{bath.cost_weekday}₽</span>/час (пн-чт)
+                        </>
+                      )}
                     </div>
                     <div className="text-sm text-gray-500">
-                      <span className="font-medium text-gray-700">{bath.cost_weekend}₽</span>/час (пт-вс)
+                      {hasTimeTariffs(bath) ? (
+                        <>
+                          <span className="font-medium text-gray-700">{getPriceRangeLabel(bath, 'weekend')}₽</span>/час (пт-вс)
+                        </>
+                      ) : (
+                        <>
+                          <span className="font-medium text-gray-700">{bath.cost_weekend}₽</span>/час (пт-вс)
+                        </>
+                      )}
                     </div>
                   </div>
                   <div className="text-sm text-gray-500 mb-4">
