@@ -23,34 +23,12 @@ export const normalizePhone = (phone) => {
 
 export const isBirthdayPromotion = (promo) => promo?.promotion_type === 'birthday';
 
-export const isInBirthdayWindow = (bookingDate, birthDate, windowDays = 7) => {
-  if (!birthDate) return false;
-  const window = Math.max(0, Number(windowDays) || 0);
-  const booking = bookingDate instanceof Date ? formatLocalYmd(bookingDate) : birthDate;
-  const bookingParts = (typeof booking === 'string' ? booking : formatLocalYmd(bookingDate)).split('-').map(Number);
-  const birthParts = String(birthDate).split('-').map(Number);
-  if (birthParts.length !== 3) return false;
-
-  const bookingDt = new Date(bookingParts[0], bookingParts[1] - 1, bookingParts[2]);
-  for (const yearOffset of [-1, 0, 1]) {
-    const year = bookingParts[0] + yearOffset;
-    let month = birthParts[1];
-    let day = birthParts[2];
-    if (month === 2 && day === 29) day = 28;
-    const birthdayDt = new Date(year, month - 1, day);
-    const diffDays = Math.abs(Math.round((bookingDt - birthdayDt) / (24 * 3600 * 1000)));
-    if (diffDays <= window) return true;
-  }
-  return false;
-};
-
 export const getPromoMismatchReasons = ({
   promo,
   durationHours,
   guests,
   bathCost,
   startDate,
-  clientBirthDate = null,
 }) => {
   const reasons = [];
   if (!promo || promo.is_active === false) {
@@ -58,15 +36,6 @@ export const getPromoMismatchReasons = ({
   }
 
   const bookingDate = formatLocalYmd(startDate);
-
-  if (isBirthdayPromotion(promo)) {
-    const windowDays = Number(promo.birthday_window_days ?? 7);
-    if (!clientBirthDate) {
-      reasons.push('не указана дата рождения клиента');
-    } else if (!isInBirthdayWindow(startDate, clientBirthDate, windowDays)) {
-      reasons.push(`бронь вне периода ±${windowDays} дн. от дня рождения`);
-    }
-  }
 
   if (promo.valid_from && bookingDate < promo.valid_from) {
     reasons.push(`действует с ${new Date(`${promo.valid_from}T12:00:00`).toLocaleDateString('ru-RU')}`);
@@ -126,7 +95,6 @@ export const computeDefaultPromotionIds = ({
   guests,
   bathCost,
   startDate,
-  clientBirthDate = null,
 }) => {
   const list = (promos || []).filter((p) => p && p.is_active !== false);
   const conflictingIds = new Set();
@@ -141,6 +109,7 @@ export const computeDefaultPromotionIds = ({
   }
 
   return list
+    .filter((promo) => !isBirthdayPromotion(promo))
     .filter((promo) => !conflictingIds.has(Number(promo.id)))
     .filter((promo) => promoMatches({
       promo,
@@ -148,7 +117,6 @@ export const computeDefaultPromotionIds = ({
       guests,
       bathCost,
       startDate,
-      clientBirthDate,
     }))
     .map((promo) => Number(promo.id));
 };
@@ -160,7 +128,6 @@ export const buildPromotionSelectionRows = ({
   guests,
   bathCost,
   startDate,
-  clientBirthDate = null,
 }) => {
   const list = (promos || []).filter((p) => p && p.is_active !== false);
   const selectedSet = new Set((selectedIds || []).map(Number));
@@ -172,7 +139,6 @@ export const buildPromotionSelectionRows = ({
       guests,
       bathCost,
       startDate,
-      clientBirthDate,
     });
     const incompatibleWithSelected = list
       .filter(
@@ -281,11 +247,4 @@ export const normalizePromotionSnapshot = (snapshot) => {
     id: snapshot.id,
     name: snapshot.name || '',
   };
-};
-
-export const findClientBirthDate = (clients, phone) => {
-  const normalized = normalizePhone(phone);
-  if (!normalized) return null;
-  const client = (clients || []).find((item) => normalizePhone(item.phone) === normalized);
-  return client?.birth_date || null;
 };

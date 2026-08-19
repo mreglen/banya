@@ -3,7 +3,6 @@ import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { useSelector } from 'react-redux';
 import {
   useGetBathsQuery,
-  useGetClientsQuery,
 } from '../../../redux/slices/apiSlice';
 import {
   useGetStockProductsQuery,
@@ -28,7 +27,6 @@ import {
   applySelectedPromotions,
   buildPromotionSelectionRows,
   computeDefaultPromotionIds,
-  findClientBirthDate,
   formatPromotionDiscount,
   getSnapshotPromotionIds,
   normalizePromotionSnapshot,
@@ -179,7 +177,6 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
   const promotionSelectionTouchedRef = useRef(false);
 
   const { data: baths = [], isLoading: isLoadingBaths } = useGetBathsQuery();
-  const { data: clients = [] } = useGetClientsQuery(undefined, { skip: !isOpen });
   const { data: stockProducts = [] } = useGetStockProductsQuery();
   const { data: units = [], isLoading: isLoadingUnits } = useGetUnitsOfMeasurementQuery(); // ← ДОБАВЛЕНО
   const {
@@ -190,10 +187,6 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
   const selectedBathIdNum = formData.bath_id ? Number(formData.bath_id) : null;
   const selectedBath = baths.find((bath) => Number(bath.bath_id) === selectedBathIdNum);
   const minBookingHours = Math.max(1, Number(selectedBath?.min_booking_hours) || 1);
-  const clientBirthDate = useMemo(
-    () => findClientBirthDate(clients, formData.client_phone),
-    [clients, formData.client_phone]
-  );
   const { data: reservationsForDate = [] } = useGetReservationsByDateQuery(
     { date: formData.date, bathId: selectedBathIdNum },
     { skip: !isOpen || !formData.date || !selectedBathIdNum }
@@ -415,7 +408,6 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
       guests: guestsNum,
       bathCost: bathServiceCost,
       startDate: start,
-      clientBirthDate,
     }));
   }, [
     isOpen,
@@ -426,7 +418,6 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
     formData.duration_hours,
     formData.guests,
     formData.hourly_rate,
-    clientBirthDate,
     minBookingHours,
   ]);
 
@@ -1042,7 +1033,6 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
     formData.selectedProducts,
     formData.client_name,
     formData.client_phone,
-    clientBirthDate,
     selectedPromotionIds,
     minBookingHours,
     isEditing,
@@ -1071,7 +1061,6 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
       guests: guestsNum,
       bathCost: bathServiceCost,
       startDate: start,
-      clientBirthDate,
     });
   }, [
     selectedBath,
@@ -1081,7 +1070,6 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
     formData.duration_hours,
     formData.guests,
     formData.hourly_rate,
-    clientBirthDate,
     minBookingHours,
   ]);
 
