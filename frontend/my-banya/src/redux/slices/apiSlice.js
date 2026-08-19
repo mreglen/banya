@@ -72,12 +72,17 @@ export const apiSlice = createApi({
     }),
 
     updateBath: builder.mutation({
-      query: ({ bath_id, ...body }) => ({
+      query: ({ bath_id, slug, ...body }) => ({
         url: `/baths/${bath_id}`,
         method: 'PUT',
         body,
       }),
-      invalidatesTags: [{ type: 'Baths', id: 'LIST' }],
+      invalidatesTags: (result, error, { bath_id, slug }) => {
+        const tags = [{ type: 'Baths', id: 'LIST' }];
+        if (slug) tags.push({ type: 'Baths', id: slug });
+        if (bath_id != null) tags.push({ type: 'Baths', id: String(bath_id) });
+        return tags;
+      },
     }),
 
     deleteBath: builder.mutation({

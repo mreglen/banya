@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm.attributes import flag_modified
 from sqlalchemy.exc import IntegrityError
 from typing import List, Optional
 import os
@@ -169,6 +170,7 @@ def update_bath(
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc))
         db_bath.time_tariffs = time_tariffs or None
+        flag_modified(db_bath, "time_tariffs")
         wd, we = sync_flat_costs_from_tariffs(
             db_bath.time_tariffs,
             update_data.get('cost_weekday', db_bath.cost_weekday),
@@ -178,6 +180,11 @@ def update_bath(
         db_bath.cost_weekend = we
         update_data.pop('cost_weekday', None)
         update_data.pop('cost_weekend', None)
+    elif 'cost_weekday' in update_data or 'cost_weekend' in update_data:
+        if 'cost_weekday' in update_data:
+            db_bath.cost_weekday = update_data.pop('cost_weekday')
+        if 'cost_weekend' in update_data:
+            db_bath.cost_weekend = update_data.pop('cost_weekend')
     
     # Если обновляется name, перегенерируем slug
     if 'name' in update_data and update_data['name'] != db_bath.name:

@@ -184,7 +184,6 @@ def create_reservation(
             status_code=400,
             detail=f"Минимальная длительность брони для бани \"{bath.name}\" — {min_booking_hours} ч."
         )
-    weekday = start_dt.weekday()
     hourly_rate_override = None
     if reservation.hourly_rate is not None:
         if reservation.hourly_rate < 0:
@@ -604,7 +603,6 @@ def update_reservation(
                     detail=f"Минимальная длительность брони для бани \"{bath.name}\" — {min_booking_hours} ч."
                 )
 
-            weekday = start_dt.weekday()
             time_or_bath_changed = bool(
                 reservation.start_datetime
                 or reservation.end_datetime

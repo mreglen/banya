@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   useGetBathsQuery,
@@ -170,6 +170,20 @@ function BathForm() {
   const [selectedPromotionIds, setSelectedPromotionIds] = useState([]);
   const [uploadProgress, setUploadProgress] = useState(null); // Track upload progress
   const [lightboxIndex, setLightboxIndex] = useState(null);
+  const formHydratedForRef = useRef(null);
+
+  const normalizeTariffsForSave = (tariffs) => ({
+    weekday: (tariffs.weekday || []).map((slot) => ({
+      from: slot.from,
+      to: slot.to,
+      price: Number(slot.price),
+    })),
+    weekend: (tariffs.weekend || []).map((slot) => ({
+      from: slot.from,
+      to: slot.to,
+      price: Number(slot.price),
+    })),
+  });
 
   const lightboxItems = useMemo(() => {
     if (!bath?.photos?.length) return [];
@@ -180,19 +194,25 @@ function BathForm() {
     }));
   }, [bath, SERVER_BASE_URL]);
 
-  // Заполняем форму данными при редактировании
   useEffect(() => {
-    if (!bath) return;
+    formHydratedForRef.current = null;
+  }, [slug]);
+
+  // Заполняем форму один раз при загрузке бани с API (не сбрасываем при refetch)
+  useEffect(() => {
+    if (!bathFromApi?.bath_id) return;
+    if (formHydratedForRef.current === bathFromApi.bath_id) return;
+    formHydratedForRef.current = bathFromApi.bath_id;
     setFormData({
-      name: bath.name || '',
-      title: bath.title || '',
-      min_booking_hours: bath.min_booking_hours || 1,
-      description: bath.description || '',
-      base_guests: bath.base_guests ?? 4,
-      extra_guest_price: bath.extra_guest_price ?? 500,
+      name: bathFromApi.name || '',
+      title: bathFromApi.title || '',
+      min_booking_hours: bathFromApi.min_booking_hours || 1,
+      description: bathFromApi.description || '',
+      base_guests: bathFromApi.base_guests ?? 4,
+      extra_guest_price: bathFromApi.extra_guest_price ?? 500,
     });
-    setTimeTariffs(resolveInitialTariffs(bath));
-  }, [bath]);
+    setTimeTariffs(resolveInitialTariffs(bathFromApi));
+  }, [bathFromApi]);
 
   // Акции инициализируем только при открытии другой бани, не при каждом refetch
   useEffect(() => {
@@ -252,6 +272,8 @@ function BathForm() {
 
     setIsSaving(true);
     setUploadProgress(0);
+
+    const tariffsPayload = normalizeTariffsForSave(timeTariffs);
     
     try {
       let resultBathId = bathId;
@@ -264,17 +286,20 @@ function BathForm() {
         // Обновляем существующую баню
         await updateBath({
           bath_id: bathId,
+          slug: bathFromApi?.slug || bath?.slug || slug,
           name: formData.name,
           title: formData.title,
           cost_weekday: costWeekday,
           cost_weekend: costWeekend,
-          time_tariffs: timeTariffs,
+          time_tariffs: tariffsPayload,
           min_booking_hours: Number(formData.min_booking_hours),
           description: formData.description || null,
           base_guests: Number(formData.base_guests),
           extra_guest_price: Number(formData.extra_guest_price),
           promotion_ids: selectedPromotionIds,
         }).unwrap();
+        formHydratedForRef.current = null;
+        await refetchBath();
       } else {
         // Создаем новую баню
         const result = await createBath({
@@ -282,7 +307,7 @@ function BathForm() {
           title: formData.title,
           cost_weekday: costWeekday,
           cost_weekend: costWeekend,
-          time_tariffs: timeTariffs,
+          time_tariffs: tariffsPayload,
           min_booking_hours: Number(formData.min_booking_hours),
           description: formData.description || null,
           base_guests: Number(formData.base_guests),
