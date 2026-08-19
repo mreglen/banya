@@ -112,6 +112,27 @@ def get_bath(slug_or_id: str, db: Session = Depends(get_db)):
     return _serialize_bath(bath, incompatibility_map)
 
 # новые эндпоинты
+def _reload_and_serialize_bath(db: Session, bath_id: int) -> dict:
+    bath = (
+        db.query(Bath)
+        .options(
+            joinedload(Bath.photos),
+            joinedload(Bath.promotions)
+            .joinedload(Promotion.gift_products)
+            .joinedload(PromotionGiftProduct.product),
+        )
+        .filter(Bath.bath_id == bath_id)
+        .first()
+    )
+    if not bath:
+        raise HTTPException(status_code=404, detail="Баня не найдена")
+    incompatibility_map = load_incompatibility_map(
+        db,
+        [p.id for p in (bath.promotions or []) if p.is_active],
+    )
+    return _serialize_bath(bath, incompatibility_map)
+
+
 @router.post("/", response_model=BathOut, status_code=201)
 def create_bath(
     bath: BathCreate,
@@ -164,8 +185,7 @@ def create_bath(
             db.add(bath_promo)
 
     db.commit()
-    db.refresh(db_bath)
-    return db_bath
+    return _reload_and_serialize_bath(db, db_bath.bath_id)
 
 
 @router.put("/{bath_id}", response_model=BathOut)
@@ -237,8 +257,7 @@ def update_bath(
                 db.add(bath_promo)
 
     db.commit()
-    db.refresh(db_bath)
-    return db_bath
+    return _reload_and_serialize_bath(db, bath_id)
 
 
 @router.delete("/{bath_id}", status_code=204)
