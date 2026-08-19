@@ -69,6 +69,15 @@ function Promotions() {
     return gifts.join(', ') || 'Нет подарков';
   };
 
+  const formatIncompatibilities = (promotion, allItems) => {
+    const ids = (promotion.incompatible_promotion_ids || []).map(Number);
+    if (!ids.length) return 'Со всеми совместима';
+    const names = ids
+      .map((id) => allItems.find((item) => Number(item.id) === id)?.name)
+      .filter(Boolean);
+    return names.length ? names.join(', ') : `${ids.length} акций`;
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 p-4 md:p-8">
       <div className="max-w-6xl mx-auto">
@@ -140,6 +149,10 @@ function Promotions() {
                           <div>
                             <span className="font-medium text-gray-700">Подарки: </span>
                             <span className="text-gray-600">{formatGifts(promotion)}</span>
+                          </div>
+                          <div>
+                            <span className="font-medium text-gray-700">Не суммируется с: </span>
+                            <span className="text-gray-600">{formatIncompatibilities(promotion, promotions)}</span>
                           </div>
                         </div>
                       </div>

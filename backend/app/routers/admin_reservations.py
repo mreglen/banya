@@ -7,7 +7,7 @@ from app.auth import get_current_user
 from app.email_service import send_booking_confirmation_email
 from app.audit_logger import log_action, get_client_ip
 from app.database import SessionLocal
-from app.promotion_utils import apply_promotion_to_reservation
+from app.promotion_utils import apply_selected_promotions_to_reservation, get_snapshot_gift_product_ids
 from app.pricing_utils import calculate_bath_base_cost
 
 
@@ -196,16 +196,21 @@ def create_reservation(
     extra_guest_cost = extra_guests * bath.extra_guest_price
     bath_cost = bath_base_cost + extra_guest_cost
 
-    # 5.1 Применяем акцию: бонусное время + подарочные товары
-    end_dt, applied_promo, promo_snapshot, effective_products = apply_promotion_to_reservation(
-        db,
-        bath,
-        start_dt=start_dt,
-        end_dt=end_dt,
-        guests=reservation.guests,
-        bath_cost=bath_cost,
-        products=reservation.products or [],
-    )
+    # 5.1 Применяем акции: бонусное время + подарочные товары
+    try:
+        end_dt, applied_promos, promo_snapshot, effective_products = apply_selected_promotions_to_reservation(
+            db,
+            bath,
+            start_dt=start_dt,
+            end_dt=end_dt,
+            guests=reservation.guests,
+            bath_cost=bath_cost,
+            products=reservation.products or [],
+            promotion_ids=reservation.promotion_ids,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    applied_promo_ids = [int(p.id) for p in applied_promos]
 
     # 4. Проверяем пересечения уже с учётом бонусного времени
     overlap = check_overlap(db, reservation.bath_id, start_dt, end_dt)
@@ -248,7 +253,8 @@ def create_reservation(
         hourly_rate=int(hourly_rate),
         status_id=reservation.status_id,
         income_account_id=reservation.income_account_id,
-        applied_promotion_id=applied_promo.id if applied_promo else None,
+        applied_promotion_id=applied_promo_ids[0] if applied_promo_ids else None,
+        applied_promotion_ids=applied_promo_ids or None,
         promotion_snapshot=promo_snapshot,
     )
     db.add(db_reservation)
@@ -395,6 +401,7 @@ def create_reservation(
         status_id=db_reservation.status_id,
         income_account_id=db_reservation.income_account_id,
         applied_promotion_id=db_reservation.applied_promotion_id,
+        applied_promotion_ids=db_reservation.applied_promotion_ids,
         promotion_snapshot=db_reservation.promotion_snapshot,
         products=response_products,
     )
@@ -643,33 +650,40 @@ def update_reservation(
                     for rp in db_reservation.reservation_products
                     # Исключаем прошлые подарки: цена 0 и были в snapshot
                 ]
-                gift_ids = {
-                    int(g["product_id"])
-                    for g in (db_reservation.promotion_snapshot or {}).get("gift_products", [])
-                }
+                gift_ids = get_snapshot_gift_product_ids(db_reservation.promotion_snapshot)
                 products_for_promo = [
                     p for p in products_for_promo
                     if p.product_id not in gift_ids or (p.price is not None and float(p.price) > 0)
                 ]
 
-            end_dt, applied_promo, promo_snapshot, effective_products = apply_promotion_to_reservation(
-                db,
-                bath,
-                start_dt=start_dt,
-                end_dt=end_dt,
-                guests=current_guests,
-                bath_cost=bath_cost,
-                products=products_for_promo,
-            )
+            promo_ids_for_apply = reservation.promotion_ids
+            if promo_ids_for_apply is None and db_reservation.applied_promotion_ids:
+                promo_ids_for_apply = db_reservation.applied_promotion_ids
 
-            if reservation.start_datetime or reservation.end_datetime or reservation.bath_id or applied_promo:
+            try:
+                end_dt, applied_promos, promo_snapshot, effective_products = apply_selected_promotions_to_reservation(
+                    db,
+                    bath,
+                    start_dt=start_dt,
+                    end_dt=end_dt,
+                    guests=current_guests,
+                    bath_cost=bath_cost,
+                    products=products_for_promo,
+                    promotion_ids=promo_ids_for_apply,
+                )
+            except ValueError as exc:
+                raise HTTPException(status_code=400, detail=str(exc))
+            applied_promo_ids = [int(p.id) for p in applied_promos]
+
+            if reservation.start_datetime or reservation.end_datetime or reservation.bath_id or applied_promo_ids:
                 overlap = check_overlap(db, db_reservation.bath_id, start_dt, end_dt, exclude_id=id)
                 if overlap:
                     raise HTTPException(status_code=400, detail="Бронь пересекается с существующей")
 
             db_reservation.start_datetime = start_dt
             db_reservation.end_datetime = end_dt
-            db_reservation.applied_promotion_id = applied_promo.id if applied_promo else None
+            db_reservation.applied_promotion_id = applied_promo_ids[0] if applied_promo_ids else None
+            db_reservation.applied_promotion_ids = applied_promo_ids or None
             db_reservation.promotion_snapshot = promo_snapshot
 
             if should_recalc:
@@ -806,6 +820,7 @@ def update_reservation(
             status_id=db_reservation.status_id,
             income_account_id=db_reservation.income_account_id,
             applied_promotion_id=db_reservation.applied_promotion_id,
+            applied_promotion_ids=db_reservation.applied_promotion_ids,
             promotion_snapshot=db_reservation.promotion_snapshot,
             products=response_products,
         )

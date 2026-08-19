@@ -110,6 +110,7 @@ class ReservationCreate(BaseModel):
     status_id: int = 1
     income_account_id: Optional[int] = None
     hourly_rate: Optional[int] = None
+    promotion_ids: Optional[List[int]] = None
 
     products: List[ReservationProductCreate] = []
 
@@ -129,6 +130,7 @@ class ReservationUpdate(BaseModel):
     status_id: Optional[int] = None
     income_account_id: Optional[int] = None
     hourly_rate: Optional[int] = None
+    promotion_ids: Optional[List[int]] = None
 
     products: Optional[List[ReservationProductCreate]] = None
 
@@ -162,6 +164,7 @@ class ReservationResponse(BaseModel):
     status_id: int
     income_account_id: Optional[int] = None
     applied_promotion_id: Optional[int] = None
+    applied_promotion_ids: Optional[List[int]] = None
     promotion_snapshot: Optional[dict] = None
     
     products: List[ReservationProductResponse] = []
@@ -761,6 +764,7 @@ class PromotionCreate(BaseModel):
     # Подарки
     bonus_minutes: Optional[int] = None
     gift_products: List[PromotionGiftProductCreate] = []
+    incompatible_promotion_ids: Optional[List[int]] = None
 
 
 class PromotionUpdate(BaseModel):
@@ -777,6 +781,7 @@ class PromotionUpdate(BaseModel):
     
     bonus_minutes: Optional[int] = None
     gift_products: Optional[List[PromotionGiftProductCreate]] = None
+    incompatible_promotion_ids: Optional[List[int]] = None
 
 
 class PromotionGiftProductResponse(BaseModel):
@@ -803,6 +808,7 @@ class PromotionResponse(BaseModel):
     
     bonus_minutes: Optional[int]
     gift_products: List[PromotionGiftProductResponse]
+    incompatible_promotion_ids: List[int] = []
     
     created_at: datetime
     updated_at: datetime
@@ -821,6 +827,10 @@ class PromotionBrief(BaseModel):
     bonus_minutes: Optional[int] = None
     valid_from: Optional[date] = None
     valid_until: Optional[date] = None
+    applicable_weekdays: Optional[List[int]] = None
+    is_active: Optional[bool] = True
+    gift_products: List[PromotionGiftProductResponse] = []
+    incompatible_promotion_ids: List[int] = []
     
     class Config:
         from_attributes = True

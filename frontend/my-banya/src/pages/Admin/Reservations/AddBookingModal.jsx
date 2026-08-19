@@ -23,6 +23,14 @@ import {
   getEffectiveHourlyRate,
   formatSegmentBreakdown,
 } from '../../../utils/bathPricing';
+import {
+  applySelectedPromotions,
+  buildPromotionSelectionRows,
+  computeDefaultPromotionIds,
+  getSnapshotPromotionIds,
+  normalizePromotionSnapshot,
+  togglePromotionSelection,
+} from '../../../utils/promotionSelection';
 
 const generateTimeOptions = () => {
   const options = [];
@@ -51,33 +59,6 @@ const computeEndDateTime = (ymd, hm, durationHours) => {
   const start = new Date(`${ymd}T${hm}:00`);
   const end = new Date(start.getTime() + Number(durationHours) * 60 * 60 * 1000);
   return { endDate: formatLocalYmd(end), endHm: formatLocalHm(end) };
-};
-
-const findApplicablePromotion = ({ bath, durationHours, guests, bathCost, startDate }) => {
-  const promos = (bath?.promotions || []).filter((p) => p && p.is_active !== false);
-  if (!promos.length || !startDate) return null;
-
-  const bookingDate = formatLocalYmd(startDate);
-  const weekday = ((startDate.getDay() + 6) % 7); // 0=пн … 6=вс
-
-  const matched = promos.filter((promo) => {
-    if (promo.valid_from && bookingDate < promo.valid_from) return false;
-    if (promo.valid_until && bookingDate > promo.valid_until) return false;
-    if (promo.min_hours != null && durationHours < Number(promo.min_hours)) return false;
-    if (promo.min_guests != null && guests < Number(promo.min_guests)) return false;
-    if (promo.min_amount != null && bathCost < Number(promo.min_amount)) return false;
-    if (Array.isArray(promo.applicable_weekdays) && promo.applicable_weekdays.length > 0) {
-      if (!promo.applicable_weekdays.includes(weekday)) return false;
-    }
-    return true;
-  });
-
-  if (!matched.length) return null;
-  matched.sort((a, b) => {
-    const score = (p) => (Number(p.bonus_minutes) || 0) * 1000 + (p.gift_products?.length || 0);
-    return score(b) - score(a);
-  });
-  return matched[0];
 };
 
 // Build ISO string with timezone offset (Python datetime.fromisoformat supports it)
@@ -181,6 +162,7 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [paymentModalView, setPaymentModalView] = useState('choose');
   const [showReceipt, setShowReceipt] = useState(false);
+  const [selectedPromotionIds, setSelectedPromotionIds] = useState([]);
   const { data: paymentQr } = useGetPaymentQrCodeQuery(undefined, {
     skip: !isPaymentModalOpen,
   });
@@ -191,6 +173,7 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
   /** Чтобы при редактировании не сбрасывать форму при догрузке stock/units */
   const editFormHydratedForRef = useRef(null);
   const hourlyRateManualRef = useRef(false);
+  const promotionSelectionTouchedRef = useRef(false);
 
   const { data: baths = [], isLoading: isLoadingBaths } = useGetBathsQuery();
   const { data: stockProducts = [] } = useGetStockProductsQuery();
@@ -228,6 +211,8 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
     if (justOpened) {
       setShowReceipt(false);
       hourlyRateManualRef.current = false;
+      promotionSelectionTouchedRef.current = false;
+      setSelectedPromotionIds([]);
     }
 
     if (!justOpened || !isOpen || isEditing) return;
@@ -250,6 +235,8 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
       status_id: 1,
       selectedProducts: [],
     }));
+    setSelectedPromotionIds([]);
+    promotionSelectionTouchedRef.current = false;
   }, [isOpen, isEditing, selectedDate]);
 
   useEffect(() => {
@@ -306,12 +293,13 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
       const date = formatLocalYmd(start);
       const start_time = start.toTimeString().slice(0, 5);
       const diffMs = end.getTime() - start.getTime();
-      const bonusMinutes = Number(booking.promotion_snapshot?.bonus_minutes) || 0;
+      const normalizedSnapshot = normalizePromotionSnapshot(booking.promotion_snapshot);
+      const bonusMinutes = Number(normalizedSnapshot.bonus_minutes) || 0;
       const paidMs = Math.max(diffMs - bonusMinutes * 60 * 1000, 30 * 60 * 1000);
       const duration_hours = Math.max(0.5, Math.round((paidMs / (1000 * 60 * 60)) * 2) / 2);
 
       const giftIds = new Set(
-        (booking.promotion_snapshot?.gift_products || []).map((g) => Number(g.product_id))
+        (normalizedSnapshot.gift_products || []).map((g) => Number(g.product_id))
       );
       const selectedProducts = (booking.products || [])
         .filter((product) => {
@@ -363,6 +351,8 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
         status_id: statusIdFromBooking,
         selectedProducts,
       });
+      setSelectedPromotionIds(getSnapshotPromotionIds(booking));
+      promotionSelectionTouchedRef.current = true;
     } catch (error) {
       console.error('Ошибка загрузки данных брони:', error);
       showToast('Ошибка загрузки данных для редактирования', 'error');
@@ -392,6 +382,41 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
     formData.date,
     formData.start_time,
     formData.duration_hours,
+    minBookingHours,
+  ]);
+
+  useEffect(() => {
+    if (!isOpen || !selectedBath || promotionSelectionTouchedRef.current || isEditing) return;
+    if (!formData.date || !formData.start_time) return;
+    const durationHours = Number(formData.duration_hours);
+    if (Number.isNaN(durationHours) || durationHours < minBookingHours) return;
+
+    const start = new Date(`${formData.date}T${formData.start_time}:00`);
+    const end = new Date(start.getTime() + durationHours * 3600 * 1000);
+    const manualOverride = hourlyRateManualRef.current && formData.hourly_rate !== ''
+      ? Number(formData.hourly_rate)
+      : null;
+    const pricing = calculateBathBaseCost(selectedBath, start, end, manualOverride);
+    const guestsNum = parseInt(formData.guests, 10) || 0;
+    const extraGuests = Math.max(0, guestsNum - (Number(selectedBath.base_guests) || 0));
+    const bathServiceCost = pricing.bathBaseCost + extraGuests * (Number(selectedBath.extra_guest_price) || 0);
+
+    setSelectedPromotionIds(computeDefaultPromotionIds({
+      promos: selectedBath.promotions,
+      durationHours,
+      guests: guestsNum,
+      bathCost: bathServiceCost,
+      startDate: start,
+    }));
+  }, [
+    isOpen,
+    isEditing,
+    selectedBath,
+    formData.date,
+    formData.start_time,
+    formData.duration_hours,
+    formData.guests,
+    formData.hourly_rate,
     minBookingHours,
   ]);
 
@@ -441,16 +466,20 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
     } else if (name === 'duration_hours') {
       if (value === '') {
         hourlyRateManualRef.current = false;
+        if (!isEditing) promotionSelectionTouchedRef.current = false;
         setFormData((prev) => ({ ...prev, duration_hours: '' }));
       } else {
         const n = parseFloat(value);
         hourlyRateManualRef.current = false;
+        if (!isEditing) promotionSelectionTouchedRef.current = false;
         setFormData((prev) => ({ ...prev, duration_hours: Number.isNaN(n) ? prev.duration_hours : n }));
       }
     } else if (name === 'bath_id') {
       const selected = baths.find((bath) => String(bath.bath_id) === String(value));
       const minHours = Math.max(1, Number(selected?.min_booking_hours) || 1);
       hourlyRateManualRef.current = false;
+      promotionSelectionTouchedRef.current = false;
+      setSelectedPromotionIds([]);
       setFormData((prev) => ({
         ...prev,
         bath_id: value,
@@ -461,6 +490,7 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
       }));
     } else if (name === 'date') {
       hourlyRateManualRef.current = false;
+      if (!isEditing) promotionSelectionTouchedRef.current = false;
       setFormData((prev) => {
         const selected = baths.find((bath) => String(bath.bath_id) === String(prev.bath_id));
         return {
@@ -473,6 +503,7 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
       });
     } else if (name === 'start_time') {
       hourlyRateManualRef.current = false;
+      if (!isEditing) promotionSelectionTouchedRef.current = false;
       setFormData((prev) => {
         const selected = baths.find((bath) => String(bath.bath_id) === String(prev.bath_id));
         return {
@@ -793,6 +824,7 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
         quantity: parseInt(p.quantity, 10) || 1,
         price: parseFloat(String(p.price ?? p.purchase_price ?? 0).replace(',', '.')) || 0,
       })),
+      promotion_ids: selectedPromotionIds.map(Number),
     };
 
     console.log('🟢 Payload:', payload);
@@ -921,15 +953,9 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
 
     const bathServiceCost = bathBaseCost + extraGuestCost;
 
-    const appliedPromotion = findApplicablePromotion({
-      bath: selectedBath,
-      durationHours,
-      guests: guestsNum,
-      bathCost: bathServiceCost,
-      startDate: start,
-    });
-    const bonusMinutes = Number(appliedPromotion?.bonus_minutes) || 0;
-    const giftItems = (appliedPromotion?.gift_products || []).map((gp) => ({
+    const promotionResult = applySelectedPromotions(selectedBath?.promotions, selectedPromotionIds);
+    const bonusMinutes = promotionResult.bonusMinutes;
+    const giftItems = promotionResult.giftProducts.map((gp) => ({
       name: gp.product_name || `Товар #${gp.product_id}`,
       quantity: gp.quantity || 1,
       unitPrice: 0,
@@ -979,7 +1005,8 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
       massageItems,
       massageTotal,
       totalCost,
-      appliedPromotion,
+      appliedPromotions: promotionResult.selectedPromotions,
+      appliedPromotionLabel: promotionResult.label,
       bonusMinutes,
       paidEndLabel,
       startLabel: start.toLocaleString('ru-RU', {
@@ -1003,9 +1030,44 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
     formData.selectedProducts,
     formData.client_name,
     formData.client_phone,
+    selectedPromotionIds,
     minBookingHours,
     isEditing,
     booking,
+  ]);
+
+  const promotionSelectionRows = useMemo(() => {
+    if (!selectedBath || !formData.date || !formData.start_time) return [];
+    const durationHours = Number(formData.duration_hours);
+    if (Number.isNaN(durationHours) || durationHours < minBookingHours) return [];
+
+    const start = new Date(`${formData.date}T${formData.start_time}:00`);
+    const end = new Date(start.getTime() + durationHours * 3600 * 1000);
+    const manualOverride = hourlyRateManualRef.current && formData.hourly_rate !== ''
+      ? Number(formData.hourly_rate)
+      : null;
+    const pricing = calculateBathBaseCost(selectedBath, start, end, manualOverride);
+    const guestsNum = parseInt(formData.guests, 10) || 0;
+    const extraGuests = Math.max(0, guestsNum - (Number(selectedBath.base_guests) || 0));
+    const bathServiceCost = pricing.bathBaseCost + extraGuests * (Number(selectedBath.extra_guest_price) || 0);
+
+    return buildPromotionSelectionRows({
+      promos: selectedBath.promotions,
+      selectedIds: selectedPromotionIds,
+      durationHours,
+      guests: guestsNum,
+      bathCost: bathServiceCost,
+      startDate: start,
+    });
+  }, [
+    selectedBath,
+    selectedPromotionIds,
+    formData.date,
+    formData.start_time,
+    formData.duration_hours,
+    formData.guests,
+    formData.hourly_rate,
+    minBookingHours,
   ]);
 
   const allTimeSlots = generateTimeOptions();
@@ -1440,6 +1502,60 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
             />
           </div>
 
+          {formData.bath_id && promotionSelectionRows.length > 0 && (
+            <div className="border-t pt-4 sm:pt-6">
+              <h3 className="text-lg sm:text-xl font-medium text-gray-800 mb-3">Акции бани</h3>
+              <div className="space-y-2">
+                {promotionSelectionRows.map((row) => (
+                  <label
+                    key={row.id}
+                    className={`flex items-start gap-3 p-3 rounded-xl border ${
+                      row.checked ? 'border-green-300 bg-green-50' : 'border-gray-200 bg-gray-50'
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={row.checked}
+                      onChange={(e) => {
+                        promotionSelectionTouchedRef.current = true;
+                        setSelectedPromotionIds(togglePromotionSelection({
+                          promos: selectedBath?.promotions,
+                          selectedIds: selectedPromotionIds,
+                          promoId: row.id,
+                          checked: e.target.checked,
+                        }));
+                      }}
+                      className="mt-1 w-4 h-4 text-green-600 rounded focus:ring-green-500"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium text-gray-800">{row.promo.name}</div>
+                      {row.promo.description && (
+                        <div className="text-sm text-gray-600 mt-0.5">{row.promo.description}</div>
+                      )}
+                      <div className="text-xs text-gray-500 mt-1">
+                        {row.promo.bonus_minutes ? `+${row.promo.bonus_minutes} мин` : null}
+                        {row.promo.bonus_minutes && row.promo.gift_products?.length ? ' · ' : null}
+                        {row.promo.gift_products?.length
+                          ? row.promo.gift_products.map((gp) => `${gp.product_name} x${gp.quantity}`).join(', ')
+                          : null}
+                      </div>
+                      {row.mismatchReasons.length > 0 && (
+                        <div className="text-xs text-amber-700 mt-1">
+                          Условия не выполнены: {row.mismatchReasons.join('; ')}
+                        </div>
+                      )}
+                      {row.incompatibleWithSelected.length > 0 && (
+                        <div className="text-xs text-red-600 mt-1">
+                          Несовместима с: {row.incompatibleWithSelected.join(', ')}
+                        </div>
+                      )}
+                    </div>
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* ========== СЕКЦИЯ ТОВАРОВ ========== */}
           <div className="border-t pt-4 sm:pt-6">
             <h3 className="text-lg sm:text-xl font-medium text-gray-800 mb-3">Товары (опционально)</h3>
@@ -1563,9 +1679,9 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
                       )}
                     </section>
 
-                    {receiptSummary.appliedPromotion && (
+                    {receiptSummary.appliedPromotionLabel && (
                       <div className="mb-3 rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-800">
-                        Акция: <strong>{receiptSummary.appliedPromotion.name}</strong>
+                        Акции: <strong>{receiptSummary.appliedPromotionLabel}</strong>
                       </div>
                     )}
 

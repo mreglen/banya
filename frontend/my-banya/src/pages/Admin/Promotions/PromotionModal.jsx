@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
-import { useCreatePromotionMutation, useUpdatePromotionMutation } from '../../../redux/slices/promotionsApiSlice';
+import { useCreatePromotionMutation, useUpdatePromotionMutation, useGetPromotionsQuery } from '../../../redux/slices/promotionsApiSlice';
 import ProductSelectorModal from './ProductSelectorModal';
 
 function PromotionModal({ isOpen, onClose, promotion = null }) {
   const [createPromotion] = useCreatePromotionMutation();
   const [updatePromotion] = useUpdatePromotionMutation();
+  const { data: allPromotions = [] } = useGetPromotionsQuery(undefined, { skip: !isOpen });
   
   const [template, setTemplate] = useState('');
   const [showProductSelector, setShowProductSelector] = useState(false);
@@ -20,7 +21,8 @@ function PromotionModal({ isOpen, onClose, promotion = null }) {
     valid_from: '',
     valid_until: '',
     bonus_minutes: null,
-    gift_products: []
+    gift_products: [],
+    incompatible_promotion_ids: [],
   });
 
   // Сброс формы при открытии
@@ -40,7 +42,8 @@ function PromotionModal({ isOpen, onClose, promotion = null }) {
           valid_from: promotion.valid_from || '',
           valid_until: promotion.valid_until || '',
           bonus_minutes: promotion.bonus_minutes || null,
-          gift_products: promotion.gift_products || []
+          gift_products: promotion.gift_products || [],
+          incompatible_promotion_ids: (promotion.incompatible_promotion_ids || []).map(Number),
         });
       } else {
         // Режим создания
@@ -56,7 +59,8 @@ function PromotionModal({ isOpen, onClose, promotion = null }) {
           valid_from: '',
           valid_until: '',
           bonus_minutes: null,
-          gift_products: []
+          gift_products: [],
+          incompatible_promotion_ids: [],
         });
       }
     }
@@ -145,7 +149,10 @@ function PromotionModal({ isOpen, onClose, promotion = null }) {
         gift_products: formData.gift_products.map(gp => ({
           product_id: gp.product_id,
           quantity: gp.quantity
-        }))
+        })),
+        incompatible_promotion_ids: formData.incompatible_promotion_ids.length
+          ? formData.incompatible_promotion_ids.map(Number)
+          : [],
       };
 
       let resultId;
@@ -435,6 +442,43 @@ function PromotionModal({ isOpen, onClose, promotion = null }) {
                       </div>
                     )}
                   </div>
+                </div>
+              </div>
+
+              <div className="border-t border-gray-200 pt-4 md:pt-6">
+                <h3 className="text-base md:text-lg font-medium text-gray-800 mb-3 md:mb-4">
+                  Не суммируется с акциями
+                </h3>
+                <div className="space-y-2 max-h-48 overflow-y-auto border border-gray-200 rounded-lg p-3">
+                  {allPromotions
+                    .filter((item) => !isEditing || Number(item.id) !== Number(promotion.id))
+                    .map((item) => (
+                      <label key={item.id} className="flex items-start gap-3 p-2 hover:bg-gray-50 rounded-lg cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={formData.incompatible_promotion_ids.includes(Number(item.id))}
+                          onChange={(e) => {
+                            const promoId = Number(item.id);
+                            setFormData((prev) => ({
+                              ...prev,
+                              incompatible_promotion_ids: e.target.checked
+                                ? [...prev.incompatible_promotion_ids, promoId]
+                                : prev.incompatible_promotion_ids.filter((id) => Number(id) !== promoId),
+                            }));
+                          }}
+                          className="mt-1 w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                        />
+                        <div>
+                          <div className="font-medium text-gray-800">{item.name}</div>
+                          {item.description && (
+                            <div className="text-xs text-gray-500">{item.description}</div>
+                          )}
+                        </div>
+                      </label>
+                    ))}
+                  {allPromotions.filter((item) => !isEditing || Number(item.id) !== Number(promotion.id)).length === 0 && (
+                    <div className="text-sm text-gray-500 text-center py-3">Других акций пока нет</div>
+                  )}
                 </div>
               </div>
 

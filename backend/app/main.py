@@ -374,6 +374,26 @@ with engine.begin() as connection:
             """
         )
     )
+    connection.execute(
+        text(
+            """
+            CREATE TABLE IF NOT EXISTS promotion_incompatibilities (
+                promotion_id_a INTEGER NOT NULL REFERENCES promotions(id) ON DELETE CASCADE,
+                promotion_id_b INTEGER NOT NULL REFERENCES promotions(id) ON DELETE CASCADE,
+                PRIMARY KEY (promotion_id_a, promotion_id_b),
+                CHECK (promotion_id_a < promotion_id_b)
+            )
+            """
+        )
+    )
+    connection.execute(
+        text(
+            """
+            ALTER TABLE reservations
+            ADD COLUMN IF NOT EXISTS applied_promotion_ids JSONB
+            """
+        )
+    )
 
 app = FastAPI(title='Бани')
 

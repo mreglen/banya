@@ -93,6 +93,7 @@ class Reservation(Base):
     status_id = Column(Integer, ForeignKey('reservation_status.id'), nullable=False, default=1)
     income_account_id = Column(Integer, ForeignKey("organization_accounts.id"), nullable=True)
     applied_promotion_id = Column(Integer, ForeignKey('promotions.id'), nullable=True)
+    applied_promotion_ids = Column(JSON, nullable=True)
     promotion_snapshot = Column(JSON, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
@@ -451,6 +452,13 @@ class BathPromotion(Base):
     
     bath_id = Column(Integer, ForeignKey("baths.bath_id", ondelete="CASCADE"), primary_key=True)
     promotion_id = Column(Integer, ForeignKey("promotions.id", ondelete="CASCADE"), primary_key=True)
+
+
+class PromotionIncompatibility(Base):
+    __tablename__ = "promotion_incompatibilities"
+
+    promotion_id_a = Column(Integer, ForeignKey("promotions.id", ondelete="CASCADE"), primary_key=True)
+    promotion_id_b = Column(Integer, ForeignKey("promotions.id", ondelete="CASCADE"), primary_key=True)
 
 
 class AuditLog(Base):

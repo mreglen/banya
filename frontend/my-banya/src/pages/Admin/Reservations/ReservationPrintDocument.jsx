@@ -5,6 +5,7 @@ import {
   useGetReservationStatusesQuery,
   useUpdateReservationMutation,
 } from '../../../redux/slices/reservationSlice';
+import { normalizePromotionSnapshot } from '../../../utils/promotionSelection';
 
 const ORG_INFO = {
   name: 'Николаевские бани',
@@ -60,11 +61,20 @@ function ReservationPrintDocument() {
     () => (reservation?.massages || []).reduce((sum, m) => sum + (m.cost || 0) * (m.quantity || 0), 0),
     [reservation]
   );
+  const promotionSnapshot = useMemo(
+    () => normalizePromotionSnapshot(reservation?.promotion_snapshot),
+    [reservation?.promotion_snapshot]
+  );
   const extraTotal = productTotal + massagesTotal;
   const totalCost = reservation?.total_cost || 0;
   const bathServiceCost = Math.max(0, totalCost - extraTotal);
-  const hasBonusMinutes = Boolean(reservation?.promotion_snapshot?.bonus_minutes);
-  const hasGiftProducts = (reservation?.promotion_snapshot?.gift_products || []).length > 0;
+  const promotionNames = useMemo(() => {
+    if (promotionSnapshot.name) return promotionSnapshot.name;
+    const fromList = (promotionSnapshot.promotions || []).map((p) => p.name).filter(Boolean).join(', ');
+    return fromList || 'Нет';
+  }, [promotionSnapshot]);
+  const hasBonusMinutes = Boolean(promotionSnapshot.bonus_minutes);
+  const hasGiftProducts = (promotionSnapshot.gift_products || []).length > 0;
   const closedStatus = statusOptions.find(
     (status) => String(status.status_name || '').trim().toLowerCase() === 'закрыт'
   );
@@ -225,19 +235,19 @@ function ReservationPrintDocument() {
               </div>
             )}
             <div className="flex justify-between">
-              <span className="text-gray-700">Акция</span>
-              <span className="text-right">{reservation.promotion_snapshot?.name || 'Нет'}</span>
+              <span className="text-gray-700">Акции</span>
+              <span className="text-right">{promotionNames}</span>
             </div>
             {hasBonusMinutes && (
               <div className="flex justify-between text-green-700">
                 <span>Бонусное время</span>
-                <span>+{reservation.promotion_snapshot.bonus_minutes} мин</span>
+                <span>+{promotionSnapshot.bonus_minutes} мин</span>
               </div>
             )}
             {hasGiftProducts && (
               <div className="pt-1">
                 <div className="text-green-700 font-medium">Подарки:</div>
-                {reservation.promotion_snapshot.gift_products.map((gp, idx) => (
+                {promotionSnapshot.gift_products.map((gp, idx) => (
                   <div key={`gift-${idx}`} className="flex justify-between text-green-700">
                     <span>{gp.product_name} x {gp.quantity}</span>
                     <span>0 ₽</span>

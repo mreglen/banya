@@ -1,5 +1,6 @@
 // src/pages/Admin/Documents/DocumentsRealization/RealizationDetailsModal.jsx
 import { useGetReservationByIdQuery } from '../../../../redux/slices/reservationSlice';
+import { normalizePromotionSnapshot } from '../../../../utils/promotionSelection';
 
 function formatDateTime(value) {
   if (!value) return '—';
@@ -27,7 +28,12 @@ function RealizationDetailsModal({ isOpen, onClose, reservation }) {
   const docProducts = reservation.items || [];
   const bookingProducts = bookingDetails?.products || [];
   const massages = bookingDetails?.massages || [];
-  const promotion = bookingDetails?.promotion_snapshot;
+  const promotion = normalizePromotionSnapshot(bookingDetails?.promotion_snapshot);
+  const promotionLabel = (promotion.promotions || []).length > 1 ? 'Акции' : 'Акция';
+  const promotionNames =
+    promotion.name
+    || (promotion.promotions || []).map((p) => p.name).filter(Boolean).join(', ')
+    || '—';
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
@@ -185,9 +191,9 @@ function RealizationDetailsModal({ isOpen, onClose, reservation }) {
             </div>
           )}
 
-          {promotion && (
+          {(promotion.name || promotion.bonus_minutes || (promotion.gift_products || []).length > 0) && (
             <div className="mt-4 rounded-lg border border-green-200 bg-green-50 p-3">
-              <p className="font-medium text-green-800">Акция: {promotion.name || '—'}</p>
+              <p className="font-medium text-green-800">{promotionLabel}: {promotionNames}</p>
               {promotion.bonus_minutes ? (
                 <p className="text-sm text-green-700 mt-1">Бонусное время: +{promotion.bonus_minutes} мин</p>
               ) : null}

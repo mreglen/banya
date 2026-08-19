@@ -12,13 +12,13 @@ from app.models import Bath, Photo, BathPromotion, Promotion, PromotionGiftProdu
 from app.schemas import BathOut, BathCreate, BathUpdate
 from app.image_utils import process_image_to_webp
 from app.slug_utils import generate_slug, make_unique_slug
-from app.promotion_utils import serialize_promotion_brief
+from app.promotion_utils import serialize_promotion_brief, load_incompatibility_map
 from app.pricing_utils import validate_time_tariffs, sync_flat_costs_from_tariffs
 
 router = APIRouter(prefix="/baths", tags=["baths"])
 
 
-def _serialize_bath(bath: Bath) -> dict:
+def _serialize_bath(bath: Bath, incompatibility_map=None) -> dict:
     active_promos = [p for p in (bath.promotions or []) if p.is_active]
     return {
         "bath_id": bath.bath_id,
@@ -40,8 +40,24 @@ def _serialize_bath(bath: Bath) -> dict:
             }
             for p in bath.photos
         ],
-        "promotions": [serialize_promotion_brief(p) for p in active_promos],
+        "promotions": [
+            serialize_promotion_brief(
+                p,
+                incompatible_promotion_ids=sorted(incompatibility_map.get(p.id, set()))
+                if incompatibility_map is not None
+                else [],
+            )
+            for p in active_promos
+        ],
     }
+
+
+def _serialize_baths(db: Session, baths: List[Bath]) -> List[dict]:
+    promo_ids = []
+    for bath in baths:
+        promo_ids.extend([p.id for p in (bath.promotions or []) if p.is_active])
+    incompatibility_map = load_incompatibility_map(db, promo_ids) if promo_ids else {}
+    return [_serialize_bath(bath, incompatibility_map) for bath in baths]
 
 
 @router.get("/")
@@ -59,7 +75,7 @@ def get_baths(db: Session = Depends(get_db)):
     if not baths:
         return []
 
-    return [_serialize_bath(bath) for bath in baths]
+    return _serialize_baths(db, baths)
 
 
 @router.get("/{slug_or_id}")
@@ -89,7 +105,11 @@ def get_bath(slug_or_id: str, db: Session = Depends(get_db)):
     if not bath:
         raise HTTPException(status_code=404, detail="Баня не найдена")
 
-    return _serialize_bath(bath)
+    incompatibility_map = load_incompatibility_map(
+        db,
+        [p.id for p in (bath.promotions or []) if p.is_active],
+    )
+    return _serialize_bath(bath, incompatibility_map)
 
 # новые эндпоинты
 @router.post("/", response_model=BathOut, status_code=201)
