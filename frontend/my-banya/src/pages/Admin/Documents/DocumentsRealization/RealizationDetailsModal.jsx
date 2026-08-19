@@ -191,9 +191,12 @@ function RealizationDetailsModal({ isOpen, onClose, reservation }) {
             </div>
           )}
 
-          {(promotion.name || promotion.bonus_minutes || (promotion.gift_products || []).length > 0) && (
+          {(promotion.name || promotion.bonus_minutes || promotion.discount_amount || (promotion.gift_products || []).length > 0) && (
             <div className="mt-4 rounded-lg border border-green-200 bg-green-50 p-3">
               <p className="font-medium text-green-800">{promotionLabel}: {promotionNames}</p>
+              {promotion.discount_amount ? (
+                <p className="text-sm text-green-700 mt-1">Скидка: -{Number(promotion.discount_amount).toLocaleString('ru-RU')} ₽</p>
+              ) : null}
               {promotion.bonus_minutes ? (
                 <p className="text-sm text-green-700 mt-1">Бонусное время: +{promotion.bonus_minutes} мин</p>
               ) : null}

@@ -3,6 +3,7 @@ import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { useSelector } from 'react-redux';
 import {
   useGetBathsQuery,
+  useGetClientsQuery,
 } from '../../../redux/slices/apiSlice';
 import {
   useGetStockProductsQuery,
@@ -27,6 +28,8 @@ import {
   applySelectedPromotions,
   buildPromotionSelectionRows,
   computeDefaultPromotionIds,
+  findClientBirthDate,
+  formatPromotionDiscount,
   getSnapshotPromotionIds,
   normalizePromotionSnapshot,
   togglePromotionSelection,
@@ -176,6 +179,7 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
   const promotionSelectionTouchedRef = useRef(false);
 
   const { data: baths = [], isLoading: isLoadingBaths } = useGetBathsQuery();
+  const { data: clients = [] } = useGetClientsQuery(undefined, { skip: !isOpen });
   const { data: stockProducts = [] } = useGetStockProductsQuery();
   const { data: units = [], isLoading: isLoadingUnits } = useGetUnitsOfMeasurementQuery(); // ← ДОБАВЛЕНО
   const {
@@ -186,6 +190,10 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
   const selectedBathIdNum = formData.bath_id ? Number(formData.bath_id) : null;
   const selectedBath = baths.find((bath) => Number(bath.bath_id) === selectedBathIdNum);
   const minBookingHours = Math.max(1, Number(selectedBath?.min_booking_hours) || 1);
+  const clientBirthDate = useMemo(
+    () => findClientBirthDate(clients, formData.client_phone),
+    [clients, formData.client_phone]
+  );
   const { data: reservationsForDate = [] } = useGetReservationsByDateQuery(
     { date: formData.date, bathId: selectedBathIdNum },
     { skip: !isOpen || !formData.date || !selectedBathIdNum }
@@ -407,6 +415,7 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
       guests: guestsNum,
       bathCost: bathServiceCost,
       startDate: start,
+      clientBirthDate,
     }));
   }, [
     isOpen,
@@ -417,6 +426,7 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
     formData.duration_hours,
     formData.guests,
     formData.hourly_rate,
+    clientBirthDate,
     minBookingHours,
   ]);
 
@@ -953,8 +963,9 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
 
     const bathServiceCost = bathBaseCost + extraGuestCost;
 
-    const promotionResult = applySelectedPromotions(selectedBath?.promotions, selectedPromotionIds);
+    const promotionResult = applySelectedPromotions(selectedBath?.promotions, selectedPromotionIds, bathServiceCost);
     const bonusMinutes = promotionResult.bonusMinutes;
+    const promotionDiscount = promotionResult.discountAmount;
     const giftItems = promotionResult.giftProducts.map((gp) => ({
       name: gp.product_name || `Товар #${gp.product_id}`,
       quantity: gp.quantity || 1,
@@ -963,7 +974,7 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
       isGift: true,
     }));
 
-    const totalCost = bathServiceCost + productTotal + massageTotal;
+    const totalCost = Math.max(0, bathServiceCost - promotionDiscount) + productTotal + massageTotal;
 
     const paidEnd = computeEndDateTime(formData.date, formData.start_time, durationHours);
     const totalDurationHours = durationHours + bonusMinutes / 60;
@@ -1008,6 +1019,7 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
       appliedPromotions: promotionResult.selectedPromotions,
       appliedPromotionLabel: promotionResult.label,
       bonusMinutes,
+      promotionDiscount,
       paidEndLabel,
       startLabel: start.toLocaleString('ru-RU', {
         day: '2-digit',
@@ -1030,6 +1042,7 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
     formData.selectedProducts,
     formData.client_name,
     formData.client_phone,
+    clientBirthDate,
     selectedPromotionIds,
     minBookingHours,
     isEditing,
@@ -1058,6 +1071,7 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
       guests: guestsNum,
       bathCost: bathServiceCost,
       startDate: start,
+      clientBirthDate,
     });
   }, [
     selectedBath,
@@ -1067,6 +1081,7 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
     formData.duration_hours,
     formData.guests,
     formData.hourly_rate,
+    clientBirthDate,
     minBookingHours,
   ]);
 
@@ -1533,6 +1548,8 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
                         <div className="text-sm text-gray-600 mt-0.5">{row.promo.description}</div>
                       )}
                       <div className="text-xs text-gray-500 mt-1">
+                        {formatPromotionDiscount(row.promo) || null}
+                        {formatPromotionDiscount(row.promo) && (row.promo.bonus_minutes || row.promo.gift_products?.length) ? ' · ' : null}
                         {row.promo.bonus_minutes ? `+${row.promo.bonus_minutes} мин` : null}
                         {row.promo.bonus_minutes && row.promo.gift_products?.length ? ' · ' : null}
                         {row.promo.gift_products?.length
@@ -1544,7 +1561,7 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
                           Условия не выполнены: {row.mismatchReasons.join('; ')}
                         </div>
                       )}
-                      {row.incompatibleWithSelected.length > 0 && (
+                      {row.incompatibleWithSelected.length > 0 && !row.checked && (
                         <div className="text-xs text-red-600 mt-1">
                           Несовместима с: {row.incompatibleWithSelected.join(', ')}
                         </div>
@@ -1675,6 +1692,12 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
                         <div className="flex justify-between gap-3 text-green-700">
                           <span>Бонусное время</span>
                           <span className="text-right">+{receiptSummary.bonusMinutes} мин</span>
+                        </div>
+                      )}
+                      {receiptSummary.promotionDiscount > 0 && (
+                        <div className="flex justify-between gap-3 text-green-700">
+                          <span>Скидка по акции</span>
+                          <span className="text-right">-{formatReceiptMoney(receiptSummary.promotionDiscount)}</span>
                         </div>
                       )}
                     </section>

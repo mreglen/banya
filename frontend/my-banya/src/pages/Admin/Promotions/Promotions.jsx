@@ -39,6 +39,10 @@ function Promotions() {
   // Форматирование условий акции
   const formatConditions = (promotion) => {
     const conditions = [];
+
+    if (promotion.promotion_type === 'birthday') {
+      conditions.push(`день рождения ±${promotion.birthday_window_days ?? 7} дн.`);
+    }
     
     if (promotion.min_hours) conditions.push(`от ${promotion.min_hours} ч`);
     if (promotion.min_guests) conditions.push(`от ${promotion.min_guests} чел`);
@@ -57,6 +61,9 @@ function Promotions() {
   // Форматирование подарков
   const formatGifts = (promotion) => {
     const gifts = [];
+
+    if (promotion.discount_percent) gifts.push(`-${promotion.discount_percent}%`);
+    if (promotion.discount_amount) gifts.push(`-${Number(promotion.discount_amount).toLocaleString('ru-RU')} ₽`);
     
     if (promotion.bonus_minutes) {
       gifts.push(`+${promotion.bonus_minutes} мин`);
@@ -130,6 +137,11 @@ function Promotions() {
                       <div className="flex-1 min-w-0">
                         <div className="flex flex-wrap items-center gap-2 md:gap-3 mb-2 md:mb-3">
                           <h3 className="text-base md:text-xl font-semibold text-gray-800 break-words">{promotion.name}</h3>
+                          {promotion.promotion_type === 'birthday' && (
+                            <span className="px-2 py-0.5 md:px-3 md:py-1 rounded-full text-xs font-medium whitespace-nowrap bg-pink-100 text-pink-800">
+                              День рождения
+                            </span>
+                          )}
                           <span
                             className={`px-2 py-0.5 md:px-3 md:py-1 rounded-full text-xs font-medium whitespace-nowrap ${
                               promotion.is_active
@@ -147,7 +159,7 @@ function Promotions() {
                             <span className="text-gray-600">{formatConditions(promotion)}</span>
                           </div>
                           <div>
-                            <span className="font-medium text-gray-700">Подарки: </span>
+                            <span className="font-medium text-gray-700">Награды: </span>
                             <span className="text-gray-600">{formatGifts(promotion)}</span>
                           </div>
                           <div>

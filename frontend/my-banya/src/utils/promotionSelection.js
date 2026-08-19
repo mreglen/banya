@@ -12,12 +12,45 @@ export const normalizeWeekday = (day) => {
   return value;
 };
 
+export const normalizePhone = (phone) => {
+  if (!phone) return null;
+  const digits = String(phone).replace(/\D/g, '');
+  if (digits.length === 11 && digits.startsWith('8')) return `+7${digits.slice(1)}`;
+  if (digits.length === 11 && digits.startsWith('7')) return `+${digits}`;
+  if (digits.length === 10) return `+7${digits}`;
+  return null;
+};
+
+export const isBirthdayPromotion = (promo) => promo?.promotion_type === 'birthday';
+
+export const isInBirthdayWindow = (bookingDate, birthDate, windowDays = 7) => {
+  if (!birthDate) return false;
+  const window = Math.max(0, Number(windowDays) || 0);
+  const booking = bookingDate instanceof Date ? formatLocalYmd(bookingDate) : birthDate;
+  const bookingParts = (typeof booking === 'string' ? booking : formatLocalYmd(bookingDate)).split('-').map(Number);
+  const birthParts = String(birthDate).split('-').map(Number);
+  if (birthParts.length !== 3) return false;
+
+  const bookingDt = new Date(bookingParts[0], bookingParts[1] - 1, bookingParts[2]);
+  for (const yearOffset of [-1, 0, 1]) {
+    const year = bookingParts[0] + yearOffset;
+    let month = birthParts[1];
+    let day = birthParts[2];
+    if (month === 2 && day === 29) day = 28;
+    const birthdayDt = new Date(year, month - 1, day);
+    const diffDays = Math.abs(Math.round((bookingDt - birthdayDt) / (24 * 3600 * 1000)));
+    if (diffDays <= window) return true;
+  }
+  return false;
+};
+
 export const getPromoMismatchReasons = ({
   promo,
   durationHours,
   guests,
   bathCost,
   startDate,
+  clientBirthDate = null,
 }) => {
   const reasons = [];
   if (!promo || promo.is_active === false) {
@@ -25,6 +58,16 @@ export const getPromoMismatchReasons = ({
   }
 
   const bookingDate = formatLocalYmd(startDate);
+
+  if (isBirthdayPromotion(promo)) {
+    const windowDays = Number(promo.birthday_window_days ?? 7);
+    if (!clientBirthDate) {
+      reasons.push('не указана дата рождения клиента');
+    } else if (!isInBirthdayWindow(startDate, clientBirthDate, windowDays)) {
+      reasons.push(`бронь вне периода ±${windowDays} дн. от дня рождения`);
+    }
+  }
+
   if (promo.valid_from && bookingDate < promo.valid_from) {
     reasons.push(`действует с ${new Date(`${promo.valid_from}T12:00:00`).toLocaleDateString('ru-RU')}`);
   }
@@ -54,10 +97,27 @@ export const promoMatches = (params) => getPromoMismatchReasons(params).length =
 
 export const arePromotionsIncompatible = (promoA, promoB) => {
   if (!promoA || !promoB) return false;
-  if (Number(promoA.id) === Number(promoB.id)) return true;
+  if (Number(promoA.id) === Number(promoB.id)) return false;
   const idsA = new Set((promoA.incompatible_promotion_ids || []).map(Number));
   const idsB = new Set((promoB.incompatible_promotion_ids || []).map(Number));
   return idsA.has(Number(promoB.id)) || idsB.has(Number(promoA.id));
+};
+
+export const calculatePromotionDiscount = (promos, bathCost) => {
+  const bathCostInt = Math.max(0, Math.round(Number(bathCost) || 0));
+  let total = 0;
+  (promos || []).forEach((promo) => {
+    if (promo.discount_amount) total += Number(promo.discount_amount);
+    if (promo.discount_percent) total += Math.round(bathCostInt * Number(promo.discount_percent) / 100);
+  });
+  return Math.min(total, bathCostInt);
+};
+
+export const formatPromotionDiscount = (promo) => {
+  const parts = [];
+  if (promo.discount_percent) parts.push(`-${promo.discount_percent}%`);
+  if (promo.discount_amount) parts.push(`-${Number(promo.discount_amount).toLocaleString('ru-RU')} ₽`);
+  return parts.join(' ');
 };
 
 export const computeDefaultPromotionIds = ({
@@ -66,6 +126,7 @@ export const computeDefaultPromotionIds = ({
   guests,
   bathCost,
   startDate,
+  clientBirthDate = null,
 }) => {
   const list = (promos || []).filter((p) => p && p.is_active !== false);
   const conflictingIds = new Set();
@@ -87,6 +148,7 @@ export const computeDefaultPromotionIds = ({
       guests,
       bathCost,
       startDate,
+      clientBirthDate,
     }))
     .map((promo) => Number(promo.id));
 };
@@ -98,6 +160,7 @@ export const buildPromotionSelectionRows = ({
   guests,
   bathCost,
   startDate,
+  clientBirthDate = null,
 }) => {
   const list = (promos || []).filter((p) => p && p.is_active !== false);
   const selectedSet = new Set((selectedIds || []).map(Number));
@@ -109,9 +172,14 @@ export const buildPromotionSelectionRows = ({
       guests,
       bathCost,
       startDate,
+      clientBirthDate,
     });
     const incompatibleWithSelected = list
-      .filter((other) => selectedSet.has(Number(other.id)) && arePromotionsIncompatible(promo, other))
+      .filter(
+        (other) => Number(other.id) !== Number(promo.id)
+          && selectedSet.has(Number(other.id))
+          && arePromotionsIncompatible(promo, other),
+      )
       .map((other) => other.name);
 
     return {
@@ -138,6 +206,7 @@ export const togglePromotionSelection = ({
   if (checked) {
     next.add(Number(promoId));
     list.forEach((other) => {
+      if (Number(other.id) === Number(promoId)) return;
       if (arePromotionsIncompatible(target, other)) {
         next.delete(Number(other.id));
       }
@@ -148,10 +217,11 @@ export const togglePromotionSelection = ({
   return Array.from(next);
 };
 
-export const applySelectedPromotions = (promos, selectedIds) => {
+export const applySelectedPromotions = (promos, selectedIds, bathCost = 0) => {
   const selectedSet = new Set((selectedIds || []).map(Number));
   const selected = (promos || []).filter((p) => selectedSet.has(Number(p.id)));
   const bonusMinutes = selected.reduce((sum, promo) => sum + (Number(promo.bonus_minutes) || 0), 0);
+  const discountAmount = calculatePromotionDiscount(selected, bathCost);
 
   const giftMap = new Map();
   selected.forEach((promo) => {
@@ -173,6 +243,7 @@ export const applySelectedPromotions = (promos, selectedIds) => {
   return {
     selectedPromotions: selected,
     bonusMinutes,
+    discountAmount,
     giftProducts: Array.from(giftMap.values()),
     label: selected.map((p) => p.name).join(', '),
   };
@@ -194,16 +265,27 @@ export const getSnapshotPromotionIds = (booking) => {
 
 export const normalizePromotionSnapshot = (snapshot) => {
   if (!snapshot) {
-    return { promotions: [], bonus_minutes: 0, gift_products: [], name: '' };
+    return { promotions: [], bonus_minutes: 0, gift_products: [], discount_amount: 0, name: '' };
   }
   if (Array.isArray(snapshot.promotions)) {
-    return snapshot;
+    return {
+      ...snapshot,
+      discount_amount: Number(snapshot.discount_amount) || 0,
+    };
   }
   return {
     promotions: [snapshot],
     bonus_minutes: Number(snapshot.bonus_minutes) || 0,
+    discount_amount: Number(snapshot.discount_amount) || 0,
     gift_products: snapshot.gift_products || [],
     id: snapshot.id,
     name: snapshot.name || '',
   };
+};
+
+export const findClientBirthDate = (clients, phone) => {
+  const normalized = normalizePhone(phone);
+  if (!normalized) return null;
+  const client = (clients || []).find((item) => normalizePhone(item.phone) === normalized);
+  return client?.birth_date || null;
 };

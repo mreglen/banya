@@ -1,7 +1,7 @@
 """Применение акций бани к бронированию."""
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from typing import Any, Dict, List, Optional, Set, Tuple
 
 from sqlalchemy.orm import Session, joinedload
@@ -26,6 +26,64 @@ def _weekday_matches(promo: models.Promotion, start_dt: datetime) -> bool:
     return weekday in normalized
 
 
+def _is_birthday_promotion(promo: models.Promotion) -> bool:
+    return getattr(promo, "promotion_type", None) == "birthday"
+
+
+def _is_in_birthday_window(
+    booking_date: date,
+    birth_date: Optional[date],
+    window_days: int,
+) -> bool:
+    if not birth_date:
+        return False
+    window_days = max(0, int(window_days or 0))
+    for year_offset in (-1, 0, 1):
+        year = booking_date.year + year_offset
+        try:
+            birthday = birth_date.replace(year=year)
+        except ValueError:
+            birthday = date(year, 2, 28)
+        if abs((booking_date - birthday).days) <= window_days:
+            return True
+    return False
+
+
+def lookup_client_birth_date(db: Session, client_phone: Optional[str]) -> Optional[date]:
+    if not client_phone:
+        return None
+    from app.phone_utils import normalize_phone
+
+    target = normalize_phone(client_phone)
+    if not target:
+        return None
+    clients = (
+        db.query(models.Client)
+        .filter(models.Client.birth_date.isnot(None), models.Client.phone.isnot(None))
+        .all()
+    )
+    for client in clients:
+        if normalize_phone(client.phone or "") == target:
+            return client.birth_date
+    return None
+
+
+def calculate_promotions_discount(promos: List[models.Promotion], bath_cost: float) -> int:
+    total = 0
+    bath_cost_int = max(0, int(bath_cost))
+    for promo in promos:
+        if promo.discount_amount:
+            total += int(promo.discount_amount)
+        if promo.discount_percent:
+            total += int(bath_cost_int * float(promo.discount_percent) / 100)
+    return min(total, bath_cost_int)
+
+
+def get_snapshot_discount(snapshot: Optional[Dict[str, Any]]) -> int:
+    normalized = normalize_promotion_snapshot(snapshot)
+    return int(normalized.get("discount_amount") or 0)
+
+
 def get_promo_mismatch_reasons(
     promo: models.Promotion,
     *,
@@ -33,12 +91,20 @@ def get_promo_mismatch_reasons(
     guests: int,
     bath_cost: float,
     start_dt: datetime,
+    client_birth_date: Optional[date] = None,
 ) -> List[str]:
     reasons: List[str] = []
     if not promo.is_active:
         reasons.append("акция неактивна")
 
     booking_date = start_dt.date() if hasattr(start_dt, "date") else start_dt
+
+    if _is_birthday_promotion(promo):
+        window_days = int(promo.birthday_window_days or 7)
+        if not client_birth_date:
+            reasons.append("не указана дата рождения клиента")
+        elif not _is_in_birthday_window(booking_date, client_birth_date, window_days):
+            reasons.append(f"бронь вне периода ±{window_days} дн. от дня рождения")
     if promo.valid_from and booking_date < promo.valid_from:
         reasons.append(f"действует с {promo.valid_from.strftime('%d.%m.%Y')}")
     if promo.valid_until and booking_date > promo.valid_until:
@@ -61,6 +127,7 @@ def _promo_matches(
     guests: int,
     bath_cost: float,
     start_dt: datetime,
+    client_birth_date: Optional[date] = None,
 ) -> bool:
     return len(get_promo_mismatch_reasons(
         promo,
@@ -68,6 +135,7 @@ def _promo_matches(
         guests=guests,
         bath_cost=bath_cost,
         start_dt=start_dt,
+        client_birth_date=client_birth_date,
     )) == 0
 
 
@@ -100,7 +168,7 @@ def are_promotions_incompatible(
     promo_id_b: int,
 ) -> bool:
     if promo_id_a == promo_id_b:
-        return True
+        return False
     return promo_id_b in incompatibility_map.get(promo_id_a, set())
 
 
@@ -162,6 +230,7 @@ def compute_default_promotion_ids(
     guests: int,
     bath_cost: float,
     start_dt: datetime,
+    client_birth_date: Optional[date] = None,
 ) -> List[int]:
     conflicting_ids: Set[int] = set()
     promo_ids = [int(p.id) for p in promos]
@@ -181,6 +250,7 @@ def compute_default_promotion_ids(
             guests=guests,
             bath_cost=bath_cost,
             start_dt=start_dt,
+            client_birth_date=client_birth_date,
         ):
             selected.append(int(promo.id))
     return selected
@@ -250,15 +320,24 @@ def build_promotion_snapshot(promo: models.Promotion) -> Dict[str, Any]:
         "id": promo.id,
         "name": promo.name,
         "description": promo.description,
+        "promotion_type": getattr(promo, "promotion_type", None) or "standard",
+        "birthday_window_days": promo.birthday_window_days,
+        "reward_mode": promo.reward_mode,
         "min_hours": promo.min_hours,
         "min_guests": promo.min_guests,
         "min_amount": promo.min_amount,
         "bonus_minutes": promo.bonus_minutes,
+        "discount_percent": promo.discount_percent,
+        "discount_amount": promo.discount_amount,
         "gift_products": gift_products,
     }
 
 
-def build_combined_promotion_snapshot(promos: List[models.Promotion]) -> Optional[Dict[str, Any]]:
+def build_combined_promotion_snapshot(
+    promos: List[models.Promotion],
+    *,
+    bath_cost: float = 0,
+) -> Optional[Dict[str, Any]]:
     if not promos:
         return None
 
@@ -281,11 +360,13 @@ def build_combined_promotion_snapshot(promos: List[models.Promotion]) -> Optiona
 
     primary = promo_snapshots[0]
     names = ", ".join(p["name"] for p in promo_snapshots)
+    discount_amount = calculate_promotions_discount(promos, bath_cost)
     return {
         "id": primary["id"],
         "name": names,
         "description": primary.get("description"),
         "bonus_minutes": bonus_minutes,
+        "discount_amount": discount_amount,
         "gift_products": list(gift_map.values()),
         "promotions": promo_snapshots,
     }
@@ -293,12 +374,15 @@ def build_combined_promotion_snapshot(promos: List[models.Promotion]) -> Optiona
 
 def normalize_promotion_snapshot(snapshot: Optional[Dict[str, Any]]) -> Dict[str, Any]:
     if not snapshot:
-        return {"promotions": [], "bonus_minutes": 0, "gift_products": []}
+        return {"promotions": [], "bonus_minutes": 0, "gift_products": [], "discount_amount": 0}
     if isinstance(snapshot.get("promotions"), list):
+        if snapshot.get("discount_amount") is None:
+            snapshot = {**snapshot, "discount_amount": 0}
         return snapshot
     return {
         "promotions": [snapshot],
         "bonus_minutes": int(snapshot.get("bonus_minutes") or 0),
+        "discount_amount": int(snapshot.get("discount_amount") or 0),
         "gift_products": snapshot.get("gift_products") or [],
         "id": snapshot.get("id"),
         "name": snapshot.get("name"),
@@ -333,6 +417,7 @@ def apply_selected_promotions_to_reservation(
     bath_cost: float,
     products: List[Any],
     promotion_ids: Optional[List[int]] = None,
+    client_birth_date: Optional[date] = None,
 ) -> Tuple[datetime, List[models.Promotion], Optional[Dict[str, Any]], List[Any]]:
     duration_hours = (end_dt - start_dt).total_seconds() / 3600.0
 
@@ -346,13 +431,14 @@ def apply_selected_promotions_to_reservation(
             guests=guests,
             bath_cost=bath_cost,
             start_dt=start_dt,
+            client_birth_date=client_birth_date,
         )
 
     selected_promos = validate_selected_promotion_ids(db, bath.bath_id, promotion_ids or [])
     if not selected_promos:
         return end_dt, [], None, list(products or [])
 
-    snapshot = build_combined_promotion_snapshot(selected_promos)
+    snapshot = build_combined_promotion_snapshot(selected_promos, bath_cost=bath_cost)
     bonus_minutes = int(snapshot.get("bonus_minutes") or 0) if snapshot else 0
     new_end = end_dt + timedelta(minutes=bonus_minutes) if bonus_minutes else end_dt
 
@@ -382,6 +468,7 @@ def apply_promotion_to_reservation(
     bath_cost: float,
     products: List[Any],
     promotion_ids: Optional[List[int]] = None,
+    client_birth_date: Optional[date] = None,
 ) -> Tuple[datetime, Optional[models.Promotion], Optional[Dict[str, Any]], List[Any]]:
     """Обратно совместимая обёртка: возвращает первую акцию."""
     new_end, promos, snapshot, merged = apply_selected_promotions_to_reservation(
@@ -393,6 +480,7 @@ def apply_promotion_to_reservation(
         bath_cost=bath_cost,
         products=products,
         promotion_ids=promotion_ids,
+        client_birth_date=client_birth_date,
     )
     return new_end, promos[0] if promos else None, snapshot, merged
 
@@ -405,6 +493,7 @@ def find_applicable_promotion(
     guests: int,
     bath_cost: float,
     start_dt: datetime,
+    client_birth_date: Optional[date] = None,
 ) -> Optional[models.Promotion]:
     promos = get_bath_promotions(db, bath_id)
     incompatibility_map = load_incompatibility_map(db, [p.id for p in promos])
@@ -415,6 +504,7 @@ def find_applicable_promotion(
         guests=guests,
         bath_cost=bath_cost,
         start_dt=start_dt,
+        client_birth_date=client_birth_date,
     )
     if not ids:
         return None
@@ -440,11 +530,16 @@ def serialize_promotion_brief(
         "name": promo.name,
         "description": promo.description,
         "is_active": promo.is_active,
+        "promotion_type": getattr(promo, "promotion_type", None) or "standard",
+        "birthday_window_days": promo.birthday_window_days,
+        "reward_mode": promo.reward_mode,
         "min_hours": promo.min_hours,
         "min_guests": promo.min_guests,
         "min_amount": promo.min_amount,
         "applicable_weekdays": promo.applicable_weekdays,
         "bonus_minutes": promo.bonus_minutes,
+        "discount_percent": promo.discount_percent,
+        "discount_amount": promo.discount_amount,
         "valid_from": promo.valid_from,
         "valid_until": promo.valid_until,
         "gift_products": gift_products,

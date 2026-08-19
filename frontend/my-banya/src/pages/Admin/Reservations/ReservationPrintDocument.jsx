@@ -74,6 +74,7 @@ function ReservationPrintDocument() {
     return fromList || 'Нет';
   }, [promotionSnapshot]);
   const hasBonusMinutes = Boolean(promotionSnapshot.bonus_minutes);
+  const hasPromotionDiscount = Number(promotionSnapshot.discount_amount) > 0;
   const hasGiftProducts = (promotionSnapshot.gift_products || []).length > 0;
   const closedStatus = statusOptions.find(
     (status) => String(status.status_name || '').trim().toLowerCase() === 'закрыт'
@@ -242,6 +243,12 @@ function ReservationPrintDocument() {
               <div className="flex justify-between text-green-700">
                 <span>Бонусное время</span>
                 <span>+{promotionSnapshot.bonus_minutes} мин</span>
+              </div>
+            )}
+            {hasPromotionDiscount && (
+              <div className="flex justify-between text-green-700">
+                <span>Скидка по акции</span>
+                <span>-{formatMoney(promotionSnapshot.discount_amount)}</span>
               </div>
             )}
             {hasGiftProducts && (

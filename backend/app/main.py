@@ -394,6 +394,46 @@ with engine.begin() as connection:
             """
         )
     )
+    connection.execute(
+        text(
+            """
+            ALTER TABLE promotions
+            ADD COLUMN IF NOT EXISTS promotion_type VARCHAR(50) DEFAULT 'standard'
+            """
+        )
+    )
+    connection.execute(
+        text(
+            """
+            ALTER TABLE promotions
+            ADD COLUMN IF NOT EXISTS birthday_window_days INTEGER
+            """
+        )
+    )
+    connection.execute(
+        text(
+            """
+            ALTER TABLE promotions
+            ADD COLUMN IF NOT EXISTS reward_mode VARCHAR(20)
+            """
+        )
+    )
+    connection.execute(
+        text(
+            """
+            ALTER TABLE promotions
+            ADD COLUMN IF NOT EXISTS discount_percent DOUBLE PRECISION
+            """
+        )
+    )
+    connection.execute(
+        text(
+            """
+            ALTER TABLE promotions
+            ADD COLUMN IF NOT EXISTS discount_amount INTEGER
+            """
+        )
+    )
 
 app = FastAPI(title='Бани')
 

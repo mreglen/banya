@@ -14,6 +14,9 @@ function PromotionModal({ isOpen, onClose, promotion = null }) {
     name: '',
     description: '',
     is_active: true,
+    promotion_type: 'standard',
+    birthday_window_days: 7,
+    reward_mode: 'combined',
     min_hours: null,
     min_guests: null,
     min_amount: null,
@@ -21,6 +24,8 @@ function PromotionModal({ isOpen, onClose, promotion = null }) {
     valid_from: '',
     valid_until: '',
     bonus_minutes: null,
+    discount_percent: null,
+    discount_amount: null,
     gift_products: [],
     incompatible_promotion_ids: [],
   });
@@ -29,12 +34,15 @@ function PromotionModal({ isOpen, onClose, promotion = null }) {
   useEffect(() => {
     if (isOpen) {
       if (promotion) {
-        // Режим редактирования
-        setTemplate('combined');
+        const isBirthday = promotion.promotion_type === 'birthday';
+        setTemplate(isBirthday ? 'birthday' : 'combined');
         setFormData({
           name: promotion.name || '',
           description: promotion.description || '',
           is_active: promotion.is_active ?? true,
+          promotion_type: promotion.promotion_type || 'standard',
+          birthday_window_days: promotion.birthday_window_days ?? 7,
+          reward_mode: promotion.reward_mode || 'combined',
           min_hours: promotion.min_hours || null,
           min_guests: promotion.min_guests || null,
           min_amount: promotion.min_amount || null,
@@ -42,6 +50,8 @@ function PromotionModal({ isOpen, onClose, promotion = null }) {
           valid_from: promotion.valid_from || '',
           valid_until: promotion.valid_until || '',
           bonus_minutes: promotion.bonus_minutes || null,
+          discount_percent: promotion.discount_percent ?? null,
+          discount_amount: promotion.discount_amount ?? null,
           gift_products: promotion.gift_products || [],
           incompatible_promotion_ids: (promotion.incompatible_promotion_ids || []).map(Number),
         });
@@ -52,6 +62,9 @@ function PromotionModal({ isOpen, onClose, promotion = null }) {
           name: '',
           description: '',
           is_active: true,
+          promotion_type: 'standard',
+          birthday_window_days: 7,
+          reward_mode: 'combined',
           min_hours: null,
           min_guests: null,
           min_amount: null,
@@ -59,6 +72,8 @@ function PromotionModal({ isOpen, onClose, promotion = null }) {
           valid_from: '',
           valid_until: '',
           bonus_minutes: null,
+          discount_percent: null,
+          discount_amount: null,
           gift_products: [],
           incompatible_promotion_ids: [],
         });
@@ -74,9 +89,15 @@ function PromotionModal({ isOpen, onClose, promotion = null }) {
   const handleTemplateSelect = (selectedTemplate) => {
     setTemplate(selectedTemplate);
     
-    // Сбросить все условия
     setFormData(prev => ({
       ...prev,
+      promotion_type: selectedTemplate === 'birthday' ? 'birthday' : 'standard',
+      birthday_window_days: selectedTemplate === 'birthday' ? 7 : null,
+      reward_mode: selectedTemplate === 'birthday' ? 'combined' : null,
+      discount_percent: null,
+      discount_amount: null,
+      bonus_minutes: null,
+      gift_products: [],
       min_hours: null,
       min_guests: null,
       min_amount: null,
@@ -140,12 +161,20 @@ function PromotionModal({ isOpen, onClose, promotion = null }) {
     try {
       const payload = {
         ...formData,
-        // Преобразовать пустые строки в null
+        promotion_type: template === 'birthday' ? 'birthday' : (formData.promotion_type || 'standard'),
+        birthday_window_days: template === 'birthday'
+          ? Number(formData.birthday_window_days ?? 7)
+          : null,
+        reward_mode: template === 'birthday' ? formData.reward_mode : null,
+        discount_percent: formData.discount_percent === '' || formData.discount_percent == null
+          ? null
+          : Number(formData.discount_percent),
+        discount_amount: formData.discount_amount === '' || formData.discount_amount == null
+          ? null
+          : Number(formData.discount_amount),
         valid_from: formData.valid_from || null,
         valid_until: formData.valid_until || null,
-        // Преобразовать applicable_weekdays: если пустой массив, то null
         applicable_weekdays: formData.applicable_weekdays.length > 0 ? formData.applicable_weekdays : null,
-        // Убрать product_name из gift_products (нужен только product_id)
         gift_products: formData.gift_products.map(gp => ({
           product_id: gp.product_id,
           quantity: gp.quantity
@@ -154,6 +183,15 @@ function PromotionModal({ isOpen, onClose, promotion = null }) {
           ? formData.incompatible_promotion_ids.map(Number)
           : [],
       };
+
+      if (template !== 'birthday') {
+        payload.birthday_window_days = null;
+        payload.reward_mode = null;
+        if (!payload.discount_percent && !payload.discount_amount) {
+          payload.discount_percent = null;
+          payload.discount_amount = null;
+        }
+      }
 
       let resultId;
       if (isEditing) {
@@ -180,6 +218,12 @@ function PromotionModal({ isOpen, onClose, promotion = null }) {
     { id: 6, name: 'Сб' },
     { id: 7, name: 'Вс' }
   ];
+
+  const showDiscountFields = template === 'birthday'
+    && (formData.reward_mode === 'discount' || formData.reward_mode === 'combined');
+  const showGiftFields = template !== 'birthday'
+    || formData.reward_mode === 'gift'
+    || formData.reward_mode === 'combined';
 
   return (
     <div 
@@ -218,6 +262,7 @@ function PromotionModal({ isOpen, onClose, promotion = null }) {
                   { id: 'amount', label: 'При минимальной сумме от X руб - подарок', desc: 'Пример: При заказе от 5000 руб' },
                   { id: 'weekdays', label: 'В определённые дни недели - подарок', desc: 'Пример: Только в будни' },
                   { id: 'period', label: 'В период с X по Y - подарок', desc: 'Пример: С 1 января по 31 марта' },
+                  { id: 'birthday', label: 'День рождения — скидка / подарок / комбо', desc: 'Пример: скидка 10% или подарок в ±7 дней от ДР клиента' },
                   { id: 'combined', label: 'Комбинированная (несколько условий)', desc: 'Все условия доступны' }
                 ].map(t => (
                   <button
@@ -267,6 +312,26 @@ function PromotionModal({ isOpen, onClose, promotion = null }) {
                 <h3 className="text-base md:text-lg font-medium text-gray-800 mb-3 md:mb-4">Условия акции</h3>
                 
                 <div className="space-y-4">
+                  {template === 'birthday' && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Период вокруг дня рождения (± дней)
+                      </label>
+                      <input
+                        type="number"
+                        name="birthday_window_days"
+                        value={formData.birthday_window_days ?? 7}
+                        onChange={handleChange}
+                        min="0"
+                        placeholder="7"
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">
+                        Дата рождения берётся из карточки клиента по номеру телефона в брони
+                      </p>
+                    </div>
+                  )}
+
                   {/* Минимум часов */}
                   {(template === 'hours' || template === 'combined') && (
                     <div>
@@ -379,7 +444,69 @@ function PromotionModal({ isOpen, onClose, promotion = null }) {
                 </div>
               </div>
 
+              {template === 'birthday' && (
+                <div className="border-t border-gray-200 pt-4 md:pt-6">
+                  <h3 className="text-base md:text-lg font-medium text-gray-800 mb-3 md:mb-4">Тип награды</h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    {[
+                      { id: 'discount', label: 'Скидка' },
+                      { id: 'gift', label: 'Подарок' },
+                      { id: 'combined', label: 'Скидка + подарок' },
+                    ].map((mode) => (
+                      <button
+                        key={mode.id}
+                        type="button"
+                        onClick={() => setFormData((prev) => ({ ...prev, reward_mode: mode.id }))}
+                        className={`px-4 py-3 rounded-lg border text-sm font-medium transition ${
+                          formData.reward_mode === mode.id
+                            ? 'border-blue-600 bg-blue-50 text-blue-700'
+                            : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300'
+                        }`}
+                      >
+                        {mode.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {showDiscountFields && (
+                <div className="border-t border-gray-200 pt-4 md:pt-6">
+                  <h3 className="text-base md:text-lg font-medium text-gray-800 mb-3 md:mb-4">Скидка</h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Процент скидки</label>
+                      <input
+                        type="number"
+                        name="discount_percent"
+                        value={formData.discount_percent ?? ''}
+                        onChange={handleChange}
+                        min="0"
+                        max="100"
+                        step="0.1"
+                        placeholder="Например: 10"
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Сумма скидки (₽)</label>
+                      <input
+                        type="number"
+                        name="discount_amount"
+                        value={formData.discount_amount ?? ''}
+                        onChange={handleChange}
+                        min="0"
+                        placeholder="Например: 1000"
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-2">Можно указать процент, фиксированную сумму или оба варианта</p>
+                </div>
+              )}
+
               {/* Подарки */}
+              {showGiftFields && (
               <div className="border-t border-gray-200 pt-4 md:pt-6">
                 <h3 className="text-base md:text-lg font-medium text-gray-800 mb-3 md:mb-4">Подарки</h3>
                 
@@ -444,6 +571,7 @@ function PromotionModal({ isOpen, onClose, promotion = null }) {
                   </div>
                 </div>
               </div>
+              )}
 
               <div className="border-t border-gray-200 pt-4 md:pt-6">
                 <h3 className="text-base md:text-lg font-medium text-gray-800 mb-3 md:mb-4">

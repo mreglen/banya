@@ -426,8 +426,15 @@ class Promotion(Base):
     valid_from = Column(Date, nullable=True)
     valid_until = Column(Date, nullable=True)
     
-    # Подарки
+    # Тип акции: standard | birthday
+    promotion_type = Column(String(50), nullable=False, default='standard')
+    birthday_window_days = Column(Integer, nullable=True)
+    reward_mode = Column(String(20), nullable=True)  # discount | gift | combined
+    
+    # Подарки и скидки
     bonus_minutes = Column(Integer, nullable=True)
+    discount_percent = Column(Float, nullable=True)
+    discount_amount = Column(Integer, nullable=True)
     
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())

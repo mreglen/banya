@@ -7,7 +7,7 @@ from app.auth import get_current_user
 from app.email_service import send_booking_confirmation_email
 from app.audit_logger import log_action, get_client_ip
 from app.database import SessionLocal
-from app.promotion_utils import apply_selected_promotions_to_reservation, get_snapshot_gift_product_ids
+from app.promotion_utils import apply_selected_promotions_to_reservation, get_snapshot_gift_product_ids, get_snapshot_discount, lookup_client_birth_date
 from app.pricing_utils import calculate_bath_base_cost
 
 
@@ -196,7 +196,8 @@ def create_reservation(
     extra_guest_cost = extra_guests * bath.extra_guest_price
     bath_cost = bath_base_cost + extra_guest_cost
 
-    # 5.1 Применяем акции: бонусное время + подарочные товары
+    # 5.1 Применяем акции: бонусное время + подарочные товары + скидки
+    client_birth_date = lookup_client_birth_date(db, reservation.client_phone)
     try:
         end_dt, applied_promos, promo_snapshot, effective_products = apply_selected_promotions_to_reservation(
             db,
@@ -207,17 +208,19 @@ def create_reservation(
             bath_cost=bath_cost,
             products=reservation.products or [],
             promotion_ids=reservation.promotion_ids,
+            client_birth_date=client_birth_date,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     applied_promo_ids = [int(p.id) for p in applied_promos]
+    promotion_discount = get_snapshot_discount(promo_snapshot)
 
     # 4. Проверяем пересечения уже с учётом бонусного времени
     overlap = check_overlap(db, reservation.bath_id, start_dt, end_dt)
     if overlap:
         raise HTTPException(status_code=400, detail="Бронь пересекается с существующей")
 
-    total_cost = bath_cost
+    total_cost = max(0, bath_cost - promotion_discount)
 
     # 5.2 Стоимость товаров (подарки по акции — 0 ₽)
     if effective_products:
@@ -660,6 +663,9 @@ def update_reservation(
             if promo_ids_for_apply is None and db_reservation.applied_promotion_ids:
                 promo_ids_for_apply = db_reservation.applied_promotion_ids
 
+            client_phone_for_birthday = reservation.client_phone if reservation.client_phone is not None else db_reservation.client_phone
+            client_birth_date = lookup_client_birth_date(db, client_phone_for_birthday)
+
             try:
                 end_dt, applied_promos, promo_snapshot, effective_products = apply_selected_promotions_to_reservation(
                     db,
@@ -670,10 +676,12 @@ def update_reservation(
                     bath_cost=bath_cost,
                     products=products_for_promo,
                     promotion_ids=promo_ids_for_apply,
+                    client_birth_date=client_birth_date,
                 )
             except ValueError as exc:
                 raise HTTPException(status_code=400, detail=str(exc))
             applied_promo_ids = [int(p.id) for p in applied_promos]
+            promotion_discount = get_snapshot_discount(promo_snapshot)
 
             if reservation.start_datetime or reservation.end_datetime or reservation.bath_id or applied_promo_ids:
                 overlap = check_overlap(db, db_reservation.bath_id, start_dt, end_dt, exclude_id=id)
@@ -687,7 +695,7 @@ def update_reservation(
             db_reservation.promotion_snapshot = promo_snapshot
 
             if should_recalc:
-                total_cost = bath_cost
+                total_cost = max(0, bath_cost - promotion_discount)
                 if effective_products:
                     product_ids = [p.product_id for p in effective_products]
                     products = db.query(models.Product).filter(models.Product.id.in_(product_ids)).all()

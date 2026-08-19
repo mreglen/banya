@@ -761,8 +761,13 @@ class PromotionCreate(BaseModel):
     valid_from: Optional[date] = None
     valid_until: Optional[date] = None
     
-    # Подарки
+    promotion_type: str = 'standard'
+    birthday_window_days: Optional[int] = None
+    reward_mode: Optional[str] = None
+    
     bonus_minutes: Optional[int] = None
+    discount_percent: Optional[float] = None
+    discount_amount: Optional[int] = None
     gift_products: List[PromotionGiftProductCreate] = []
     incompatible_promotion_ids: Optional[List[int]] = None
 
@@ -779,7 +784,13 @@ class PromotionUpdate(BaseModel):
     valid_from: Optional[date] = None
     valid_until: Optional[date] = None
     
+    promotion_type: Optional[str] = None
+    birthday_window_days: Optional[int] = None
+    reward_mode: Optional[str] = None
+    
     bonus_minutes: Optional[int] = None
+    discount_percent: Optional[float] = None
+    discount_amount: Optional[int] = None
     gift_products: Optional[List[PromotionGiftProductCreate]] = None
     incompatible_promotion_ids: Optional[List[int]] = None
 
@@ -806,7 +817,13 @@ class PromotionResponse(BaseModel):
     valid_from: Optional[date]
     valid_until: Optional[date]
     
+    promotion_type: str = 'standard'
+    birthday_window_days: Optional[int] = None
+    reward_mode: Optional[str] = None
+    
     bonus_minutes: Optional[int]
+    discount_percent: Optional[float] = None
+    discount_amount: Optional[int] = None
     gift_products: List[PromotionGiftProductResponse]
     incompatible_promotion_ids: List[int] = []
     
@@ -829,6 +846,11 @@ class PromotionBrief(BaseModel):
     valid_until: Optional[date] = None
     applicable_weekdays: Optional[List[int]] = None
     is_active: Optional[bool] = True
+    promotion_type: str = 'standard'
+    birthday_window_days: Optional[int] = None
+    reward_mode: Optional[str] = None
+    discount_percent: Optional[float] = None
+    discount_amount: Optional[int] = None
     gift_products: List[PromotionGiftProductResponse] = []
     incompatible_promotion_ids: List[int] = []
     
