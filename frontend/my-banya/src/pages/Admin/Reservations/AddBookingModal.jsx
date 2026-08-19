@@ -29,6 +29,7 @@ import {
   computeDefaultPromotionIds,
   formatPromotionDiscount,
   getSnapshotPromotionIds,
+  isBirthdayPromotion,
   normalizePromotionSnapshot,
   togglePromotionSelection,
 } from '../../../utils/promotionSelection';
@@ -1544,7 +1545,7 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
                           ? row.promo.gift_products.map((gp) => `${gp.product_name} x${gp.quantity}`).join(', ')
                           : null}
                       </div>
-                      {row.mismatchReasons.length > 0 && (
+                      {row.mismatchReasons.length > 0 && !isBirthdayPromotion(row.promo) && (
                         <div className="text-xs text-amber-700 mt-1">
                           Условия не выполнены: {row.mismatchReasons.join('; ')}
                         </div>
