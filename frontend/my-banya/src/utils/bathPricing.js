@@ -146,6 +146,13 @@ export function buildTimeTariffsFromFlatCosts(costWeekday, costWeekend) {
   };
 }
 
+export function calculateExtraGuestCost(bath, guests, paidHours) {
+  const extraGuests = Math.max(0, Number(guests || 0) - Number(bath?.base_guests || 0));
+  const extraPrice = Number(bath?.extra_guest_price || 0);
+  if (extraGuests <= 0 || extraPrice <= 0 || paidHours <= 0) return 0;
+  return Math.round(extraGuests * extraPrice * paidHours);
+}
+
 export function formatSegmentBreakdown(segments, formatMoney) {
   if (!segments?.length) return '';
   if (segments.length === 1) {

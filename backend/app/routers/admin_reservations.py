@@ -8,7 +8,7 @@ from app.email_service import send_booking_confirmation_email
 from app.audit_logger import log_action, get_client_ip
 from app.database import SessionLocal
 from app.promotion_utils import apply_selected_promotions_to_reservation, get_snapshot_gift_product_ids, get_snapshot_discount
-from app.pricing_utils import calculate_bath_base_cost
+from app.pricing_utils import calculate_bath_base_cost, calculate_extra_guest_cost
 
 
 router = APIRouter(
@@ -192,8 +192,7 @@ def create_reservation(
     bath_base_cost, hourly_rate = calculate_bath_base_cost(
         bath, start_dt, end_dt, hourly_rate_override=hourly_rate_override
     )
-    extra_guests = max(0, reservation.guests - bath.base_guests)
-    extra_guest_cost = extra_guests * bath.extra_guest_price
+    extra_guest_cost = calculate_extra_guest_cost(bath, reservation.guests, paid_duration_hours)
     bath_cost = bath_base_cost + extra_guest_cost
 
     # 5.1 Применяем акции: бонусное время + подарочные товары + скидки
@@ -635,8 +634,7 @@ def update_reservation(
                 bath_base_cost = int(hourly_rate * paid_duration_hours)
 
             db_reservation.hourly_rate = int(hourly_rate)
-            extra_guests = max(0, current_guests - bath.base_guests)
-            extra_guest_cost = extra_guests * bath.extra_guest_price
+            extra_guest_cost = calculate_extra_guest_cost(bath, current_guests, paid_duration_hours)
             bath_cost = bath_base_cost + extra_guest_cost
 
             products_for_promo = reservation.products if reservation.products is not None else []

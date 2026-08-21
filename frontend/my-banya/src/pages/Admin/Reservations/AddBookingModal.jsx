@@ -20,6 +20,7 @@ import { useGetPaymentQrCodeQuery } from '../../../redux/slices/settingsApiSlice
 import ProductSelectionModal from '../../Admin/Documents/DocumentsEntrance/ProductSelectionModal';
 import {
   calculateBathBaseCost,
+  calculateExtraGuestCost,
   getEffectiveHourlyRate,
   formatSegmentBreakdown,
 } from '../../../utils/bathPricing';
@@ -400,8 +401,7 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
       : null;
     const pricing = calculateBathBaseCost(selectedBath, start, end, manualOverride);
     const guestsNum = parseInt(formData.guests, 10) || 0;
-    const extraGuests = Math.max(0, guestsNum - (Number(selectedBath.base_guests) || 0));
-    const bathServiceCost = pricing.bathBaseCost + extraGuests * (Number(selectedBath.extra_guest_price) || 0);
+    const bathServiceCost = pricing.bathBaseCost + calculateExtraGuestCost(selectedBath, guestsNum, durationHours);
 
     setSelectedPromotionIds(computeDefaultPromotionIds({
       promos: selectedBath.promotions,
@@ -927,7 +927,7 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
     const baseGuests = Number(selectedBath.base_guests) || 0;
     const extraGuests = Math.max(0, guestsNum - baseGuests);
     const extraGuestPrice = Number(selectedBath.extra_guest_price) || 0;
-    const extraGuestCost = extraGuests * extraGuestPrice;
+    const extraGuestCost = calculateExtraGuestCost(selectedBath, guestsNum, durationHours);
 
     const productItems = formData.selectedProducts.map((p) => {
       const quantity = parseInt(p.quantity, 10) || 0;
@@ -1052,8 +1052,7 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
       : null;
     const pricing = calculateBathBaseCost(selectedBath, start, end, manualOverride);
     const guestsNum = parseInt(formData.guests, 10) || 0;
-    const extraGuests = Math.max(0, guestsNum - (Number(selectedBath.base_guests) || 0));
-    const bathServiceCost = pricing.bathBaseCost + extraGuests * (Number(selectedBath.extra_guest_price) || 0);
+    const bathServiceCost = pricing.bathBaseCost + calculateExtraGuestCost(selectedBath, guestsNum, durationHours);
 
     return buildPromotionSelectionRows({
       promos: selectedBath.promotions,
@@ -1423,13 +1422,14 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
                     const guestsNum = parseInt(formData.guests, 10) || 0;
                     const extraGuestsCount = Math.max(0, guestsNum - baseGuests);
                     const extraPrice = Number(selectedBath.extra_guest_price) || 0;
-                    const extraTotal = extraGuestsCount * extraPrice;
+                    const durationHours = Number(formData.duration_hours) || 0;
+                    const extraTotal = calculateExtraGuestCost(selectedBath, guestsNum, durationHours);
                     return (
                       <>
                         Входит: <strong>{baseGuests}</strong> чел.
                         {extraGuestsCount > 0 && (
                           <>
-                            | Доп. гости ({extraGuestsCount} × {extraPrice} ₽):{' '}
+                            | Доп. гости ({extraGuestsCount} × {extraPrice} ₽ × {durationHours} ч):{' '}
                             <strong>{extraTotal.toLocaleString()}</strong> ₽
                           </>
                         )}
@@ -1727,7 +1727,7 @@ function AddBookingModal({ isOpen, onClose, booking, selectedDate, onEditSuccess
                         {receiptSummary.extraGuests > 0 && (
                           <div className="flex justify-between text-gray-700 mt-1">
                             <span>
-                              Доп. гости ({receiptSummary.extraGuests} × {formatReceiptMoney(receiptSummary.extraGuestPrice)})
+                              Доп. гости ({receiptSummary.extraGuests} × {formatReceiptMoney(receiptSummary.extraGuestPrice)} × {receiptSummary.durationHours} ч)
                             </span>
                             <span>{formatReceiptMoney(receiptSummary.extraGuestCost)}</span>
                           </div>

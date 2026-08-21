@@ -87,6 +87,14 @@ def calculate_bath_base_cost(
     return int(round(total_cost)), effective_rate
 
 
+def calculate_extra_guest_cost(bath, guests: int, paid_hours: float) -> int:
+    extra_guests = max(0, int(guests or 0) - int(getattr(bath, "base_guests", 0) or 0))
+    extra_price = int(getattr(bath, "extra_guest_price", 0) or 0)
+    if extra_guests <= 0 or extra_price <= 0 or paid_hours <= 0:
+        return 0
+    return int(round(extra_guests * extra_price * paid_hours))
+
+
 def _validate_hm(value: str, field_name: str) -> None:
     try:
         _parse_hm(value)
