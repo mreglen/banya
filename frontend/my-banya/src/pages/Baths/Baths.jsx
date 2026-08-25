@@ -1,6 +1,7 @@
 import { useGetBathsQuery } from '../../redux/slices/apiSlice';
 import CustomButton from '../../components/UI/CustomButton/CustomButton';
 import SeoHead from '../../components/Seo/SeoHead';
+import { PAGES, absoluteUrl, breadcrumbJsonLd } from '../../config/seo';
 import { getPriceRangeLabel, hasTimeTariffs } from '../../utils/bathPricing';
 
 function Baths() {
@@ -26,15 +27,32 @@ function Baths() {
   return (
     <main className="py-16 px-6 bg-gray-50 min-h-screen mt-28">
       <SeoHead
-        title="Наши бани - Николаевские бани в Екатеринбурге"
-        description="Выберите свою баню в Николаевских банях Екатеринбурга. Каждая баня - особая атмосфера, температура и ритуал. Русские бани на дровах."
-        keywords="бани Екатеринбург, выбрать баню, русская баня, парилка, бани на дровах"
+        title={PAGES.baths.title}
+        description={PAGES.baths.description}
+        keywords={PAGES.baths.keywords}
         canonical="/baths"
+        jsonLd={[
+          breadcrumbJsonLd([
+            { name: 'Главная', path: '/' },
+            { name: 'Бани', path: '/baths' },
+          ]),
+          {
+            '@context': 'https://schema.org',
+            '@type': 'ItemList',
+            name: 'Бани в Екатеринбурге — Николаевские бани',
+            itemListElement: baths.map((bath, index) => ({
+              '@type': 'ListItem',
+              position: index + 1,
+              name: bath.name,
+              url: absoluteUrl(`/baths/${bath.slug}`),
+            })),
+          },
+        ]}
       />
       <div className="text-center mb-14 max-w-3xl mx-auto">
-        <h1 className="text-4xl sm:text-5xl font-light text-gray-800 mb-4">Наши бани</h1>
+        <h1 className="text-4xl sm:text-5xl font-light text-gray-800 mb-4">Бани в Екатеринбурге</h1>
         <p className="text-lg text-gray-600 font-extralight">
-          Каждая баня — особая атмосфера, температура и ритуал. Выберите свою.
+          Русские парные на дровах в ЕКБ. Каждая баня — своя атмосфера, температура и ритуал.
         </p>
       </div>
 

@@ -71,9 +71,9 @@ function SliderBaths() {
               <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/50 to-transparent md:to-black/20" />
               <div className="relative z-10 md:w-1/2 w-full px-6 md:px-12 py-16 md:py-0">
                 <div className="space-y-6 max-w-lg mx-auto md:mx-0 md:bg-black/30 md:backdrop-blur-sm md:p-8 md:rounded-2xl">
-                  <h1 className="text-4xl sm:text-5xl lg:text-6xl font-light tracking-tight text-white drop-shadow-lg">
+                  <h2 className="text-4xl sm:text-5xl lg:text-6xl font-light tracking-tight text-white drop-shadow-lg">
                     {bath.name}
-                  </h1>
+                  </h2>
                   <p className="text-lg sm:text-xl font-extralight text-gray-100 leading-relaxed">
                     {bath.subtitle}
                   </p>

@@ -1,22 +1,28 @@
 import CustomButton from "../../components/UI/CustomButton/CustomButton";
 import SeoHead from '../../components/Seo/SeoHead';
-import { localBusinessJsonLd } from '../../config/seo';
+import { PAGES, breadcrumbJsonLd, localBusinessJsonLd } from '../../config/seo';
 
 function Contacts() {
   return (
     <main className="bg-gradient-to-b from-white via-green-50 to-amber-50 min-h-screen mt-28">
       <SeoHead
-        title="Контакты - Николаевские бани в Екатеринбурге"
-        description="Контакты Николаевских бань в Екатеринбурге. Адрес: ул. Кизеловская, 18. Телефон: +7 (343) 344-87-55. Бронирование бань онлайн."
-        keywords="Николаевские бани контакты, адрес бани Екатеринбург, телефон бани, как добраться"
+        title={PAGES.contacts.title}
+        description={PAGES.contacts.description}
+        keywords={PAGES.contacts.keywords}
         canonical="/contacts"
-        jsonLd={localBusinessJsonLd()}
+        jsonLd={[
+          localBusinessJsonLd(),
+          breadcrumbJsonLd([
+            { name: 'Главная', path: '/' },
+            { name: 'Контакты', path: '/contacts' },
+          ]),
+        ]}
       />
 
       <div className="py-16 px-6 text-center max-w-4xl mx-auto">
-        <h1 className="text-4xl sm:text-5xl font-light text-gray-800 mb-4">Контакты</h1>
+        <h1 className="text-4xl sm:text-5xl font-light text-gray-800 mb-4">Контакты бань в Екатеринбурге</h1>
         <p className="text-lg text-gray-600 font-extralight">
-          Мы всегда рады гостям. Приезжайте к нам — баня ждёт вас в любое время года.
+          Бани в Екатеринбурге (ЕКБ): ул. Кизеловская, 18. Звоните или бронируйте онлайн.
         </p>
       </div>
 

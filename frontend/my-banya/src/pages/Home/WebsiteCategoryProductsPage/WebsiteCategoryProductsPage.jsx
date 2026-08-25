@@ -1,7 +1,7 @@
 import { Link, useParams } from 'react-router-dom';
 import { useGetWebsiteCategoriesPreviewQuery } from '../../../redux/slices/apiSlice';
 import SeoHead from '../../../components/Seo/SeoHead';
-import { absoluteUrl } from '../../../config/seo';
+import { absoluteUrl, breadcrumbJsonLd } from '../../../config/seo';
 import SEO from '../../../config/seo';
 
 function WebsiteCategoryProductsPage() {
@@ -25,7 +25,7 @@ function WebsiteCategoryProductsPage() {
   }
 
   const canonicalPath = `/categories/${category.id}/products`;
-  const description = `Каталог «${category.name}» в Николаевских банях. ${category.products?.length || 0} позиций с ценами.`;
+  const description = `${category.name} в Николаевских банях в Екатеринбурге (ЕКБ). ${category.products?.length || 0} позиций с ценами.`;
 
   const itemListJsonLd = {
     '@context': 'https://schema.org',
@@ -52,11 +52,17 @@ function WebsiteCategoryProductsPage() {
   return (
     <main className="pt-32 pb-20 px-6 bg-gray-50 min-h-screen">
       <SeoHead
-        title={`${category.name} - ${SEO.siteName}`}
+        title={`${category.name} — Николаевские бани в Екатеринбурге`}
         description={description}
-        keywords={`${category.name}, ${SEO.siteName}, меню, услуги Екатеринбург`}
+        keywords={`${category.name}, бани екб, ${SEO.siteName}, услуги Екатеринбург`}
         canonical={canonicalPath}
-        jsonLd={itemListJsonLd}
+        jsonLd={[
+          breadcrumbJsonLd([
+            { name: 'Главная', path: '/' },
+            { name: category.name, path: canonicalPath },
+          ]),
+          itemListJsonLd,
+        ]}
       />
       <div className="max-w-6xl mx-auto">
         <header className="mb-10">

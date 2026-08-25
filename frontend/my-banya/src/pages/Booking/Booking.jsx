@@ -1,16 +1,18 @@
 // src/pages/Booking/Booking.jsx
 
 import { useMemo, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import {
   useCreateBookingMutation,
   useGetBathsQuery,
   useGetBookingAvailabilityQuery,
 } from '../../redux/slices/apiSlice';
 import SeoHead from '../../components/Seo/SeoHead';
-import SEO from '../../config/seo';
+import { PAGES, breadcrumbJsonLd } from '../../config/seo';
 import { formatLocalYmd, formatLocalHm } from '../../utils/dateLocal';
 
 function Booking() {
+  const isBookingPage = useLocation().pathname === '/booking';
   const [createBooking, { isLoading, isError, error }] = useCreateBookingMutation();
   const { data: baths = [], isLoading: isLoadingBaths } = useGetBathsQuery();
 
@@ -259,17 +261,26 @@ function Booking() {
     );
   }
 
+  const Wrapper = isBookingPage ? 'main' : 'section';
+  const TitleTag = isBookingPage ? 'h1' : 'h2';
+
   return (
-    <main id="booking" className="min-h-screen bg-gradient-to-br from-amber-50 via-white to-green-50 py-20 px-4 sm:px-6 lg:px-8">
-      <SeoHead
-        title={`Забронировать баню - ${SEO.siteName}`}
-        description="Онлайн-бронирование русской бани на дровах в Екатеринбурге. Выберите дату, время и баню — мы подготовим парную к вашему приходу."
-        keywords="бронирование бани Екатеринбург, забронировать баню онлайн, Николаевские бани"
-        canonical="/booking"
-      />
+    <Wrapper id="booking" className={`min-h-screen bg-gradient-to-br from-amber-50 via-white to-green-50 py-20 px-4 sm:px-6 lg:px-8 ${isBookingPage ? 'mt-28' : ''}`}>
+      {isBookingPage && (
+        <SeoHead
+          title={PAGES.booking.title}
+          description={PAGES.booking.description}
+          keywords={PAGES.booking.keywords}
+          canonical="/booking"
+          jsonLd={breadcrumbJsonLd([
+            { name: 'Главная', path: '/' },
+            { name: 'Бронирование', path: '/booking' },
+          ])}
+        />
+      )}
       <div className="max-w-4xl mx-auto">
         <div className="text-center mb-12">
-          <h2 className="text-4xl sm:text-5xl font-light text-gray-800 mb-4">Забронировать баню</h2>
+          <TitleTag className="text-4xl sm:text-5xl font-light text-gray-800 mb-4">Забронировать баню</TitleTag>
           <p className="text-lg text-gray-600 font-extralight max-w-2xl mx-auto">
             Выберите удобную дату и время — мы подготовим парную к вашему приходу.
             Уют, чистота и ароматные веники уже ждут вас!
@@ -520,7 +531,7 @@ function Booking() {
           </form>
         </div>
       </div>
-    </main>
+    </Wrapper>
   );
 }
 

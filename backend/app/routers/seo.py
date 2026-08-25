@@ -33,6 +33,7 @@ def sitemap_xml(db: Session = Depends(get_db)):
         _url_entry("/", "weekly", "1.0"),
         _url_entry("/baths", "weekly", "0.9"),
         _url_entry("/booking", "monthly", "0.8"),
+        _url_entry("/contacts", "monthly", "0.8"),
     ]
 
     baths = db.query(Bath).filter(Bath.slug.isnot(None), Bath.slug != "").all()

@@ -5,7 +5,9 @@ import { getProfile } from './redux/slices/adminApi';
 import { BrowserRouter, Routes, Route, useLocation, useNavigate } from 'react-router-dom';
 import { HelmetProvider } from 'react-helmet-async';
 import Header from './components/Header/Header';
+import Footer from './components/Footer/Footer';
 import Home from './pages/Home/Home';
+import Contacts from './pages/Contacts/Contacts';
 import WebsiteCategoryProductsPage from './pages/Home/WebsiteCategoryProductsPage/WebsiteCategoryProductsPage';
 import LandingNotFound from './pages/Home/LandingNotFound/LandingNotFound';
 import Baths from './pages/Baths/Baths';
@@ -135,6 +137,7 @@ function AppWithLayout() {
         <Route path="/baths/:slug" element={<BathsCard />} />
         {/* Оставляем как резерв, но убираем из меню */}
         <Route path="/booking" element={<Booking />} />
+        <Route path="/contacts" element={<Contacts />} />
 
         <Route path="/admin" element={
           <PrivateRoute>
@@ -197,6 +200,7 @@ function AppWithLayout() {
         <Route path="/admin/reset-password/complete" element={withAdminSuspense(<PasswordResetComplete />)} />
         <Route path="*" element={<LandingNotFound />} />
       </Routes>
+      {!hideHeader && <Footer />}
     </>
   );
 }

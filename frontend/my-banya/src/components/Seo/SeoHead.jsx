@@ -1,5 +1,5 @@
 import { Helmet } from 'react-helmet-async';
-import SEO, { absoluteUrl } from '../../config/seo';
+import SEO, { absoluteUrl, websiteJsonLd, siteNavigationJsonLd } from '../../config/seo';
 
 /**
  * @param {Object} props
@@ -28,10 +28,12 @@ function SeoHead({
   const canonicalUrl = canonical ? absoluteUrl(canonical) : undefined;
   const imageUrl = ogImage ? absoluteUrl(ogImage) : SEO.defaultOgImage;
   const robotsContent = noindex ? 'noindex, nofollow' : 'index, follow';
+  const geoPosition = `${SEO.geo.latitude};${SEO.geo.longitude}`;
 
-  const jsonLdItems = jsonLd
-    ? (Array.isArray(jsonLd) ? jsonLd : [jsonLd])
-    : [];
+  const jsonLdItems = [
+    ...(noindex ? [] : [websiteJsonLd(), siteNavigationJsonLd()]),
+    ...(jsonLd ? (Array.isArray(jsonLd) ? jsonLd : [jsonLd]) : []),
+  ];
 
   return (
     <Helmet>
@@ -39,15 +41,22 @@ function SeoHead({
       <title>{pageTitle}</title>
       <meta name="description" content={pageDescription} />
       <meta name="keywords" content={pageKeywords} />
+      <meta name="author" content={SEO.siteName} />
       <meta name="robots" content={robotsContent} />
+      <meta name="geo.region" content={SEO.geo.region} />
+      <meta name="geo.placename" content={SEO.geo.placename} />
+      <meta name="geo.position" content={geoPosition} />
+      <meta name="ICBM" content={`${SEO.geo.latitude}, ${SEO.geo.longitude}`} />
 
       {canonicalUrl && <link rel="canonical" href={canonicalUrl} />}
+      {canonicalUrl && <link rel="alternate" hrefLang="ru" href={canonicalUrl} />}
 
       <meta property="og:title" content={pageTitle} />
       <meta property="og:description" content={pageDescription} />
       <meta property="og:type" content={ogType} />
       {canonicalUrl && <meta property="og:url" content={canonicalUrl} />}
       <meta property="og:image" content={imageUrl} />
+      <meta property="og:image:alt" content={pageTitle} />
       <meta property="og:locale" content={SEO.locale} />
       <meta property="og:site_name" content={SEO.siteName} />
 
@@ -56,6 +65,8 @@ function SeoHead({
       <meta name="twitter:description" content={pageDescription} />
       <meta name="twitter:image" content={imageUrl} />
       {canonicalUrl && <meta name="twitter:url" content={canonicalUrl} />}
+
+      <meta property="vk:image" content={imageUrl} />
 
       {jsonLdItems.map((item, index) => (
         <script key={index} type="application/ld+json">

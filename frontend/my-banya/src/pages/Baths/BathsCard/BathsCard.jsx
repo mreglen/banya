@@ -3,7 +3,7 @@ import CustomButton from '../../../components/UI/CustomButton/CustomButton';
 import { useGetBathByIdQuery } from '../../../redux/slices/apiSlice';
 import { useState, useEffect } from 'react';
 import SeoHead from '../../../components/Seo/SeoHead';
-import { absoluteUrl } from '../../../config/seo';
+import { absoluteUrl, breadcrumbJsonLd, organizationId } from '../../../config/seo';
 import { isVideoUrl } from '../../../utils/mediaHelpers';
 import { getPriceRangeLabel, hasTimeTariffs } from '../../../utils/bathPricing';
 
@@ -101,25 +101,42 @@ function BathsCard() {
   
   const ogImage = images.find((url) => !isVideoUrl(url)) || images[0];
 
+  const bathPath = `/baths/${bath.slug || slug}`;
+  const offerPrice = Number(bath.cost_weekday) || undefined;
+
   return (
     <main className="py-12 px-6 bg-white min-h-screen mt-28">
       <SeoHead
-        title={`${bath.name} - Николаевские бани в Екатеринбурге`}
-        description={bath.description || `${bath.name} - ${bath.title}. Русская баня на дровах в Екатеринбурге.`}
-        keywords={`${bath.name}, баня ${bath.name}, русская баня, баня на дровах, Николаевские бани`}
-        canonical={`/baths/${bath.slug || slug}`}
+        title={`${bath.name} — баня в Екатеринбурге | Николаевские бани`}
+        description={bath.description || `${bath.name} — русская баня на дровах в Екатеринбурге (ЕКБ). Николаевские бани, ул. Кизеловская, 18.`}
+        keywords={`${bath.name}, баня Екатеринбург, бани екб, русская баня на дровах, Николаевские бани`}
+        canonical={bathPath}
         ogImage={ogImage || undefined}
-        jsonLd={{
-          '@context': 'https://schema.org',
-          '@type': 'TouristAttraction',
-          name: bath.name,
-          description: bath.description,
-          url: absoluteUrl(`/baths/${bath.slug || slug}`),
-          image: ogImage || '',
-          touristType: 'Отдых и оздоровление',
-        }}
+        jsonLd={[
+          breadcrumbJsonLd([
+            { name: 'Главная', path: '/' },
+            { name: 'Бани', path: '/baths' },
+            { name: bath.name, path: bathPath },
+          ]),
+          {
+            '@context': 'https://schema.org',
+            '@type': 'Service',
+            name: bath.name,
+            description: bath.description || bath.subtitle,
+            url: absoluteUrl(bathPath),
+            image: ogImage || undefined,
+            areaServed: 'Екатеринбург',
+            provider: { '@id': organizationId() },
+            offers: {
+              '@type': 'Offer',
+              priceCurrency: 'RUB',
+              price: offerPrice,
+              availability: 'https://schema.org/InStock',
+            },
+          },
+        ]}
       />
-      <article itemScope itemType="https://schema.org/TouristAttraction" className="max-w-7xl mx-auto">
+      <article className="max-w-7xl mx-auto">
         <div className="text-center mb-10">
           <h1 className="text-4xl sm:text-5xl font-light text-gray-800">{bath.name}</h1>
           <p className="text-xl text-green-600 font-medium mt-2">{bath.subtitle}</p>

@@ -4,7 +4,7 @@ import LazySection from '../../components/LazySection/LazySection';
 import { useReveal } from '../../hooks/useReveal';
 import { Calendar } from 'lucide-react';
 import SeoHead from '../../components/Seo/SeoHead';
-import SEO, { localBusinessJsonLd } from '../../config/seo';
+import SEO, { PAGES, localBusinessJsonLd } from '../../config/seo';
 
 const WebsiteCategoriesPreview = lazy(() => import('./WebsiteCategoriesPreview/WebsiteCategoriesPreview'));
 const Booking = lazy(() => import('../Booking/Booking'));
@@ -34,10 +34,12 @@ function Home() {
     return (
         <main className="overflow-x-clip">
             <SeoHead
+                title={PAGES.home.title}
+                description={PAGES.home.description}
+                keywords={PAGES.home.keywords}
                 canonical="/"
                 jsonLd={localBusinessJsonLd({
                     description: SEO.defaultDescription,
-                    priceRange: '₽₽',
                 })}
             />
             <header
@@ -51,21 +53,24 @@ function Home() {
                 <div className="relative z-10 w-full px-6 py-24 sm:py-32 md:py-0">
                     <div className="max-w-5xl mx-auto text-center text-white">
                         <h1 className="text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-light mb-6 md:mb-8 leading-tight drop-shadow-2xl">
-                            Николаевские бани
+                            <span className="block">Николаевские бани</span>
+                            <span className="block text-2xl sm:text-3xl md:text-4xl lg:text-5xl mt-4 text-white/90">
+                                Бани в Екатеринбурге (ЕКБ)
+                            </span>
                         </h1>
                         <p className="text-xl sm:text-2xl md:text-3xl font-light mb-10 md:mb-14 leading-relaxed max-w-3xl mx-auto text-white/90">
-                            Атмосфера настоящей русской бани на дровах с вековыми традициями. Мы восстанавливаем силы и душевное тепло.
+                            Русские бани на дровах в ЕКБ, ул. Кизеловская, 18. Парение, купель, круглосуточно, бронирование онлайн.
                         </p>
                         <div className="flex flex-col sm:flex-row gap-5 justify-center">
                             <a
-                                href="#booking"
+                                href="/booking"
                                 onClick={scrollToBooking}
                                 className="px-10 py-5 bg-green-600 hover:bg-green-700 text-white rounded-2xl font-semibold text-xl transition-all duration-300 hover:shadow-[0_0_30px_rgba(22,163,74,0.4)] transform hover:scale-105"
                             >
                                 Забронировать
                             </a>
                             <a
-                                href="#baths"
+                                href="/baths"
                                 onClick={(e) => {
                                     e.preventDefault();
                                     document.getElementById('baths')?.scrollIntoView({ behavior: 'smooth' });

@@ -1,6 +1,5 @@
 import SliderBaths from './SliderBaths/SliderBaths';
-
-
+import { Link } from 'react-router-dom';
 
 function ListBaths() {
     return (
@@ -13,11 +12,14 @@ function ListBaths() {
                         </svg>
                     </div>
                     <h2 className="text-3xl sm:text-4xl md:text-5xl font-light text-white mb-4">
-                        Наши бани
+                        Бани в Екатеринбурге
                     </h2>
                     <p className="text-lg text-gray-300 font-extralight max-w-2xl mx-auto">
-                        Выберите идеальную баню для отдыха с друзьями и семьёй. Каждая баня уникальна и оборудована всем необходимым.
+                        Русские парные на дровах в ЕКБ. Выберите баню для отдыха с друзьями и семьёй.
                     </p>
+                    <Link to="/baths" className="inline-block mt-6 text-green-400 hover:text-green-300 transition-colors">
+                        Все бани
+                    </Link>
                 </div>
                 <div id="baths-slider">
                     <SliderBaths />

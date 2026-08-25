@@ -90,30 +90,24 @@ function Header() {
   }, [isMobileMenuOpen]);
 
   const navLinks = [
-    { title: 'Бани', anchor: '#baths', sectionId: 'baths' },
+    { title: 'Бани', href: '/baths', sectionId: 'baths' },
     ...(Array.isArray(websiteCategories)
       ? websiteCategories.map((category) => ({
           title: category.name,
-          anchor: `#site-category-${category.id}`,
+          href: `/categories/${category.id}/products`,
           sectionId: `site-category-${category.id}`,
         }))
       : []),
-    { title: 'Контакты', anchor: '#contacts', sectionId: 'contacts' },
+    { title: 'Контакты', href: '/contacts', sectionId: 'contacts' },
   ];
 
-  const handleClick = (e, anchor) => {
+  const handleClick = (e, href, sectionId) => {
     e.preventDefault();
-    const id = anchor.replace('#', '');
-    const element = document.getElementById(id);
-    if (element) {
+    const element = sectionId ? document.getElementById(sectionId) : null;
+    if (element && location.pathname === '/') {
       element.scrollIntoView({ behavior: 'smooth' });
     } else {
-      // Если мы не на главной (или секции нет в DOM) — переходим на главную с нужным hash
-      if (location.pathname !== '/') {
-        navigate(`/${anchor}`);
-      } else if (typeof window !== 'undefined') {
-        window.location.hash = anchor;
-      }
+      navigate(href);
     }
     setIsMobileMenuOpen(false);
   };
@@ -121,14 +115,10 @@ function Header() {
   const handleBookClick = (e) => {
     e.preventDefault();
     const element = document.getElementById('booking');
-    if (element) {
+    if (element && location.pathname === '/') {
       element.scrollIntoView({ behavior: 'smooth' });
     } else {
-      if (location.pathname !== '/') {
-        navigate('/#booking');
-      } else if (typeof window !== 'undefined') {
-        window.location.hash = '#booking';
-      }
+      navigate('/booking');
     }
     setIsMobileMenuOpen(false);
   };
@@ -148,7 +138,7 @@ function Header() {
             <div className="relative">
               <img 
                 src="/img/Logo.png" 
-                alt="Николаевские бани" 
+                alt="Николаевские бани в Екатеринбурге" 
                 className={`h-16 md:h-20 transition-all duration-300 ${
                   isScrolled ? 'brightness-100' : 'brightness-110'
                 } group-hover:scale-105`} 
@@ -159,11 +149,11 @@ function Header() {
 
           {/* Десктопная навигация */}
           <nav className="hidden lg:flex items-center gap-2" aria-label="Основное меню">
-            {navLinks.map(({ title, anchor, sectionId, icon }) => (
+            {navLinks.map(({ title, href, sectionId }) => (
               <a
                 key={title}
-                href={anchor}
-                onClick={(e) => handleClick(e, anchor)}
+                href={href}
+                onClick={(e) => handleClick(e, href, sectionId)}
                 className={`relative px-4 py-2 rounded-xl text-lg font-medium transition-all duration-300 group
                   ${activeSection === sectionId 
                     ? isScrolled
@@ -184,7 +174,7 @@ function Header() {
             
             {/* CTA Кнопка */}
             <a
-              href="#booking"
+              href="/booking"
               onClick={handleBookClick}
               className={`ml-4 px-6 py-2.5 rounded-xl text-lg font-semibold transition-all duration-300 transform hover:scale-105 hover:shadow-xl
                 ${isScrolled
@@ -259,11 +249,11 @@ function Header() {
           {/* Навигация */}
           <nav className="flex-1 overflow-y-auto p-6" aria-label="Мобильное меню">
             <div className="space-y-2">
-              {navLinks.map(({ title, anchor, sectionId, icon }) => (
+              {navLinks.map(({ title, href, sectionId }) => (
                 <a
                   key={title}
-                  href={anchor}
-                  onClick={(e) => handleClick(e, anchor)}
+                  href={href}
+                  onClick={(e) => handleClick(e, href, sectionId)}
                   className={`flex items-center gap-4 px-4 py-3 rounded-xl text-lg font-medium transition-all duration-300
                     ${activeSection === sectionId 
                       ? 'text-green-700 bg-green-50'
@@ -282,7 +272,7 @@ function Header() {
           {/* CTA кнопка внизу */}
           <div className="p-6 border-t border-gray-100">
             <a
-              href="#booking"
+              href="/booking"
               onClick={handleBookClick}
               className="flex items-center justify-center gap-2 w-full px-6 py-3 rounded-xl text-lg font-semibold bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white shadow-lg shadow-green-500/30 transition-all duration-300 transform hover:scale-105"
             >
