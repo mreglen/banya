@@ -4,7 +4,7 @@ import LazySection from '../../components/LazySection/LazySection';
 import { useReveal } from '../../hooks/useReveal';
 import { Calendar } from 'lucide-react';
 import SeoHead from '../../components/Seo/SeoHead';
-import SEO, { absoluteUrl } from '../../config/seo';
+import SEO, { localBusinessJsonLd } from '../../config/seo';
 
 const WebsiteCategoriesPreview = lazy(() => import('./WebsiteCategoriesPreview/WebsiteCategoriesPreview'));
 const Booking = lazy(() => import('../Booking/Booking'));
@@ -35,27 +35,10 @@ function Home() {
         <main className="overflow-x-clip">
             <SeoHead
                 canonical="/"
-                jsonLd={{
-                    '@context': 'https://schema.org',
-                    '@type': 'LocalBusiness',
-                    name: SEO.siteName,
+                jsonLd={localBusinessJsonLd({
                     description: SEO.defaultDescription,
-                    url: absoluteUrl('/'),
-                    telephone: SEO.telephone,
-                    email: SEO.email,
-                    address: {
-                        '@type': 'PostalAddress',
-                        streetAddress: SEO.address.streetAddress,
-                        addressLocality: SEO.address.addressLocality,
-                        addressCountry: SEO.address.addressCountry,
-                    },
-                    geo: {
-                        '@type': 'GeoCoordinates',
-                        latitude: SEO.geo.latitude,
-                        longitude: SEO.geo.longitude,
-                    },
                     priceRange: '₽₽',
-                }}
+                })}
             />
             <header
                 className="relative w-full min-h-[100svh] flex items-center bg-cover bg-no-repeat bg-[center_top] sm:bg-center bg-scroll"

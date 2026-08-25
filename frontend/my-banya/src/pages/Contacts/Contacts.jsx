@@ -1,6 +1,6 @@
 import CustomButton from "../../components/UI/CustomButton/CustomButton";
 import SeoHead from '../../components/Seo/SeoHead';
-import SEO, { absoluteUrl } from '../../config/seo';
+import { localBusinessJsonLd } from '../../config/seo';
 
 function Contacts() {
   return (
@@ -10,25 +10,7 @@ function Contacts() {
         description="Контакты Николаевских бань в Екатеринбурге. Адрес: ул. Кизеловская, 18. Телефон: +7 (343) 344-87-55. Бронирование бань онлайн."
         keywords="Николаевские бани контакты, адрес бани Екатеринбург, телефон бани, как добраться"
         canonical="/contacts"
-        jsonLd={{
-          '@context': 'https://schema.org',
-          '@type': 'LocalBusiness',
-          name: SEO.siteName,
-          url: absoluteUrl('/'),
-          telephone: SEO.telephone,
-          email: SEO.email,
-          address: {
-            '@type': 'PostalAddress',
-            streetAddress: SEO.address.streetAddress,
-            addressLocality: SEO.address.addressLocality,
-            addressCountry: SEO.address.addressCountry,
-          },
-          geo: {
-            '@type': 'GeoCoordinates',
-            latitude: SEO.geo.latitude,
-            longitude: SEO.geo.longitude,
-          },
-        }}
+        jsonLd={localBusinessJsonLd()}
       />
 
       <div className="py-16 px-6 text-center max-w-4xl mx-auto">
