@@ -42,26 +42,21 @@ else
   echo "WARN: build не найден ($PROJECT_ROOT/frontend/my-banya/build). Пропускаем rsync фронтенда."
 fi
 
+if [[ -f "$PROJECT_ROOT/frontend/my-banya/public/410.html" ]]; then
+  cp "$PROJECT_ROOT/frontend/my-banya/public/410.html" "$WEB_ROOT/410.html"
+fi
+
 echo "==> Установка nginx-конфига"
+mkdir -p /etc/nginx/snippets
+cp "$SCRIPT_DIR/nginx-gone-410.inc" /etc/nginx/snippets/banya-gone-410.inc
 cp "$SCRIPT_DIR/nginx-banya.conf" "$NGINX_SITE"
 rm -f /etc/nginx/sites-enabled/default
 ln -sf "$NGINX_SITE" /etc/nginx/sites-enabled/banya
 
-# Если SSL уже выпущен — заново применить сертификат к обновлённому конфигу
-if [[ -f "/etc/letsencrypt/live/$DOMAIN/fullchain.pem" ]]; then
-  echo "==> SSL найден — обновляем HTTPS-блок через certbot"
-  if command -v certbot &>/dev/null; then
-    certbot --nginx \
-      -d "$DOMAIN" \
-      -d "www.$DOMAIN" \
-      --non-interactive \
-      --agree-tos \
-      -m "$CERTBOT_EMAIL" \
-      --redirect \
-      || echo "WARN: certbot не смог обновить SSL — проверьте конфиг вручную"
-  else
-    echo "WARN: certbot не установлен — HTTPS может не работать после обновления конфига"
-  fi
+if [[ ! -f "/etc/letsencrypt/live/$DOMAIN/fullchain.pem" ]]; then
+  echo "Ошибка: нет SSL-сертификата /etc/letsencrypt/live/$DOMAIN/fullchain.pem" >&2
+  echo "Выпустите его один раз: certbot --nginx -d $DOMAIN -d www.$DOMAIN" >&2
+  exit 1
 fi
 
 echo "==> Проверка и перезагрузка nginx"

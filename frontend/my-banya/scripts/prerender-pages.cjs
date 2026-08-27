@@ -138,9 +138,9 @@ function pageBody(page, extraLinks = []) {
 ${navHtml()}
 <main>
 <h1>${escapeHtml(page.h1)}</h1>
-${page.paragraphs.map((p) => `<p>${escapeHtml(p)}</p>`).join('\n')}
+${page.paragraphs.map((p) => `<div>${escapeHtml(p)}</div>`).join('\n')}
 ${links ? `<ul>${links}</ul>` : ''}
-<p><a href="tel:${SEO.telephone}">${SEO.telephoneDisplay}</a></p>
+<div><a href="tel:${SEO.telephone}">${SEO.telephoneDisplay}</a></div>
 </main>
 </div>`;
 }
