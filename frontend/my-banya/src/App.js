@@ -170,16 +170,16 @@ function AppWithLayout() {
           <Route path="documents/product-requests/edit/:id" element={withAdminSuspense(<RoleBasedRoute requiredPermission="documents:manage"><AddProductRequest /></RoleBasedRoute>)} />
           <Route path="documents/product-requests/:id" element={withAdminSuspense(<RoleBasedRoute requiredPermission="documents:view"><ProductRequestReview /></RoleBasedRoute>)} />
           <Route path="documents/realization" element={withAdminSuspense(<RoleBasedRoute requiredPermission="documents:view"><DocumentsRealization /></RoleBasedRoute>)} />
-          <Route path="company/client" element={withAdminSuspense(<RoleBasedRoute requiredPermission="clients:view"><Clients /></RoleBasedRoute>)} />
-          <Route path="company/client/edit/:id" element={withAdminSuspense(<RoleBasedRoute requiredPermission="clients:manage"><ClientForm /></RoleBasedRoute>)} />
-          <Route path="company/client/add" element={withAdminSuspense(<RoleBasedRoute requiredPermission="clients:manage"><ClientForm /></RoleBasedRoute>)} />
-          <Route path="company/user" element={withAdminSuspense(<RoleBasedRoute requiredPermission="staff:view"><Users /></RoleBasedRoute>)} />
-          <Route path="company/user/edit/:id" element={withAdminSuspense(<RoleBasedRoute requiredPermission="staff:manage"><UserForm /></RoleBasedRoute>)} />
-          <Route path="company/user/add" element={withAdminSuspense(<RoleBasedRoute requiredPermission="staff:manage"><UserForm /></RoleBasedRoute>)} />
-          <Route path="company/partner" element={withAdminSuspense(<RoleBasedRoute requiredPermission="partners:view"><Partner /></RoleBasedRoute>)} />
-          <Route path="company/partner/edit/:id" element={withAdminSuspense(<RoleBasedRoute requiredPermission="partners:manage"><PartnerForm /></RoleBasedRoute>)} />
-          <Route path="company/partner/add" element={withAdminSuspense(<RoleBasedRoute requiredPermission="partners:manage"><PartnerForm /></RoleBasedRoute>)} />
-          <Route path="company/organization" element={withAdminSuspense(<Organization />)} />
+          <Route path="company/client" element={withAdminSuspense(<RoleBasedRoute adminOnly requiredPermission="clients:view"><Clients /></RoleBasedRoute>)} />
+          <Route path="company/client/edit/:id" element={withAdminSuspense(<RoleBasedRoute adminOnly requiredPermission="clients:manage"><ClientForm /></RoleBasedRoute>)} />
+          <Route path="company/client/add" element={withAdminSuspense(<RoleBasedRoute adminOnly requiredPermission="clients:manage"><ClientForm /></RoleBasedRoute>)} />
+          <Route path="company/user" element={withAdminSuspense(<RoleBasedRoute adminOnly requiredPermission="staff:view"><Users /></RoleBasedRoute>)} />
+          <Route path="company/user/edit/:id" element={withAdminSuspense(<RoleBasedRoute adminOnly requiredPermission="staff:manage"><UserForm /></RoleBasedRoute>)} />
+          <Route path="company/user/add" element={withAdminSuspense(<RoleBasedRoute adminOnly requiredPermission="staff:manage"><UserForm /></RoleBasedRoute>)} />
+          <Route path="company/partner" element={withAdminSuspense(<RoleBasedRoute adminOnly requiredPermission="partners:view"><Partner /></RoleBasedRoute>)} />
+          <Route path="company/partner/edit/:id" element={withAdminSuspense(<RoleBasedRoute adminOnly requiredPermission="partners:manage"><PartnerForm /></RoleBasedRoute>)} />
+          <Route path="company/partner/add" element={withAdminSuspense(<RoleBasedRoute adminOnly requiredPermission="partners:manage"><PartnerForm /></RoleBasedRoute>)} />
+          <Route path="company/organization" element={withAdminSuspense(<RoleBasedRoute adminOnly><Organization /></RoleBasedRoute>)} />
           <Route path="storage/nomenclature" element={withAdminSuspense(<RoleBasedRoute requiredPermission="storage:view"><Storage /></RoleBasedRoute>)} />
           <Route path="storage/nomenclature/add/product" element={withAdminSuspense(<RoleBasedRoute requiredPermission="storage:manage"><AddStorageProduct /></RoleBasedRoute>)} />
           <Route path="storage/product/:id" element={withAdminSuspense(<RoleBasedRoute requiredPermission="storage:view"><Product /></RoleBasedRoute>)} />

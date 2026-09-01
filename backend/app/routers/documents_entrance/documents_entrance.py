@@ -74,9 +74,6 @@ def create_document(doc: EntranceDocumentCreate, db: Session = Depends(get_db)):
     if doc_status not in ("draft", "posted"):
         raise HTTPException(status_code=400, detail="status должен быть draft или posted")
 
-    if doc_status == "posted" and not doc.supplier_id:
-        raise HTTPException(status_code=400, detail="Для проведения укажите поставщика")
-
     if doc.account_id:
         account = db.query(OrganizationAccount).filter(OrganizationAccount.id == doc.account_id).first()
         if not account:
@@ -164,8 +161,6 @@ def post_document(doc_id: int, db: Session = Depends(get_db)):
     db_doc = _load_document(db, doc_id)
     if (db_doc.status or "posted") != "draft":
         raise HTTPException(status_code=400, detail="Провести можно только черновик")
-    if not db_doc.supplier_id:
-        raise HTTPException(status_code=400, detail="Укажите поставщика перед проведением")
     if not db_doc.items:
         raise HTTPException(status_code=400, detail="В документе нет позиций")
 

@@ -17,6 +17,8 @@ const ProductSelectionModal = ({ isOpen, onClose, onSelect }) => {
   const [contextMenu, setContextMenu] = useState(null);
   const [isCreatingCategory, setIsCreatingCategory] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
+  const [createParentId, setCreateParentId] = useState(null);
+  const [expandedParentCategories, setExpandedParentCategories] = useState(new Set());
   const [expandedCategories, setExpandedCategories] = useState(new Set());
   const [productSearchTerm, setProductSearchTerm] = useState('');
 
@@ -35,6 +37,8 @@ const ProductSelectionModal = ({ isOpen, onClose, onSelect }) => {
     setContextMenu(null);
     setIsCreatingCategory(false);
     setNewCategoryName('');
+    setCreateParentId(null);
+    setExpandedParentCategories(new Set());
     setExpandedCategories(new Set());
     setProductSearchTerm('');
   }, []);
@@ -108,6 +112,60 @@ const ProductSelectionModal = ({ isOpen, onClose, onSelect }) => {
     return () => window.removeEventListener('click', handleClick);
   }, [contextMenu, closeContextMenu]);
 
+  const toggleParentExpand = (id) => {
+    setExpandedParentCategories((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const openCreateCategoryModal = (parentId = null) => {
+    setCreateParentId(parentId);
+    setNewCategoryName('');
+    setExpandedParentCategories(parentId ? new Set([parentId]) : new Set());
+    setIsCreatingCategory(true);
+    closeContextMenu();
+  };
+
+  const renderParentCategoryTree = (categoryList) => {
+    return categoryList.map((category) => {
+      const hasChildren = category.children?.length > 0;
+      const isExpanded = expandedParentCategories.has(category.id);
+
+      return (
+        <div key={category.id} className="ml-3">
+          <div className="flex items-center py-1 px-1">
+            {hasChildren ? (
+              <span
+                className="mr-1 cursor-pointer select-none text-sm"
+                onClick={() => toggleParentExpand(category.id)}
+              >
+                {isExpanded ? '▼' : '►'}
+              </span>
+            ) : (
+              <span className="mr-1 text-gray-500 text-sm">•</span>
+            )}
+            <label className="flex items-center cursor-pointer ml-1 min-w-0">
+              <input
+                type="radio"
+                name="parent-category"
+                checked={createParentId === category.id}
+                onChange={() => setCreateParentId(category.id)}
+                className="mr-2"
+              />
+              <span className="truncate text-sm">{category.name}</span>
+            </label>
+          </div>
+          {hasChildren && isExpanded && (
+            <div className="ml-3">{renderParentCategoryTree(category.children)}</div>
+          )}
+        </div>
+      );
+    });
+  };
+
   const renderCategoryTree = (categories, level = 0) => {
     return categories.map(category => {
       const isExpanded = expandedCategories.has(category.id);
@@ -156,12 +214,12 @@ const ProductSelectionModal = ({ isOpen, onClose, onSelect }) => {
     }
 
     try {
-      const parentId = contextMenu?.category?.id || selectedCategory?.id || null;
       await createCategory({
-        name: newCategoryName,
-        parent_id: parentId
+        name: newCategoryName.trim(),
+        parent_id: createParentId,
       }).unwrap();
       setNewCategoryName('');
+      setCreateParentId(null);
       setIsCreatingCategory(false);
       closeContextMenu();
     } catch (err) {
@@ -234,10 +292,7 @@ const ProductSelectionModal = ({ isOpen, onClose, onSelect }) => {
             <div className="flex gap-2">
               <button
                 type="button"
-                onClick={() => {
-                  setContextMenu(null);
-                  setIsCreatingCategory(true);
-                }}
+                onClick={() => openCreateCategoryModal(selectedCategory?.id ?? null)}
                 className="px-3 py-1.5 bg-blue-100 text-blue-800 rounded text-sm hover:bg-blue-200"
               >
                 Добавить категорию
@@ -506,8 +561,7 @@ const ProductSelectionModal = ({ isOpen, onClose, onSelect }) => {
               className="block w-full text-left px-4 py-2 hover:bg-gray-100"
               onClick={(e) => {
                 e.stopPropagation();
-                setIsCreatingCategory(true);
-                closeContextMenu();
+                openCreateCategoryModal(contextMenu?.category?.id ?? null);
               }}
             >
               Добавить подкатегорию
@@ -521,21 +575,49 @@ const ProductSelectionModal = ({ isOpen, onClose, onSelect }) => {
         {/* Модалка создания категории */}
         {isCreatingCategory && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white p-4 rounded-lg shadow-lg w-full max-w-md">
-              <h4 className="font-medium mb-2 text-sm">
-                Создать категорию в:{" "}
-                <span className="font-normal">
-                  {contextMenu?.category ? contextMenu.category.name : 'Номенклатура'}
-                </span>
-              </h4>
-              <input
-                type="text"
-                value={newCategoryName}
-                onChange={(e) => setNewCategoryName(e.target.value)}
-                className="w-full p-2 border border-gray-300 rounded mb-3 text-sm"
-                placeholder="Введите имя категории"
-                autoFocus
-              />
+            <div className="bg-white p-4 rounded-lg shadow-lg w-full max-w-md max-h-[90vh] overflow-y-auto">
+              <h4 className="font-medium mb-4 text-sm sm:text-base">Добавить категорию</h4>
+
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Родительская категория
+                </label>
+                <div className="border rounded p-2 max-h-40 overflow-y-auto text-sm bg-gray-50">
+                  <label className="flex items-center cursor-pointer mb-2 px-1">
+                    <input
+                      type="radio"
+                      name="parent-category"
+                      checked={createParentId === null}
+                      onChange={() => setCreateParentId(null)}
+                      className="mr-2"
+                    />
+                    <span>Номенклатура</span>
+                  </label>
+                  {isLoadingCategories ? (
+                    <p className="text-gray-500 px-1">Загрузка...</p>
+                  ) : (
+                    renderParentCategoryTree(categories)
+                  )}
+                </div>
+              </div>
+
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Имя категории
+                </label>
+                <input
+                  type="text"
+                  value={newCategoryName}
+                  onChange={(e) => setNewCategoryName(e.target.value)}
+                  className="w-full p-2 border border-gray-300 rounded text-sm"
+                  placeholder="Введите имя категории"
+                  autoFocus
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleCreateCategory();
+                  }}
+                />
+              </div>
+
               <div className="flex space-x-2">
                 <button
                   onClick={handleCreateCategory}
@@ -547,6 +629,7 @@ const ProductSelectionModal = ({ isOpen, onClose, onSelect }) => {
                   onClick={() => {
                     setIsCreatingCategory(false);
                     setNewCategoryName('');
+                    setCreateParentId(null);
                   }}
                   className="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400 text-sm"
                 >

@@ -18,7 +18,7 @@ def upload_scripts(sftp: paramiko.SFTPClient) -> None:
     except OSError:
         pass
     for f in DEPLOY_DIR.iterdir():
-        if f.is_file() and f.suffix in {".sh", ".service", ".conf", ".py"}:
+        if f.is_file() and f.suffix in {".sh", ".service", ".conf", ".py", ".inc"}:
             data = f.read_bytes().replace(b"\r\n", b"\n")
             remote = f"/root/banya/deploy/{f.name}"
             with sftp.open(remote, "w") as rf:

@@ -1,12 +1,10 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
-import ContractorModal from './ContractorModal';
 import ProductSelectionModal from './ProductSelectionModal';
 import {
   setInitialState,
   updateField,
-  setSupplier,
   addItem,
   updateItem,
   removeItem,
@@ -20,9 +18,6 @@ import {
   useGetUnitsOfMeasurementQuery,
   useGetProductsQuery,
 } from '../../../../redux/slices/productsApiSlice';
-import {
-  useGetPartnersQuery,
-} from '../../../../redux/slices/apiSlice';
 import { toast } from 'react-hot-toast';
 
 function AddDocumentEntrance() {
@@ -31,11 +26,10 @@ function AddDocumentEntrance() {
   const { id } = useParams();
   const isEditing = Boolean(id);
 
-  const { date, supplierId, accountId, responsibleName, supplierNumber, comment, items } = useSelector(
+  const { date, accountId, responsibleName, comment, items } = useSelector(
     (state) => state.documentEntranceForm
   );
 
-  const [isContractorModalOpen, setIsContractorModalOpen] = useState(false);
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
   const [pendingPayload, setPendingPayload] = useState(null);
@@ -45,7 +39,6 @@ function AddDocumentEntrance() {
   const productSearchRef = useRef(null);
 
   // --- RTK Query ---
-  const { data: partnersData = [], isLoading: isLoadingPartners } = useGetPartnersQuery();
   const { data: units = [], isLoading: isLoadingUnits } = useGetUnitsOfMeasurementQuery();
   const { data: products = [] } = useGetProductsQuery();
   const {
@@ -58,7 +51,7 @@ function AddDocumentEntrance() {
   const [updateDocument, { isLoading: isUpdating }] = useUpdateEntranceDocumentMutation();
   const [postDocument, { isLoading: isPosting }] = usePostEntranceDocumentMutation();
 
-  const isLoading = isLoadingPartners || isLoadingDoc || isLoadingUnits;
+  const isLoading = isLoadingDoc || isLoadingUnits;
   const isDraft = isEditing && documentData?.status === 'draft';
   const isPostedLocked = isEditing && !isDraft;
   const isBusy = isCreating || isUpdating || isPosting;
@@ -108,10 +101,8 @@ function AddDocumentEntrance() {
       dispatch(
         setInitialState({
           date: documentData.date,
-          supplierId: documentData.supplier_id,
           accountId: documentData.account_id ?? null,
           responsibleName: documentData.responsible_name,
-          supplierNumber: documentData.supplier_number || '',
           comment: documentData.comment || '',
           items: parsedItems,
         })
@@ -151,11 +142,6 @@ function AddDocumentEntrance() {
       navigate('/admin/documents/entrance');
     }
   }, [isDocError, navigate]);
-
-  const handleContractorSelect = (partner) => {
-    dispatch(setSupplier(partner.partner_id));
-    setIsContractorModalOpen(false);
-  };
 
   const handleSelectProductFromModal = (product) => {
     const unit = units.find(u => u.id === product.unit_id);
@@ -210,8 +196,6 @@ function AddDocumentEntrance() {
     dispatch(removeItem(index));
   };
 
-  const handleOpenContractorModal = () => setIsContractorModalOpen(true);
-  const handleCloseContractorModal = () => setIsContractorModalOpen(false);
   const handleOpenProductModal = () => setIsProductModalOpen(true);
   const handleCloseProductModal = () => setIsProductModalOpen(false);
 
@@ -253,10 +237,10 @@ function AddDocumentEntrance() {
     return {
       payload: {
         date,
-        supplier_id: supplierId,
+        supplier_id: null,
         account_id: accountId ?? null,
         responsible_name: responsibleName,
-        supplier_number: supplierNumber?.trim() || null,
+        supplier_number: null,
         comment: comment || null,
         total_amount: total,
         status: isDraft ? 'draft' : 'posted',
@@ -272,10 +256,6 @@ function AddDocumentEntrance() {
   };
 
   const handleSaveDocument = async () => {
-    if (!isDraft && !supplierId) {
-      toast.error('Выберите поставщика');
-      return;
-    }
     if (items.length === 0) {
       toast.error('Добавьте хотя бы один товар');
       return;
@@ -290,10 +270,6 @@ function AddDocumentEntrance() {
   };
 
   const handlePostDocument = async () => {
-    if (!supplierId) {
-      toast.error('Укажите поставщика перед проведением');
-      return;
-    }
     if (items.length === 0) {
       toast.error('Добавьте хотя бы один товар');
       return;
@@ -312,8 +288,6 @@ function AddDocumentEntrance() {
     navigate(`/admin/storage/product/${productId}`, { state: { from: currentPath } });
   };
 
-  const currentUrl = window.location.pathname + window.location.search;
-  const selectedPartner = partnersData.find((p) => p.partner_id === supplierId);
   const getLineTotal = (item) => (Number(item.quantity) || 0) * (Number(item.purchasePrice) || 0);
   const documentTotal = enhancedItems.reduce((sum, item) => sum + getLineTotal(item), 0);
 
@@ -381,30 +355,9 @@ function AddDocumentEntrance() {
           </div>
         </div>
 
-        {/* Блок поставщика и данных — ВОЗВРАЩАЕМ СТАРУЮ СТРУКТУРУ */}
         <div className="bg-white rounded-xl sm:rounded-2xl shadow p-4 sm:p-6 mb-6 border border-gray-100">
           <div className="space-y-4">
-            {/* Первая строка: Поставщик | Дата */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">Поставщик *</label>
-                <div className="flex flex-col sm:flex-row gap-2">
-                  <input
-                    type="text"
-                    value={selectedPartner?.supplier_name || ''}
-                    readOnly
-                    className="flex-grow px-3 py-2 sm:px-4 sm:py-3 border border-gray-300 rounded-lg sm:rounded-xl bg-gray-100 text-sm"
-                    placeholder="Не выбран"
-                  />
-                  <button
-                    onClick={handleOpenContractorModal}
-                    className="px-3 py-2 sm:px-4 sm:py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg sm:rounded-xl font-medium shadow transition text-xs sm:text-sm"
-                    disabled={isPostedLocked}
-                  >
-                    Выбрать
-                  </button>
-                </div>
-              </div>
               <div>
                 <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">Дата</label>
                 <input
@@ -413,20 +366,6 @@ function AddDocumentEntrance() {
                   onChange={(e) => updateDocumentData('date', e.target.value)}
                   className="w-full px-3 py-2 sm:px-4 sm:py-3 border border-gray-300 rounded-lg sm:rounded-xl text-sm"
                   disabled={isPostedLocked}
-                />
-              </div>
-            </div>
-
-            {/* Вторая строка: Ответственный | Номер документа */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">Ответственный *</label>
-                <input
-                  type="text"
-                  value={responsibleName || ''}
-                  readOnly
-                  className="w-full px-3 py-2 sm:px-4 sm:py-3 border border-gray-300 rounded-lg sm:rounded-xl bg-gray-100 text-sm"
-                  placeholder="—"
                 />
               </div>
               <div>
@@ -439,6 +378,17 @@ function AddDocumentEntrance() {
                   placeholder="—"
                 />
               </div>
+            </div>
+
+            <div>
+              <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">Ответственный *</label>
+              <input
+                type="text"
+                value={responsibleName || ''}
+                readOnly
+                className="w-full px-3 py-2 sm:px-4 sm:py-3 border border-gray-300 rounded-lg sm:rounded-xl bg-gray-100 text-sm"
+                placeholder="—"
+              />
             </div>
 
             <div>
@@ -737,13 +687,6 @@ function AddDocumentEntrance() {
           </div>
         )}
       </div>
-
-      <ContractorModal
-        isOpen={isContractorModalOpen}
-        onClose={handleCloseContractorModal}
-        onSelect={handleContractorSelect}
-        currentUrl={currentUrl}
-      />
 
       <ProductSelectionModal
         isOpen={isProductModalOpen}

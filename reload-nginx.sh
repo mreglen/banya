@@ -39,6 +39,7 @@ run_on_remote() {
   echo "==> Копирование конфига на $user@$host:$remote_dir/deploy/"
   scp -o StrictHostKeyChecking=accept-new \
     "$ROOT/deploy/nginx-banya.conf" \
+    "$ROOT/deploy/nginx-gone-410.inc" \
     "$ROOT/deploy/reload-nginx.sh" \
     "$user@$host:$remote_dir/deploy/"
 

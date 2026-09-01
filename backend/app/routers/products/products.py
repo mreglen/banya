@@ -114,8 +114,13 @@ def update_product(
 
     old_price = float(db_product.price or 0)
 
-    for key, value in product.model_dump().items():
+    update_data = product.model_dump()
+    total_quantity = update_data.pop("total_quantity", None)
+    for key, value in update_data.items():
         setattr(db_product, key, value)
+
+    if total_quantity is not None:
+        db_product.total_quantity = max(0, int(total_quantity))
 
     if not db_product.is_countable:
         db_product.min_stock = 0.0

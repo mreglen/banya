@@ -1,5 +1,6 @@
 #!/bin/bash
-# Выпуск SSL-сертификата Let's Encrypt для nikolaevskie.ru
+# Выпуск SSL-сертификата Let's Encrypt для nikolaevskie.ru.
+# Не используем certbot --nginx: он переписывает vhost и ломает 410/HTTPS-конфиг.
 set -euo pipefail
 
 DOMAIN="nikolaevskie.ru"
@@ -10,18 +11,18 @@ if ! command -v certbot &>/dev/null; then
   apt install -y certbot python3-certbot-nginx
 fi
 
-# Убедимся, что nginx слушает домен на :80
-bash /root/banya/deploy/remote-fix-nginx.sh
+if [[ ! -f "/etc/letsencrypt/live/$DOMAIN/fullchain.pem" ]]; then
+  echo "==> Выпуск сертификата (certonly, без правки nginx)"
+  certbot certonly --nginx \
+    -d "$DOMAIN" \
+    -d "www.$DOMAIN" \
+    --non-interactive \
+    --agree-tos \
+    -m "$EMAIL"
+else
+  echo "==> Сертификат уже есть: /etc/letsencrypt/live/$DOMAIN/fullchain.pem"
+fi
 
-certbot --nginx \
-  -d "$DOMAIN" \
-  -d "www.$DOMAIN" \
-  --non-interactive \
-  --agree-tos \
-  -m "$EMAIL" \
-  --redirect
-
-nginx -t
-systemctl reload nginx
+bash /root/banya/deploy/reload-nginx.sh
 
 echo "SSL готов: https://$DOMAIN"

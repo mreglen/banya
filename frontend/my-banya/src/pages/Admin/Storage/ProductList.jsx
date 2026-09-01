@@ -188,9 +188,10 @@ const ProductList = ({
                 e?.stopPropagation?.();
                 if (markedForDeletion) {
                     dispatch(unmarkForDeletion(product.id));
+                    toast.success('Пометка на удаление снята');
                 } else {
                     dispatch(markForDeletion(product.id));
-                    navigate('/admin/deletion-requests');
+                    toast.success('Товар помечен на удаление');
                 }
             },
         },

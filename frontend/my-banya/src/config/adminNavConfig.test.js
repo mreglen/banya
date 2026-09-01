@@ -54,6 +54,20 @@ describe('adminNavConfig', () => {
     expect(paths).toContain('/admin/reservations');
   });
 
+  test('company section hidden for director in more menu', () => {
+    const user = { is_director: true };
+    const hasAccess = () => true;
+    const sections = getMobileMoreItems('director', hasAccess, user);
+    expect(sections.company).toBeUndefined();
+  });
+
+  test('company section visible for admin in more menu', () => {
+    const user = { is_admin: true };
+    const hasAccess = () => true;
+    const sections = getMobileMoreItems('admin', hasAccess, user);
+    expect(sections.company?.some((i) => i.path === '/admin/company/user')).toBe(true);
+  });
+
   test('mobile home path', () => {
     expect(MOBILE_HOME_PATH).toBe('/admin/documents/realization');
   });

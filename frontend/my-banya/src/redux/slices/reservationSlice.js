@@ -1,6 +1,25 @@
 // src/redux/slices/reservationSlice.js
 import { createApi } from '@reduxjs/toolkit/query/react';
 import baseQuery from '../../utils/baseQuery';
+import { apiSlice } from './apiSlice';
+
+const invalidateDashboard = async (_, { dispatch, queryFulfilled }) => {
+  try {
+    await queryFulfilled;
+    dispatch(
+      apiSlice.util.invalidateTags([
+        { type: 'Dashboard', id: 'statistics' },
+        { type: 'Dashboard', id: 'revenue-chart' },
+        { type: 'Dashboard', id: 'reservations-chart' },
+        { type: 'Dashboard', id: 'bookings-chart' },
+        { type: 'Dashboard', id: 'popular-baths' },
+        { type: 'Dashboard', id: 'recent-activity' },
+      ])
+    );
+  } catch {
+    // ignore
+  }
+};
 
 export const reservationApiSlice = createApi({
     reducerPath: 'reservationApi',
@@ -25,6 +44,7 @@ export const reservationApiSlice = createApi({
                 body,
             }),
             invalidatesTags: ['Reservations'],
+            onQueryStarted: invalidateDashboard,
         }),
         updateReservation: builder.mutation({
             query: ({ id, ...body }) => ({
@@ -33,6 +53,7 @@ export const reservationApiSlice = createApi({
                 body,
             }),
             invalidatesTags: ['Reservations'],
+            onQueryStarted: invalidateDashboard,
         }),
         deleteReservation: builder.mutation({
             query: (id) => ({
@@ -40,6 +61,7 @@ export const reservationApiSlice = createApi({
                 method: 'DELETE',
             }),
             invalidatesTags: ['Reservations'],
+            onQueryStarted: invalidateDashboard,
         }),
         getReservationStatuses: builder.query({
             query: () => '/admin/reservation-status/',

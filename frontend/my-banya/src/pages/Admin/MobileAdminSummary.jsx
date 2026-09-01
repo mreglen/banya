@@ -39,7 +39,7 @@ function MobileAdminSummary({ stats, recentActivity, userName, greeting }) {
     {
       label: 'Заявки',
       value: stats?.bookings?.unread || 0,
-      sub: 'новых',
+      sub: `${stats?.bookings?.this_month ?? stats?.bookings?.total ?? 0} / мес`,
       icon: MousePointer2,
       color: 'text-orange-600 bg-orange-50',
       to: hasAccess('bookings:view') ? '/admin/bookings' : null,

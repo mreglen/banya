@@ -338,7 +338,7 @@ function AddProductRequest() {
                           <button
                             type="button"
                             onClick={() => dispatch(removeItem(index))}
-                            className="text-red-500 hover:text-red-700"
+                            className="text-red-500 hover:text-red-700 text-4xl "
                           >
                             ×
                           </button>

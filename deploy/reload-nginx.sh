@@ -48,8 +48,11 @@ fi
 
 echo "==> Установка nginx-конфига"
 mkdir -p /etc/nginx/snippets
+# Windows checkout может оставить CRLF — nginx от этого падает
+sed -i 's/\r$//' "$SCRIPT_DIR/nginx-gone-410.inc" "$SCRIPT_DIR/nginx-banya.conf" "$SCRIPT_DIR/reload-nginx.sh" || true
 cp "$SCRIPT_DIR/nginx-gone-410.inc" /etc/nginx/snippets/banya-gone-410.inc
 cp "$SCRIPT_DIR/nginx-banya.conf" "$NGINX_SITE"
+sed -i 's/\r$//' /etc/nginx/snippets/banya-gone-410.inc "$NGINX_SITE" || true
 rm -f /etc/nginx/sites-enabled/default
 ln -sf "$NGINX_SITE" /etc/nginx/sites-enabled/banya
 

@@ -115,10 +115,8 @@ function Admin() {
           </NavLink>
         )}
 
-        {/* Компания */}
-        {(hasAccess('/admin/company/user') ||
-          hasAccess('/admin/company/partner') ||
-          hasAccess('/admin/company/organization')) && (
+        {/* Компания — только системный администратор */}
+        {user?.is_admin && (
             <div>
               <button
                 onClick={toggleCompany}

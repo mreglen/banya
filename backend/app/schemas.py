@@ -485,6 +485,7 @@ class ProductBase(BaseModel):
 
 class ProductCreate(ProductBase):
     unit_id: Optional[int] = None
+    total_quantity: Optional[float] = None
 
 
 class ProductWriteOff(BaseModel):

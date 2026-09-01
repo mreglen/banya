@@ -51,7 +51,7 @@ function Product() {
     name: '',
     description: '',
     category_id: null,
-    total_quantity: 0,
+    total_quantity: '0',
     price: '',
     is_countable: true,
     min_stock: 0.0,
@@ -74,7 +74,7 @@ function Product() {
         name: product.name || '',
         description: product.description || '',
         category_id: product.category_id || null,
-        total_quantity: product.total_quantity || 0,
+        total_quantity: String(Math.floor(Number(product.total_quantity) || 0)),
         price: (product.price ?? 0).toString(),
         is_countable: product.is_countable ?? true,
         min_stock: product.min_stock || 0.0,
@@ -112,7 +112,7 @@ function Product() {
     setForm(prev => ({
       ...prev,
       [name]: name === 'total_quantity'
-        ? parseFloat(value) || 0
+        ? (value === '' || /^\d+$/.test(value) ? value : prev.total_quantity)
         : name === 'price'
         ? (value === '' || /^\d*$/.test(value) ? value : prev.price)
         : name === 'unit_id'
@@ -216,7 +216,7 @@ function Product() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const { name, description, category_id, is_countable, min_stock, unit_id, price, is_visible_on_website } = form;
+    const { name, description, category_id, is_countable, min_stock, unit_id, price, is_visible_on_website, total_quantity } = form;
 
     try {
       const selectedCat = findCategoryById(categories, category_id);
@@ -231,6 +231,7 @@ function Product() {
         min_stock: is_countable ? min_stock : 0,
         unit_id: unit_id,
         price: price === '' ? 0 : Number(price),
+        ...(is_countable ? { total_quantity: parseInt(total_quantity, 10) || 0 } : {}),
       };
 
       await updateProduct(productData).unwrap();
@@ -484,9 +485,15 @@ function Product() {
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Остаток ({selectedUnit?.name || 'шт.'})
                 </label>
-                <div className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-700">
-                  {product?.total_quantity || 0}
-                </div>
+                <input
+                  type="text"
+                  name="total_quantity"
+                  value={form.total_quantity}
+                  onChange={handleChange}
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
               </div>
             )}
 

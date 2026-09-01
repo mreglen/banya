@@ -56,7 +56,7 @@ function AdminDashboard() {
   const [revenuePeriod, setRevenuePeriod] = useState('month');
 
   // Загрузка данных
-  const { data: stats, isLoading: statsLoading } = useGetDashboardStatisticsQuery();
+  const { data: stats, isLoading: statsLoading, isError: statsError, refetch: refetchStats } = useGetDashboardStatisticsQuery();
   const { data: revenueData, isLoading: revenueLoading } = useGetRevenueChartDataQuery(revenuePeriod);
   const { data: reservationsData, isLoading: reservationsLoading } = useGetReservationsChartDataQuery(14);
   const { data: bookingsData, isLoading: bookingsLoading } = useGetBookingsChartDataQuery(14);
@@ -107,6 +107,24 @@ function AdminDashboard() {
 
   if (statsLoading) {
     return <AdminDashboardSkeleton />;
+  }
+
+  if (statsError) {
+    return (
+      <div className="p-8 min-h-screen bg-gray-50/50 flex items-center justify-center">
+        <div className="bg-white rounded-2xl border border-red-100 shadow-sm p-6 max-w-md text-center">
+          <p className="text-red-700 font-medium mb-2">Не удалось загрузить сводку</p>
+          <p className="text-sm text-gray-500 mb-4">Проверьте подключение к серверу и попробуйте снова.</p>
+          <button
+            type="button"
+            onClick={() => refetchStats()}
+            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+          >
+            Повторить
+          </button>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -194,7 +212,7 @@ function AdminDashboard() {
               <span className="text-sm text-gray-400 pb-1">новых</span>
             </div>
             <div className="mt-4 flex items-center gap-2 text-xs font-semibold text-orange-600 bg-orange-50 w-fit px-2 py-1 rounded-lg">
-              {stats?.bookings?.total || 0} всего за месяц
+              {stats?.bookings?.this_month ?? stats?.bookings?.total ?? 0} за месяц
             </div>
           </div>
         </div>
@@ -340,6 +358,10 @@ function AdminDashboard() {
             <div className="h-[250px] w-full bg-gray-50 rounded-2xl animate-pulse flex items-center justify-center">
               <span className="text-gray-400 text-sm">Загрузка данных...</span>
             </div>
+          ) : !popularBaths?.length ? (
+            <div className="h-[250px] w-full bg-gray-50 rounded-2xl flex items-center justify-center text-sm text-gray-500">
+              Пока нет бронирований за этот месяц
+            </div>
           ) : (
             <div className="flex flex-col md:flex-row items-center gap-8">
               <div className="h-[250px] w-full md:w-1/2">
@@ -388,7 +410,12 @@ function AdminDashboard() {
             )}
           </div>
           <div className="space-y-6">
-            {recentActivity?.map((activity) => (
+            {activityLoading ? (
+              <p className="text-sm text-gray-400">Загрузка...</p>
+            ) : !recentActivity?.length ? (
+              <p className="text-sm text-gray-400">Пока нет записей в журнале</p>
+            ) : (
+            recentActivity.map((activity) => (
               <div key={activity.id} className="flex items-start gap-4">
                 <div className="mt-1 p-2 bg-gray-50 rounded-xl">
                   {getActionIcon(activity.action)}
@@ -409,6 +436,7 @@ function AdminDashboard() {
                 </div>
               </div>
             ))}
+            )}
           </div>
         </div>
       </div>

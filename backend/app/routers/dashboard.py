@@ -1,18 +1,22 @@
 # app/routers/dashboard.py
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
-from sqlalchemy import func, extract, and_
-from datetime import datetime, timedelta, date
+from sqlalchemy import func, extract
+from datetime import timedelta, date
 from typing import List, Dict, Any
 
 from app import models, database
+from app.auth import get_current_user
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 
 
 @router.get("/statistics")
-def get_dashboard_statistics(db: Session = Depends(database.get_db)) -> Dict[str, Any]:
+def get_dashboard_statistics(
+    db: Session = Depends(database.get_db),
+    _current_user: models.User = Depends(get_current_user),
+) -> Dict[str, Any]:
     """Получить статистику для дашборда"""
     
     today = date.today()
@@ -60,6 +64,10 @@ def get_dashboard_statistics(db: Session = Depends(database.get_db)) -> Dict[str
     
     # Всего заявок с сайта
     total_bookings = db.query(models.Booking).count()
+
+    bookings_this_month = db.query(models.Booking).filter(
+        func.date(models.Booking.created_at) >= start_of_month
+    ).count()
     
     return {
         "reservations": {
@@ -81,12 +89,17 @@ def get_dashboard_statistics(db: Session = Depends(database.get_db)) -> Dict[str
         "bookings": {
             "unread": unread_bookings,
             "total": total_bookings,
+            "this_month": bookings_this_month,
         }
     }
 
 
 @router.get("/revenue-chart")
-def get_revenue_chart_data(period: str = "month", db: Session = Depends(database.get_db)) -> List[Dict[str, Any]]:
+def get_revenue_chart_data(
+    period: str = "month",
+    db: Session = Depends(database.get_db),
+    _current_user: models.User = Depends(get_current_user),
+) -> List[Dict[str, Any]]:
     """Получить данные для графика дохода за выбранный период"""
     
     end_date = date.today()
@@ -167,7 +180,11 @@ def get_revenue_chart_data(period: str = "month", db: Session = Depends(database
 
 
 @router.get("/reservations-chart")
-def get_reservations_chart_data(days: int = 30, db: Session = Depends(database.get_db)) -> List[Dict[str, Any]]:
+def get_reservations_chart_data(
+    days: int = 30,
+    db: Session = Depends(database.get_db),
+    _current_user: models.User = Depends(get_current_user),
+) -> List[Dict[str, Any]]:
     """Получить данные для графика бронирований за последние N дней"""
     
     end_date = date.today()
@@ -205,7 +222,11 @@ def get_reservations_chart_data(days: int = 30, db: Session = Depends(database.g
 
 
 @router.get("/bookings-chart")
-def get_bookings_chart_data(days: int = 30, db: Session = Depends(database.get_db)) -> List[Dict[str, Any]]:
+def get_bookings_chart_data(
+    days: int = 30,
+    db: Session = Depends(database.get_db),
+    _current_user: models.User = Depends(get_current_user),
+) -> List[Dict[str, Any]]:
     """Получить данные для графика заявок с сайта за последние N дней"""
     
     end_date = date.today()
@@ -243,7 +264,10 @@ def get_bookings_chart_data(days: int = 30, db: Session = Depends(database.get_d
 
 
 @router.get("/popular-baths")
-def get_popular_baths(db: Session = Depends(database.get_db)) -> List[Dict[str, Any]]:
+def get_popular_baths(
+    db: Session = Depends(database.get_db),
+    _current_user: models.User = Depends(get_current_user),
+) -> List[Dict[str, Any]]:
     """Получить самые популярные бани за последний месяц"""
     
     start_of_month = date.today().replace(day=1)
@@ -278,7 +302,11 @@ def get_popular_baths(db: Session = Depends(database.get_db)) -> List[Dict[str, 
 
 
 @router.get("/recent-activity")
-def get_recent_activity(limit: int = 10, db: Session = Depends(database.get_db)) -> List[Dict[str, Any]]:
+def get_recent_activity(
+    limit: int = 10,
+    db: Session = Depends(database.get_db),
+    _current_user: models.User = Depends(get_current_user),
+) -> List[Dict[str, Any]]:
     """Получить последнюю активность из audit logs"""
     
     activities = db.query(models.AuditLog).order_by(

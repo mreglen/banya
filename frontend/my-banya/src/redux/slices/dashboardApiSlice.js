@@ -1,6 +1,6 @@
 import { apiSlice } from './apiSlice';
 
-const DASHBOARD_URL = '/api/dashboard';
+const DASHBOARD_URL = '/dashboard';
 
 export const dashboardApiSlice = apiSlice.injectEndpoints({
   endpoints: (builder) => ({
