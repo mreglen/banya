@@ -4,6 +4,7 @@ import { setCredentials, logOut } from './redux/slices/authSlice';
 import { getProfile } from './redux/slices/adminApi';
 import { BrowserRouter, Routes, Route, useLocation, useNavigate } from 'react-router-dom';
 import { HelmetProvider } from 'react-helmet-async';
+import { YANDEX_METRIKA_ID } from './utils/yandexMetrika';
 import Header from './components/Header/Header';
 import Footer from './components/Footer/Footer';
 import Home from './pages/Home/Home';
@@ -91,7 +92,7 @@ function AppWithLayout() {
       metrikaInitialHit.current = false;
       return;
     }
-    window.ym(112153346, 'hit', `${location.pathname}${location.search}`, {
+    window.ym(YANDEX_METRIKA_ID, 'hit', `${location.pathname}${location.search}`, {
       title: document.title,
     });
   }, [location.pathname, location.search]);

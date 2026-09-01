@@ -1,6 +1,7 @@
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { useGetWebsiteCategoriesPreviewQuery } from '../../redux/slices/apiSlice';
+import { METRIKA_GOALS, reachMetrikaGoal } from '../../utils/yandexMetrika';
 
 function Header() {
   const [activeSection, setActiveSection] = useState('');
@@ -101,8 +102,11 @@ function Header() {
     { title: 'Контакты', href: '/contacts', sectionId: 'contacts' },
   ];
 
-  const handleClick = (e, href, sectionId) => {
+  const handleClick = (e, href, sectionId, goal) => {
     e.preventDefault();
+    if (goal) {
+      reachMetrikaGoal(goal, { href, section: sectionId || null });
+    }
     const element = sectionId ? document.getElementById(sectionId) : null;
     if (element && location.pathname === '/') {
       element.scrollIntoView({ behavior: 'smooth' });
@@ -112,8 +116,9 @@ function Header() {
     setIsMobileMenuOpen(false);
   };
 
-  const handleBookClick = (e) => {
+  const handleBookClick = (e, source) => {
     e.preventDefault();
+    reachMetrikaGoal(METRIKA_GOALS.BOOKING_HEADER, { source });
     const element = document.getElementById('booking');
     if (element && location.pathname === '/') {
       element.scrollIntoView({ behavior: 'smooth' });
@@ -149,11 +154,17 @@ function Header() {
 
           {/* Десктопная навигация */}
           <nav className="hidden lg:flex items-center gap-2" aria-label="Основное меню">
-            {navLinks.map(({ title, href, sectionId }) => (
+            {navLinks.map(({ title, href, sectionId }) => {
+              const goal = sectionId === 'baths'
+                ? METRIKA_GOALS.NAV_BATHS
+                : sectionId === 'contacts'
+                  ? METRIKA_GOALS.NAV_CONTACTS
+                  : null;
+              return (
               <a
                 key={title}
                 href={href}
-                onClick={(e) => handleClick(e, href, sectionId)}
+                onClick={(e) => handleClick(e, href, sectionId, goal)}
                 className={`relative px-4 py-2 rounded-xl text-lg font-medium transition-all duration-300 group
                   ${activeSection === sectionId 
                     ? isScrolled
@@ -170,12 +181,13 @@ function Header() {
                   <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-6 h-0.5 bg-green-500 rounded-full"></div>
                 )}
               </a>
-            ))}
+            );
+            })}
             
             {/* CTA Кнопка */}
             <a
               href="/booking"
-              onClick={handleBookClick}
+              onClick={(e) => handleBookClick(e, 'desktop')}
               className={`ml-4 px-6 py-2.5 rounded-xl text-lg font-semibold transition-all duration-300 transform hover:scale-105 hover:shadow-xl
                 ${isScrolled
                   ? 'bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white shadow-lg shadow-green-500/30'
@@ -249,11 +261,17 @@ function Header() {
           {/* Навигация */}
           <nav className="flex-1 overflow-y-auto p-6" aria-label="Мобильное меню">
             <div className="space-y-2">
-              {navLinks.map(({ title, href, sectionId }) => (
+              {navLinks.map(({ title, href, sectionId }) => {
+                const goal = sectionId === 'baths'
+                  ? METRIKA_GOALS.NAV_BATHS
+                  : sectionId === 'contacts'
+                    ? METRIKA_GOALS.NAV_CONTACTS
+                    : null;
+                return (
                 <a
                   key={title}
                   href={href}
-                  onClick={(e) => handleClick(e, href, sectionId)}
+                  onClick={(e) => handleClick(e, href, sectionId, goal)}
                   className={`flex items-center gap-4 px-4 py-3 rounded-xl text-lg font-medium transition-all duration-300
                     ${activeSection === sectionId 
                       ? 'text-green-700 bg-green-50'
@@ -265,7 +283,8 @@ function Header() {
                     <div className="ml-auto w-2 h-2 rounded-full bg-green-500"></div>
                   )}
                 </a>
-              ))}
+              );
+              })}
             </div>
           </nav>
 
@@ -273,7 +292,7 @@ function Header() {
           <div className="p-6 border-t border-gray-100">
             <a
               href="/booking"
-              onClick={handleBookClick}
+              onClick={(e) => handleBookClick(e, 'mobile')}
               className="flex items-center justify-center gap-2 w-full px-6 py-3 rounded-xl text-lg font-semibold bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white shadow-lg shadow-green-500/30 transition-all duration-300 transform hover:scale-105"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

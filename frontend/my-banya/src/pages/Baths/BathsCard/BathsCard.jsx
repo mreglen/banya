@@ -4,6 +4,7 @@ import { useGetBathByIdQuery } from '../../../redux/slices/apiSlice';
 import { useState, useEffect } from 'react';
 import SeoHead from '../../../components/Seo/SeoHead';
 import { absoluteUrl, breadcrumbJsonLd, organizationId } from '../../../config/seo';
+import { METRIKA_GOALS } from '../../../utils/yandexMetrika';
 import { isVideoUrl } from '../../../utils/mediaHelpers';
 import { getPriceRangeLabel, hasTimeTariffs } from '../../../utils/bathPricing';
 
@@ -249,6 +250,8 @@ function BathsCard() {
                   to="/booking"
                   text="Забронировать"
                   variant="green"
+                  metrikaGoal={METRIKA_GOALS.BOOKING_BATH_PAGE}
+                  metrikaParams={{ bath_slug: bath.slug, bath_name: bath.name }}
                   className="py-3 text-base flex-1 w-full sm:w-auto"
                 />
                 <CustomButton

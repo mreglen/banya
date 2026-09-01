@@ -10,6 +10,7 @@ import {
 import SeoHead from '../../components/Seo/SeoHead';
 import { PAGES, breadcrumbJsonLd } from '../../config/seo';
 import { formatLocalYmd, formatLocalHm } from '../../utils/dateLocal';
+import { METRIKA_GOALS, reachMetrikaGoal } from '../../utils/yandexMetrika';
 
 function Booking() {
   const isBookingPage = useLocation().pathname === '/booking';
@@ -228,6 +229,11 @@ function Booking() {
         duration_hours: Math.round(selectedDurationHours),
         phone: normalizedPhone,
       }).unwrap();
+      reachMetrikaGoal(METRIKA_GOALS.BOOKING_SUCCESS, {
+        bath_id: formData.bath_id,
+        guests: formData.guests,
+        duration_hours: Math.round(selectedDurationHours),
+      });
       setShowSuccess(true);
       setFormData({
         date: '',

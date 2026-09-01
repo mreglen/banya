@@ -1,6 +1,7 @@
 import { useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useGetOrganizationQuery } from '../../../redux/slices/apiSlice';
+import { METRIKA_GOALS, reachMetrikaGoal } from '../../../utils/yandexMetrika';
 
 function ContactSection() {
     const navigate = useNavigate();
@@ -29,6 +30,7 @@ function ContactSection() {
 
     const handleClick = (e) => {
         e.preventDefault();
+        reachMetrikaGoal(METRIKA_GOALS.BOOKING_CONTACTS_SECTION);
         const element = document.getElementById('booking');
         if (element) {
             element.scrollIntoView({ behavior: 'smooth' });
@@ -101,7 +103,11 @@ function ContactSection() {
                                 </svg>
                                 <div>
                                     <p className="text-base font-semibold text-white">Телефон</p>
-                                    <a href="tel:+73433448755" className="text-gray-300 hover:text-green-400 transition mt-1 inline-block">
+                                    <a
+                                      href="tel:+73433448755"
+                                      onClick={() => reachMetrikaGoal(METRIKA_GOALS.CLICK_PHONE, { source: 'contacts_section' })}
+                                      className="text-gray-300 hover:text-green-400 transition mt-1 inline-block"
+                                    >
                                         +7 (343) 344-87-55
                                     </a>
                                 </div>
@@ -115,7 +121,11 @@ function ContactSection() {
                                 </svg>
                                 <div>
                                     <p className="text-base font-semibold text-white">Email</p>
-                                    <a href="mailto:nikolaevskiebani@yandex.ru" className="text-gray-300 hover:text-green-400 transition mt-1 inline-block break-all">
+                                    <a
+                                      href="mailto:nikolaevskiebani@yandex.ru"
+                                      onClick={() => reachMetrikaGoal(METRIKA_GOALS.CLICK_EMAIL, { source: 'contacts_section' })}
+                                      className="text-gray-300 hover:text-green-400 transition mt-1 inline-block break-all"
+                                    >
                                         nikolaevskiebani@yandex.ru
                                     </a>
                                 </div>
@@ -178,6 +188,7 @@ function ContactSection() {
                     <a
                         href="https://yandex.ru/maps/54/yekaterinburg/house/kizelovskaya_ulitsa_18/YkkYcwRpSEYPQFtsfXRzcnVqZQ==/?ll=60.539138%2C56.823991&utm_medium=mapframe&utm_source=maps&z=16"
                         className="sr-only"
+                        onClick={() => reachMetrikaGoal(METRIKA_GOALS.CLICK_MAPS, { source: 'contacts_section' })}
                     >
                         Кизеловская улица, 18 — Яндекс Карты
                     </a>

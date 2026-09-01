@@ -5,6 +5,7 @@ import { useReveal } from '../../hooks/useReveal';
 import { Calendar } from 'lucide-react';
 import SeoHead from '../../components/Seo/SeoHead';
 import SEO, { PAGES, localBusinessJsonLd } from '../../config/seo';
+import { METRIKA_GOALS, reachMetrikaGoal } from '../../utils/yandexMetrika';
 
 const WebsiteCategoriesPreview = lazy(() => import('./WebsiteCategoriesPreview/WebsiteCategoriesPreview'));
 const Booking = lazy(() => import('../Booking/Booking'));
@@ -26,8 +27,11 @@ function Home() {
         return () => window.removeEventListener('scroll', handleScroll);
     }, []);
 
-    const scrollToBooking = (e) => {
+    const scrollToBooking = (e, goal) => {
         e?.preventDefault();
+        if (goal) {
+            reachMetrikaGoal(goal);
+        }
         document.getElementById('booking')?.scrollIntoView({ behavior: 'smooth' });
     };
 
@@ -64,7 +68,7 @@ function Home() {
                         <div className="flex flex-col sm:flex-row gap-5 justify-center">
                             <a
                                 href="/booking"
-                                onClick={scrollToBooking}
+                                onClick={(e) => scrollToBooking(e, METRIKA_GOALS.BOOKING_HERO)}
                                 className="px-10 py-5 bg-green-600 hover:bg-green-700 text-white rounded-2xl font-semibold text-xl transition-all duration-300 hover:shadow-[0_0_30px_rgba(22,163,74,0.4)] transform hover:scale-105"
                             >
                                 Забронировать
@@ -73,6 +77,7 @@ function Home() {
                                 href="/baths"
                                 onClick={(e) => {
                                     e.preventDefault();
+                                    reachMetrikaGoal(METRIKA_GOALS.CLICK_OUR_BATHS);
                                     document.getElementById('baths')?.scrollIntoView({ behavior: 'smooth' });
                                 }}
                                 className="px-10 py-5 bg-white/10 hover:bg-white/20 backdrop-blur-md text-white rounded-2xl font-semibold text-xl border border-white/20 transition-all duration-300"
@@ -118,7 +123,7 @@ function Home() {
             {/* Sticky Booking Button for Mobile */}
             <div className={`fixed bottom-6 right-6 z-[100] transition-all duration-500 transform ${showSticky ? 'translate-y-0 opacity-100' : 'translate-y-20 opacity-0'}`}>
                 <button
-                    onClick={scrollToBooking}
+                    onClick={(e) => scrollToBooking(e, METRIKA_GOALS.BOOKING_STICKY)}
                     className="flex items-center gap-3 px-6 py-4 bg-green-600 text-white rounded-full shadow-2xl hover:bg-green-700 transition-all transform hover:scale-110 active:scale-95"
                 >
                     <Calendar size={24} />

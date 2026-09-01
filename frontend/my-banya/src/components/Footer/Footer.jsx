@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { SEO, SITELINKS } from '../../config/seo';
+import { METRIKA_GOALS, reachMetrikaGoal } from '../../utils/yandexMetrika';
 
 function Footer() {
   return (
@@ -10,7 +11,11 @@ function Footer() {
           <p className="text-sm mt-1">
             Бани в Екатеринбурге (ЕКБ), {SEO.address.streetAddress}
           </p>
-          <a href={`tel:${SEO.telephone}`} className="text-sm text-green-400 hover:text-green-300 mt-1 inline-block">
+          <a
+            href={`tel:${SEO.telephone}`}
+            onClick={() => reachMetrikaGoal(METRIKA_GOALS.CLICK_PHONE, { source: 'footer' })}
+            className="text-sm text-green-400 hover:text-green-300 mt-1 inline-block"
+          >
             {SEO.telephoneDisplay}
           </a>
         </div>

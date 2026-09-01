@@ -3,6 +3,7 @@ import CustomButton from '../../components/UI/CustomButton/CustomButton';
 import SeoHead from '../../components/Seo/SeoHead';
 import { PAGES, absoluteUrl, breadcrumbJsonLd } from '../../config/seo';
 import { getPriceRangeLabel, hasTimeTariffs } from '../../utils/bathPricing';
+import { METRIKA_GOALS } from '../../utils/yandexMetrika';
 
 function Baths() {
   const { data: baths = [], isLoading, error } = useGetBathsQuery();
@@ -118,6 +119,8 @@ function Baths() {
                     to={`/baths/${bath.slug}`}
                     text="Подробнее"
                     variant="green"
+                    metrikaGoal={METRIKA_GOALS.CLICK_BATH_DETAIL}
+                    metrikaParams={{ bath_slug: bath.slug, bath_name: bath.name, source: 'baths_list' }}
                     className="w-full py-3 text-sm hover:shadow-md transition"
                   />
                 </div>

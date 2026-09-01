@@ -1,6 +1,7 @@
 import CustomButton from "../../components/UI/CustomButton/CustomButton";
 import SeoHead from '../../components/Seo/SeoHead';
 import { PAGES, breadcrumbJsonLd, localBusinessJsonLd } from '../../config/seo';
+import { METRIKA_GOALS, reachMetrikaGoal } from '../../utils/yandexMetrika';
 
 function Contacts() {
   return (
@@ -52,7 +53,11 @@ function Contacts() {
                 </svg>
                 <div>
                   <p className="font-medium">Телефон</p>
-                  <a href="tel:+73433448755" className="text-gray-500 hover:text-green-600 transition-colors">
+                  <a
+                    href="tel:+73433448755"
+                    onClick={() => reachMetrikaGoal(METRIKA_GOALS.CLICK_PHONE, { source: 'contacts_page' })}
+                    className="text-gray-500 hover:text-green-600 transition-colors"
+                  >
                     +7 (343) 344-87-55
                   </a>
                 </div>
@@ -65,7 +70,11 @@ function Contacts() {
                 </svg>
                 <div>
                   <p className="font-medium">Email</p>
-                  <a href="mailto:nikolaevskiebani@yandex.ru" className="text-gray-500 hover:text-green-600 transition-colors">
+                  <a
+                    href="mailto:nikolaevskiebani@yandex.ru"
+                    onClick={() => reachMetrikaGoal(METRIKA_GOALS.CLICK_EMAIL, { source: 'contacts_page' })}
+                    className="text-gray-500 hover:text-green-600 transition-colors"
+                  >
                     nikolaevskiebani@yandex.ru
                   </a>
                 </div>
@@ -78,6 +87,7 @@ function Contacts() {
                 to="/booking"
                 text="Забронировать баню"
                 variant="green"
+                metrikaGoal={METRIKA_GOALS.BOOKING_CONTACTS_PAGE}
                 className="w-full py-3 text-lg hover:shadow-lg transition-all"
               />
             </div>
@@ -110,6 +120,7 @@ function Contacts() {
                 left: 0,
                 zIndex: 2,
               }}
+              onClick={() => reachMetrikaGoal(METRIKA_GOALS.CLICK_MAPS, { source: 'contacts_page' })}
             >
               Кизеловская улица, 18 — Яндекс Карты
             </a>

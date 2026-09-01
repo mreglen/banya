@@ -1,6 +1,7 @@
 import { Swiper, SwiperSlide } from 'swiper/react';
 import { Navigation, Pagination, Autoplay } from 'swiper/modules';
 import CustomButton from '../../../../components/UI/CustomButton/CustomButton';
+import { METRIKA_GOALS } from '../../../../utils/yandexMetrika';
 import { useGetBathsQuery } from '../../../../redux/slices/apiSlice';
 
 import 'swiper/css';
@@ -82,6 +83,8 @@ function SliderBaths() {
                     <CustomButton
                       to={`/baths/${bath.slug}`}
                       text="Подробнее"
+                      metrikaGoal={METRIKA_GOALS.CLICK_BATH_DETAIL}
+                      metrikaParams={{ bath_slug: bath.slug, bath_name: bath.name, source: 'home_slider' }}
                       className="px-6 py-3 w-auto"
                     />
                   </div>
