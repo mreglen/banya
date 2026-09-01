@@ -1,4 +1,4 @@
-import { useEffect, lazy, Suspense } from 'react';
+import { useEffect, useRef, lazy, Suspense } from 'react';
 import { useDispatch } from 'react-redux';
 import { setCredentials, logOut } from './redux/slices/authSlice';
 import { getProfile } from './redux/slices/adminApi';
@@ -77,12 +77,24 @@ function AppWithLayout() {
   const location = useLocation();
   const navigate = useNavigate();
   const hideHeader = location.pathname.startsWith('/admin');
+  const metrikaInitialHit = useRef(true);
 
   useEffect(() => {
     if (isPwaStandalone() && location.pathname === '/') {
       navigate('/admin/documents/realization', { replace: true });
     }
   }, [location.pathname, navigate]);
+
+  useEffect(() => {
+    if (typeof window.ym !== 'function') return;
+    if (metrikaInitialHit.current) {
+      metrikaInitialHit.current = false;
+      return;
+    }
+    window.ym(112153346, 'hit', `${location.pathname}${location.search}`, {
+      title: document.title,
+    });
+  }, [location.pathname, location.search]);
 
   useEffect(() => {
     const isAdminSessionRoute =
