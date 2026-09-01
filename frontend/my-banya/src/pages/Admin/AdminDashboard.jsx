@@ -415,27 +415,27 @@ function AdminDashboard() {
             ) : !recentActivity?.length ? (
               <p className="text-sm text-gray-400">Пока нет записей в журнале</p>
             ) : (
-            recentActivity.map((activity) => (
-              <div key={activity.id} className="flex items-start gap-4">
-                <div className="mt-1 p-2 bg-gray-50 rounded-xl">
-                  {getActionIcon(activity.action)}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm text-gray-900 font-medium truncate">
-                    {activity.summary || `${activity.action} ${activity.entity_type}`}
-                  </p>
-                  <div className="flex items-center gap-2 mt-1">
-                    <span className="text-xs text-gray-400">{formatDateTime(activity.created_at)}</span>
-                    {activity.client_name && (
-                      <>
-                        <span className="w-1 h-1 bg-gray-300 rounded-full"></span>
-                        <span className="text-xs text-gray-500">{activity.client_name}</span>
-                      </>
-                    )}
+              recentActivity.map((activity) => (
+                <div key={activity.id} className="flex items-start gap-4">
+                  <div className="mt-1 p-2 bg-gray-50 rounded-xl">
+                    {getActionIcon(activity.action)}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-gray-900 font-medium truncate">
+                      {activity.summary || `${activity.action} ${activity.entity_type}`}
+                    </p>
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className="text-xs text-gray-400">{formatDateTime(activity.created_at)}</span>
+                      {activity.client_name && (
+                        <>
+                          <span className="w-1 h-1 bg-gray-300 rounded-full"></span>
+                          <span className="text-xs text-gray-500">{activity.client_name}</span>
+                        </>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              ))
             )}
           </div>
         </div>
