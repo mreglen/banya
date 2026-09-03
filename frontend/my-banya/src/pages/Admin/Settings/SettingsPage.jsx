@@ -7,6 +7,10 @@ import {
   useGetPaymentQrCodeQuery,
   useUploadPaymentQrCodeMutation,
 } from '../../../redux/slices/settingsApiSlice';
+import {
+  useAdminGetOrganizationQuery,
+  useAdminUpdateOrganizationMutation,
+} from '../../../redux/slices/apiSlice';
 import { 
   useGetUnitsOfMeasurementQuery,
   useCreateUnitMutation,
@@ -15,6 +19,8 @@ import {
 } from '../../../redux/slices/productsApiSlice';
 import ActionDropdown from '../../../components/UI/ActionDropdown/ActionDropdown';
 import SettingsSkeleton from './SettingsSkeleton';
+import { formatSitePhone, normalizeSitePhone } from '../../../utils/sitePhone';
+import SEO from '../../../config/seo';
 
 const SERVER_BASE_URL = process.env.REACT_APP_API_URL
   ? process.env.REACT_APP_API_URL.replace('/api', '')
@@ -28,6 +34,10 @@ function SettingsPage() {
     skip: !isSystemAdmin,
   });
   const [updateSettings, { isLoading: isUpdating }] = useUpdateSettingsMutation();
+  const { data: organization, isLoading: isLoadingOrg, refetch: refetchOrg } = useAdminGetOrganizationQuery(undefined, {
+    skip: !isSystemAdmin,
+  });
+  const [updateOrganization, { isLoading: isUpdatingOrg }] = useAdminUpdateOrganizationMutation();
   const { data: paymentQr, isLoading: isLoadingQr, refetch: refetchQr } = useGetPaymentQrCodeQuery(undefined, {
     skip: !isSystemAdmin,
   });
@@ -44,6 +54,7 @@ function SettingsPage() {
   const [cleaningTime, setCleaningTime] = useState('30');
   const [bookingInterval, setBookingInterval] = useState('30');
   const [markupPercent, setMarkupPercent] = useState('0');
+  const [contactPhone, setContactPhone] = useState(SEO.telephoneDisplay);
   const [successMessage, setSuccessMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
 
@@ -71,6 +82,42 @@ function SettingsPage() {
       lastSavedMarkup.current = m;
     }
   }, [settings]);
+
+  useEffect(() => {
+    if (!organization) return;
+    setContactPhone(organization.phone || SEO.telephoneDisplay);
+  }, [organization]);
+
+  const handlePhoneSave = async (e) => {
+    e.preventDefault();
+    setSuccessMessage('');
+    setErrorMessage('');
+
+    const trimmed = String(contactPhone || '').trim();
+    if (!trimmed) {
+      setErrorMessage('Укажите номер телефона');
+      return;
+    }
+    if (!normalizeSitePhone(trimmed)) {
+      setErrorMessage('Некорректный номер телефона');
+      return;
+    }
+
+    try {
+      await updateOrganization({
+        phone: formatSitePhone(trimmed),
+      }).unwrap();
+      setSuccessMessage('Номер телефона сохранён');
+      refetchOrg();
+      setTimeout(() => setSuccessMessage(''), 3000);
+    } catch (err) {
+      const detail = err?.data?.detail;
+      const text = Array.isArray(detail)
+        ? (detail[0]?.msg || JSON.stringify(detail))
+        : (detail || 'Ошибка при сохранении телефона');
+      setErrorMessage(text);
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -253,10 +300,10 @@ function SettingsPage() {
   };
 
   if (!isSystemAdmin) {
-    return <Navigate to="/admin/" replace />;
+    return <Navigate to="/admin/documents/realization" replace />;
   }
 
-  if (isLoading) {
+  if (isLoading || isLoadingOrg) {
     return <SettingsSkeleton />;
   }
 
@@ -288,6 +335,37 @@ function SettingsPage() {
               {errorMessage}
             </div>
           )}
+
+          <form onSubmit={handlePhoneSave} className="space-y-4 mb-8 pb-8 border-b border-gray-100">
+            <div>
+              <label htmlFor="contactPhone" className="block text-sm font-medium text-gray-700 mb-2">
+                Номер телефона на сайте
+              </label>
+              <p className="text-xs text-gray-500 mb-2">
+                Этот номер показывается на лендинге: контакты, подвал, страница бань.
+              </p>
+              <input
+                type="tel"
+                id="contactPhone"
+                value={contactPhone}
+                onChange={(e) => setContactPhone(e.target.value)}
+                placeholder="+7 (343) 344-87-55"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                required
+              />
+            </div>
+            <div className="flex justify-end">
+              <button
+                type="submit"
+                disabled={isUpdatingOrg}
+                className={`px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition ${
+                  isUpdatingOrg ? 'opacity-50 cursor-not-allowed' : ''
+                }`}
+              >
+                {isUpdatingOrg ? 'Сохранение...' : 'Сохранить телефон'}
+              </button>
+            </div>
+          </form>
 
           <form onSubmit={handleSubmit} className="space-y-6">
             <div>
@@ -377,7 +455,7 @@ function SettingsPage() {
                         : 'Загрузить QR-код'}
                   </button>
                   <p className="text-xs text-gray-500 mt-2">
-                    Загрузка доступна только администратору и директору
+                    Загрузка доступна только администратору
                   </p>
                 </div>
               )}

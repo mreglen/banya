@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import List
 
 from app import models, schemas, database
@@ -66,6 +66,57 @@ def create_booking(booking: schemas.BookingCreate, db: Session = Depends(databas
     bath = db.query(models.Bath).filter(models.Bath.bath_id == booking.bath_id).first()
     if not bath:
         raise HTTPException(status_code=404, detail="Баня не найдена")
+
+    # Антидубль: повтор той же заявки в течение 5 минут (двойной клик / повтор отправки)
+    phone_digits = "".join(ch for ch in (booking.phone or "") if ch.isdigit())
+    recent_cutoff = datetime.now(timezone.utc) - timedelta(minutes=5)
+    recent_candidates = (
+        db.query(models.Booking)
+        .filter(
+            models.Booking.bath_id == booking.bath_id,
+            models.Booking.date == booking_date,
+            models.Booking.start_time == booking.start_time,
+            models.Booking.duration_hours == booking.duration_hours,
+            models.Booking.created_at >= recent_cutoff,
+        )
+        .order_by(models.Booking.created_at.desc())
+        .limit(20)
+        .all()
+    )
+    for existing in recent_candidates:
+        existing_digits = "".join(ch for ch in (existing.phone or "") if ch.isdigit())
+        if phone_digits and existing_digits and (
+            phone_digits == existing_digits
+            or phone_digits[-10:] == existing_digits[-10:]
+        ):
+            return {
+                "booking_id": existing.booking_id,
+                "bath_id": existing.bath_id,
+                "date": existing.date.strftime("%Y-%m-%d"),
+                "start_time": existing.start_time,
+                "duration_hours": existing.duration_hours,
+                "guests": existing.guests,
+                "name": existing.name,
+                "phone": existing.phone,
+                "email": existing.email,
+                "notes": existing.notes,
+                "is_read": existing.is_read,
+                "created_at": existing.created_at.isoformat() if existing.created_at else None,
+                "bath": {
+                    "bath_id": bath.bath_id,
+                    "slug": bath.slug,
+                    "name": bath.name,
+                    "title": bath.title,
+                    "cost_weekday": bath.cost_weekday,
+                    "cost_weekend": bath.cost_weekend,
+                    "min_booking_hours": getattr(bath, "min_booking_hours", 1) or 1,
+                    "description": bath.description,
+                    "base_guests": bath.base_guests,
+                    "extra_guest_price": bath.extra_guest_price,
+                    "photos": [],
+                    "promotions": [],
+                },
+            }
 
     db_booking = models.Booking(
         bath_id=booking.bath_id,

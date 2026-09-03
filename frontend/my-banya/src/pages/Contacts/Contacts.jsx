@@ -2,8 +2,12 @@ import CustomButton from "../../components/UI/CustomButton/CustomButton";
 import SeoHead from '../../components/Seo/SeoHead';
 import { PAGES, breadcrumbJsonLd, localBusinessJsonLd } from '../../config/seo';
 import { METRIKA_GOALS, reachMetrikaGoal } from '../../utils/yandexMetrika';
+import { useGetOrganizationQuery } from '../../redux/slices/apiSlice';
+import { resolveSitePhone } from '../../utils/sitePhone';
 
 function Contacts() {
+  const { data: org } = useGetOrganizationQuery();
+  const phone = resolveSitePhone(org?.phone);
   return (
     <main className="bg-gradient-to-b from-white via-green-50 to-amber-50 min-h-screen mt-28">
       <SeoHead
@@ -12,7 +16,9 @@ function Contacts() {
         keywords={PAGES.contacts.keywords}
         canonical="/contacts"
         jsonLd={[
-          localBusinessJsonLd(),
+          localBusinessJsonLd({
+            telephone: phone.telHref.replace('tel:', ''),
+          }),
           breadcrumbJsonLd([
             { name: 'Главная', path: '/' },
             { name: 'Контакты', path: '/contacts' },
@@ -54,11 +60,11 @@ function Contacts() {
                 <div>
                   <p className="font-medium">Телефон</p>
                   <a
-                    href="tel:+73433448755"
+                    href={phone.telHref}
                     onClick={() => reachMetrikaGoal(METRIKA_GOALS.CLICK_PHONE, { source: 'contacts_page' })}
                     className="text-gray-500 hover:text-green-600 transition-colors"
                   >
-                    +7 (343) 344-87-55
+                    {phone.display}
                   </a>
                 </div>
               </div>

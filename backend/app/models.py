@@ -373,6 +373,7 @@ class OrganizationDetails(Base):
 
     id = Column(Integer, primary_key=True)
     address = Column(Text, nullable=False, default="")
+    phone = Column(String(20), nullable=False, default="")
     inn = Column(Text, nullable=False, default="")
     kpp = Column(Text, nullable=False, default="")
     requisites = Column(Text, nullable=False, default="")

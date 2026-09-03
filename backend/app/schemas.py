@@ -3,6 +3,8 @@ from datetime import datetime
 from typing import Optional, List, Literal, Dict, Any
 from datetime import date
 
+from app.phone_utils import normalize_phone, format_phone
+
 
 # === Логин ===
 class LoginData(BaseModel):
@@ -204,6 +206,7 @@ class BookingOut(BookingBase):
 # === Реквизиты организации ===
 class OrganizationDetailsBase(BaseModel):
     address: str = ""
+    phone: str = ""
     inn: str = ""
     kpp: str = ""
     requisites: str = ""
@@ -219,9 +222,23 @@ class OrganizationDetailsOut(OrganizationDetailsBase):
 
 class OrganizationDetailsUpdate(BaseModel):
     address: Optional[str] = None
+    phone: Optional[str] = None
     inn: Optional[str] = None
     kpp: Optional[str] = None
     requisites: Optional[str] = None
+
+    @field_validator("phone")
+    @classmethod
+    def validate_phone(cls, v: Optional[str]):
+        if v is None:
+            return v
+        v = v.strip()
+        if v == "":
+            return v
+        normalized = normalize_phone(v)
+        if not normalized:
+            raise ValueError("Некорректный номер телефона")
+        return format_phone(normalized)
 
     @field_validator("inn")
     @classmethod

@@ -1,13 +1,15 @@
-import { useGetBathsQuery } from '../../redux/slices/apiSlice';
+import { useGetBathsQuery, useGetOrganizationQuery } from '../../redux/slices/apiSlice';
 import CustomButton from '../../components/UI/CustomButton/CustomButton';
 import SeoHead from '../../components/Seo/SeoHead';
 import { PAGES, absoluteUrl, breadcrumbJsonLd } from '../../config/seo';
 import { getPriceRangeLabel, hasTimeTariffs } from '../../utils/bathPricing';
 import { METRIKA_GOALS } from '../../utils/yandexMetrika';
+import { resolveSitePhone } from '../../utils/sitePhone';
 
 function Baths() {
   const { data: baths = [], isLoading, error } = useGetBathsQuery();
-  console.log('baths: ', baths)
+  const { data: org } = useGetOrganizationQuery();
+  const phone = resolveSitePhone(org?.phone);
   if (isLoading) {
     return (
       <section className="py-16 px-6 bg-gray-50 min-h-screen mt-16 flex items-center justify-center">
@@ -133,10 +135,10 @@ function Baths() {
       <div className="text-center mt-16">
         <p className="text-gray-600 mb-6">Не можете выбрать? Позвоните — поможем подобрать!</p>
         <a
-          href="tel:+73433448755"
+          href={phone.telHref}
           className="text-green-600 hover:text-green-700 font-medium text-lg transition"
         >
-          +7 (343) 344-87-55
+          {phone.display}
         </a>
       </div>
     </main>

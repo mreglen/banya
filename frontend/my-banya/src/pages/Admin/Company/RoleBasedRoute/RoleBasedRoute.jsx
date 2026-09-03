@@ -11,12 +11,7 @@ function RoleBasedRoute({ children, requiredPermission, adminOnly = false }) {
   }
 
   if (adminOnly && !user.is_admin) {
-    return (
-      <div className="p-8 text-red-600">
-        <h2 className="text-xl font-bold">Доступ запрещён</h2>
-        <p>Раздел доступен только администратору системы.</p>
-      </div>
-    );
+    return <Navigate to="/admin/documents/realization" replace />;
   }
 
   const requiredPermissions = Array.isArray(requiredPermission)

@@ -10,6 +10,7 @@ function Organization() {
 
   const [form, setForm] = useState({
     address: '',
+    phone: '',
     inn: '',
     kpp: '',
     requisites: '',
@@ -39,6 +40,7 @@ function Organization() {
     if (!data) return;
     setForm({
       address: data.address || '',
+      phone: data.phone || '',
       inn: data.inn || '',
       kpp: data.kpp || '',
       requisites: data.requisites || '',
@@ -66,6 +68,7 @@ function Organization() {
     try {
       await updateOrg({
         address: form.address,
+        phone: form.phone,
         inn: form.inn,
         kpp: form.kpp,
         requisites: form.requisites,
@@ -128,6 +131,19 @@ function Organization() {
                 className="w-full px-4 py-3 border border-gray-300 rounded-xl bg-white focus:ring-2 focus:ring-green-500"
                 placeholder="г. Екатеринбург, ул. ..."
               />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Телефон на сайте</label>
+              <input
+                name="phone"
+                type="tel"
+                value={form.phone}
+                onChange={onChange}
+                placeholder="+7 (343) 344-87-55"
+                className="w-full px-4 py-3 border border-gray-300 rounded-xl bg-white focus:ring-2 focus:ring-green-500"
+              />
+              <p className="text-xs text-gray-500 mt-1">Также редактируется в Настройках.</p>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

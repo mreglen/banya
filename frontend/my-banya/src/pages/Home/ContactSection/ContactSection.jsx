@@ -2,12 +2,14 @@ import { useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useGetOrganizationQuery } from '../../../redux/slices/apiSlice';
 import { METRIKA_GOALS, reachMetrikaGoal } from '../../../utils/yandexMetrika';
+import { resolveSitePhone } from '../../../utils/sitePhone';
 
 function ContactSection() {
     const navigate = useNavigate();
     const clickCountRef = useRef(0);
     const timerRef = useRef(null);
     const { data: org } = useGetOrganizationQuery();
+    const phone = resolveSitePhone(org?.phone);
 
     const handleIconClick = (e) => {
         // Don't prevent default or stop propagation - keep it invisible
@@ -104,11 +106,11 @@ function ContactSection() {
                                 <div>
                                     <p className="text-base font-semibold text-white">Телефон</p>
                                     <a
-                                      href="tel:+73433448755"
+                                      href={phone.telHref}
                                       onClick={() => reachMetrikaGoal(METRIKA_GOALS.CLICK_PHONE, { source: 'contacts_section' })}
                                       className="text-gray-300 hover:text-green-400 transition mt-1 inline-block"
                                     >
-                                        +7 (343) 344-87-55
+                                        {phone.display}
                                     </a>
                                 </div>
                             </div>

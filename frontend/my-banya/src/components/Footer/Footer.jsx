@@ -1,8 +1,13 @@
 import { Link } from 'react-router-dom';
 import { SEO, SITELINKS } from '../../config/seo';
 import { METRIKA_GOALS, reachMetrikaGoal } from '../../utils/yandexMetrika';
+import { useGetOrganizationQuery } from '../../redux/slices/apiSlice';
+import { resolveSitePhone } from '../../utils/sitePhone';
 
 function Footer() {
+  const { data: org } = useGetOrganizationQuery();
+  const phone = resolveSitePhone(org?.phone);
+
   return (
     <footer className="bg-gray-950 text-gray-400 py-10 px-6">
       <div className="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center md:justify-between gap-6">
@@ -12,11 +17,11 @@ function Footer() {
             Бани в Екатеринбурге (ЕКБ), {SEO.address.streetAddress}
           </p>
           <a
-            href={`tel:${SEO.telephone}`}
+            href={phone.telHref}
             onClick={() => reachMetrikaGoal(METRIKA_GOALS.CLICK_PHONE, { source: 'footer' })}
             className="text-sm text-green-400 hover:text-green-300 mt-1 inline-block"
           >
-            {SEO.telephoneDisplay}
+            {phone.display}
           </a>
         </div>
         <nav aria-label="Быстрые ссылки">

@@ -68,6 +68,22 @@ describe('adminNavConfig', () => {
     expect(sections.company?.some((i) => i.path === '/admin/company/user')).toBe(true);
   });
 
+  test('settings hidden for director in more menu', () => {
+    const user = { is_director: true };
+    const hasAccess = () => true;
+    const sections = getMobileMoreItems('director', hasAccess, user);
+    const paths = Object.values(sections).flat().map((i) => i.path);
+    expect(paths).not.toContain('/admin/settings');
+  });
+
+  test('settings visible for admin in more menu', () => {
+    const user = { is_admin: true };
+    const hasAccess = () => true;
+    const sections = getMobileMoreItems('admin', hasAccess, user);
+    const paths = Object.values(sections).flat().map((i) => i.path);
+    expect(paths).toContain('/admin/settings');
+  });
+
   test('mobile home path', () => {
     expect(MOBILE_HOME_PATH).toBe('/admin/documents/realization');
   });

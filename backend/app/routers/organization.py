@@ -22,7 +22,14 @@ def get_or_create_singleton(db: Session) -> models.OrganizationDetails:
     row = db.query(models.OrganizationDetails).filter(models.OrganizationDetails.id == 1).first()
     if row:
         return row
-    row = models.OrganizationDetails(id=1, address="", inn="", kpp="", requisites="")
+    row = models.OrganizationDetails(
+        id=1,
+        address="",
+        phone="+7 (343) 344-87-55",
+        inn="",
+        kpp="",
+        requisites="",
+    )
     db.add(row)
     db.commit()
     db.refresh(row)

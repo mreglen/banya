@@ -5,7 +5,26 @@ import { useNavigate } from 'react-router-dom';
 import { useGetBookingsQuery, useMarkBookingAsReadMutation } from '../../../redux/slices/apiSlice';
 import AdminBookingsSkeleton from './AdminBookingsSkeleton';
 import AddBookingModal from '../Reservations/AddBookingModal';
-import { toYmd } from '../../../utils/dateLocal';
+import { formatYmdToRu, toYmd } from '../../../utils/dateLocal';
+
+function formatSubmittedAt(value) {
+  if (!value) return '—';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '—';
+  return date.toLocaleString('ru-RU', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+function formatVisitDate(booking) {
+  const dateLabel = booking.formattedDate || formatYmdToRu(booking.date);
+  if (!booking.start_time) return dateLabel;
+  return `${dateLabel} · ${booking.start_time}`;
+}
 
 function AdminBookings() {
   const navigate = useNavigate();
@@ -53,10 +72,16 @@ function AdminBookings() {
       <div className="flex items-start justify-between gap-2 mb-2">
         <div className="min-w-0 flex-1">
           <p className="font-semibold text-gray-900 truncate">{booking.name}</p>
-          <p className="text-xs text-gray-500 mt-0.5">
-            {booking.formattedDate}
-            {booking.start_time ? ` · ${booking.start_time}` : ''}
-          </p>
+          <div className="mt-1 space-y-0.5 text-xs text-gray-500">
+            <p>
+              <span className="text-gray-400">Отправлена:</span>{' '}
+              {formatSubmittedAt(booking.created_at)}
+            </p>
+            <p>
+              <span className="text-gray-400">Дата записи:</span>{' '}
+              {formatVisitDate(booking)}
+            </p>
+          </div>
         </div>
         {booking.isUnread && (
           <span className="flex-shrink-0 px-2 py-0.5 rounded-full bg-blue-500 text-white text-[10px] font-bold">

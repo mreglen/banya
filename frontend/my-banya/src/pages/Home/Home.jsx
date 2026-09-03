@@ -6,6 +6,8 @@ import { Calendar } from 'lucide-react';
 import SeoHead from '../../components/Seo/SeoHead';
 import SEO, { PAGES, localBusinessJsonLd } from '../../config/seo';
 import { METRIKA_GOALS, reachMetrikaGoal } from '../../utils/yandexMetrika';
+import { useGetOrganizationQuery } from '../../redux/slices/apiSlice';
+import { resolveSitePhone } from '../../utils/sitePhone';
 
 const WebsiteCategoriesPreview = lazy(() => import('./WebsiteCategoriesPreview/WebsiteCategoriesPreview'));
 const Booking = lazy(() => import('../Booking/Booking'));
@@ -18,6 +20,8 @@ const SectionFallback = () => (
 function Home() {
     useReveal();
     const [showSticky, setShowSticky] = useState(false);
+    const { data: org } = useGetOrganizationQuery();
+    const phone = resolveSitePhone(org?.phone);
 
     useEffect(() => {
         const handleScroll = () => {
@@ -44,6 +48,7 @@ function Home() {
                 canonical="/"
                 jsonLd={localBusinessJsonLd({
                     description: SEO.defaultDescription,
+                    telephone: phone.telHref.replace('tel:', ''),
                 })}
             />
             <header

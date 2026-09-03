@@ -434,6 +434,23 @@ with engine.begin() as connection:
             """
         )
     )
+    connection.execute(
+        text(
+            """
+            ALTER TABLE organization_details
+            ADD COLUMN IF NOT EXISTS phone VARCHAR(20) NOT NULL DEFAULT ''
+            """
+        )
+    )
+    connection.execute(
+        text(
+            """
+            UPDATE organization_details
+            SET phone = '+7 (343) 344-87-55'
+            WHERE id = 1 AND (phone IS NULL OR phone = '')
+            """
+        )
+    )
 
 app = FastAPI(title='Бани')
 
