@@ -523,43 +523,11 @@ def update_reservation(
             db_reservation.status_id = reservation.status_id
             print(f"Updated status_id = {reservation.status_id}")
 
-        # Проверяем, изменился ли статус на "закрыт"
+        # Закрытие обрабатываем после пересчёта товаров/склада (см. ниже)
         new_status_id = reservation.status_id if reservation.status_id is not None else old_status_id
-        
-        # Если статус изменен на "закрыт" (проверяем по названию)
-        if _is_closed_status(db, new_status_id) and old_status_id != new_status_id:
-            # Получаем товары из брони
-            reservation_products = db.query(models.ReservationProduct).filter(
-                models.ReservationProduct.reservation_id == id
-            ).all()
-            
-            # Создаем документ реализации (без повторного списания!)
-            # Товары уже были списаны при создании/редактировании брони
-            realization_doc = models.RealizationDocument(
-                date=date.today(),
-                reservation_id=id,
-                bath_id=db_reservation.bath_id,
-                client_name=db_reservation.client_name,
-                client_phone=db_reservation.client_phone,
-                total_amount=db_reservation.total_cost,
-                account_id=db_reservation.income_account_id,
-            )
-            db.add(realization_doc)
-            db.flush()  # Получаем ID документа
-            
-            # Добавляем строки документа
-            for rp in reservation_products:
-                product = db.query(models.Product).filter(
-                    models.Product.id == rp.product_id
-                ).first()
-                if product:
-                    doc_item = models.RealizationDocumentItem(
-                        document_id=realization_doc.id,
-                        product_id=rp.product_id,
-                        quantity=rp.quantity,
-                        price=_resolve_sale_price(rp, product)
-                    )
-                    db.add(doc_item)
+        closing_now = (
+            _is_closed_status(db, new_status_id) and old_status_id != new_status_id
+        )
 
         # Обработка дат - используем текущие значения если не переданы новые
         start_dt = db_reservation.start_datetime
@@ -696,11 +664,36 @@ def update_reservation(
                         product = product_map.get(item.product_id)
                         if not product:
                             raise HTTPException(status_code=400, detail=f"Товар с ID {item.product_id} не найден")
-                        if product.is_countable and product.total_quantity < item.quantity:
-                            raise HTTPException(status_code=400, detail=f"Недостаточно товара {product.name} на складе")
                         total_cost += _resolve_sale_price(item, product) * item.quantity
 
                 db_reservation.total_cost = int(total_cost)
+
+                # Синхронизируем склад по дельте (старые qty уже могли быть списаны при создании)
+                old_rows = db.query(models.ReservationProduct).filter(
+                    models.ReservationProduct.reservation_id == id
+                ).all()
+                old_qty_map = {rp.product_id: rp.quantity for rp in old_rows}
+                new_qty_map = {item.product_id: item.quantity for item in effective_products}
+                affected_ids = set(old_qty_map) | set(new_qty_map)
+                if affected_ids:
+                    products_for_stock = db.query(models.Product).filter(
+                        models.Product.id.in_(affected_ids)
+                    ).all()
+                    stock_map = {p.id: p for p in products_for_stock}
+                    for pid in affected_ids:
+                        product = stock_map.get(pid)
+                        if not product or not product.is_countable:
+                            continue
+                        delta = new_qty_map.get(pid, 0) - old_qty_map.get(pid, 0)
+                        if delta > 0:
+                            if product.total_quantity < delta:
+                                raise HTTPException(
+                                    status_code=400,
+                                    detail=f"Недостаточно товара {product.name} на складе",
+                                )
+                            product.total_quantity -= delta
+                        elif delta < 0:
+                            product.total_quantity += -delta
 
                 # Обновляем товары (включая подарки акции)
                 db.query(models.ReservationProduct).filter(
@@ -725,6 +718,37 @@ def update_reservation(
             raise HTTPException(status_code=400, detail="Предоплата не может быть отрицательной")
         if db_reservation.total_cost > 0 and current_prepayment > db_reservation.total_cost:
             raise HTTPException(status_code=400, detail="Предоплата не может превышать сумму брони")
+
+        # Документ реализации после актуализации товаров и склада
+        # (списание уже сделано при создании/редактировании брони)
+        if closing_now:
+            db.flush()
+            reservation_products = db.query(models.ReservationProduct).filter(
+                models.ReservationProduct.reservation_id == id
+            ).all()
+            realization_doc = models.RealizationDocument(
+                date=date.today(),
+                reservation_id=id,
+                bath_id=db_reservation.bath_id,
+                client_name=db_reservation.client_name,
+                client_phone=db_reservation.client_phone,
+                total_amount=db_reservation.total_cost,
+                account_id=db_reservation.income_account_id,
+            )
+            db.add(realization_doc)
+            db.flush()
+            for rp in reservation_products:
+                product = db.query(models.Product).filter(
+                    models.Product.id == rp.product_id
+                ).first()
+                if product:
+                    db.add(models.RealizationDocumentItem(
+                        document_id=realization_doc.id,
+                        product_id=rp.product_id,
+                        quantity=rp.quantity,
+                        price=_resolve_sale_price(rp, product),
+                    ))
+            print("✅ Realization document created on close")
 
         print(f"\nCommitting to database...")
         db.commit()
