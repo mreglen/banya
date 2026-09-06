@@ -40,6 +40,16 @@ input[type="password"]::-webkit-credentials-auto-fill-button {
 @tailwind components;
 @tailwind utilities;
 
+/* Скролл работает, полоса не видна */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
 .reveal {
   opacity: 0;
   transform: translateY(30px);

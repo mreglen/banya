@@ -9,13 +9,25 @@ import {
 } from '../../../redux/slices/productsApiSlice';
 import CategoryModal from './CategoryModal';
 
+const ChevronIcon = ({ open }) => (
+  <svg
+    className={`w-4 h-4 text-gray-500 transition-transform duration-200 ${open ? 'rotate-90' : ''}`}
+    fill="none"
+    stroke="currentColor"
+    viewBox="0 0 24 24"
+    aria-hidden="true"
+  >
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+  </svg>
+);
+
 const CategoryTree = ({
   categoriesTree,
   expandedCategories,
   selectedCategoryPath,
   toggleCategory,
   selectCategory,
-  onCategoriesChange, // callback для обновления дерева
+  onCategoriesChange,
 }) => {
   const [contextMenu, setContextMenu] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -42,7 +54,14 @@ const CategoryTree = ({
 
   const handleContextMenu = useCallback((e, category) => {
     e.preventDefault();
-    setContextMenu({ x: e.clientX, y: e.clientY, category });
+    e.stopPropagation();
+    const isTouch = e.type === 'click' || window.matchMedia('(max-width: 1023px)').matches;
+    setContextMenu({
+      x: e.clientX,
+      y: e.clientY,
+      category,
+      sheet: isTouch,
+    });
   }, []);
 
   const closeContextMenu = useCallback(() => {
@@ -50,78 +69,91 @@ const CategoryTree = ({
   }, []);
 
   React.useEffect(() => {
+    if (!contextMenu || contextMenu.sheet) return undefined;
     const handleClick = () => closeContextMenu();
-    if (contextMenu) {
-      window.addEventListener('click', handleClick);
-    }
-    return () => {
-      window.removeEventListener('click', handleClick);
-    };
+    window.addEventListener('click', handleClick);
+    return () => window.removeEventListener('click', handleClick);
   }, [contextMenu, closeContextMenu]);
 
-  const renderCategoryTree = (categories, level = 0, path = [], isModalMode = false) => {
-    return categories.map(category => {
+  const openCategory = (category, currentPath) => {
+    selectCategory(currentPath);
+    if (category.children?.length > 0 && !expandedCategories.has(category.id)) {
+      toggleCategory(category.id);
+    }
+  };
+
+  const renderCategoryTree = (categories, path = []) => {
+    return categories.map((category) => {
       const currentPath = [...path, { id: category.id, name: category.name }];
+      const hasChildren = category.children?.length > 0;
       const isExpanded = expandedCategories.has(category.id);
-      const isSelected = selectedCategoryPath.length === currentPath.length &&
+      const isSelected =
+        selectedCategoryPath.length === currentPath.length &&
         selectedCategoryPath.every((cat, index) => cat.id === currentPath[index].id);
-
-      const handleClick = (e) => {
-        e.stopPropagation();
-        if (isModalMode) {
-          // В модалке выбор родителя — не используется в новом подходе
-        } else {
-          selectCategory(currentPath);
-        }
-      };
-
-      const handleRightClick = (e) => {
-        if (!isModalMode) {
-          handleContextMenu(e, category);
-        }
-      };
-
-      const handleDoubleClick = (e) => {
-        e.stopPropagation();
-        if (category.children?.length > 0) {
-          toggleCategory(category.id);
-        }
-      };
+      const depth = path.length;
 
       return (
-        <div key={category.id} className="ml-3">
-          <div className="flex items-center justify-between py-1 px-2 cursor-pointer hover:bg-gray-100 rounded">
-            <div
-              className={`flex items-center truncate flex-1 ${isSelected && !isModalMode ? 'bg-blue-100 -mx-2 px-2 py-1 rounded' : ''}`}
-              onClick={handleClick}
-              onDoubleClick={handleDoubleClick}
-              onContextMenu={handleRightClick}
-            >
-              {category.children?.length > 0 ? (
-                <span className="mr-1 flex-shrink-0">{isExpanded ? '▼' : '►'}</span>
-              ) : (
-                <span className="mr-1 text-gray-500 flex-shrink-0">•</span>
-              )}
-              <span className="truncate">{category.name}</span>
-            </div>
-
-            {/* Кнопка меню (видна всегда, включая мобильные) */}
-            {!isModalMode && (
+        <div key={category.id}>
+          <div
+            className={`group flex items-center gap-0.5 rounded-xl min-h-[44px] pr-1 transition-colors ${
+              isSelected
+                ? 'bg-blue-50 ring-1 ring-blue-200'
+                : 'hover:bg-gray-50 active:bg-gray-100'
+            }`}
+            style={{ paddingLeft: `${8 + depth * 14}px` }}
+          >
+            {hasChildren ? (
               <button
+                type="button"
                 onClick={(e) => {
                   e.stopPropagation();
-                  handleContextMenu(e, category);
+                  toggleCategory(category.id);
                 }}
-                className="ml-2 text-gray-500 hover:text-gray-700 flex-shrink-0"
-                aria-label="Действия"
+                className="w-9 h-9 flex items-center justify-center rounded-lg shrink-0 text-gray-600 hover:bg-white/80"
+                aria-label={isExpanded ? 'Свернуть' : 'Развернуть'}
               >
-                ⋯
+                <ChevronIcon open={isExpanded} />
               </button>
+            ) : (
+              <span className="w-9 h-9 flex items-center justify-center shrink-0">
+                <span className="w-1.5 h-1.5 rounded-full bg-gray-300" />
+              </span>
             )}
+
+            <button
+              type="button"
+              onClick={() => openCategory(category, currentPath)}
+              onContextMenu={(e) => handleContextMenu(e, category)}
+              className="flex-1 min-w-0 text-left py-2.5 pr-1"
+            >
+              <span
+                className={`block truncate text-[15px] ${
+                  isSelected ? 'text-blue-800 font-semibold' : 'text-gray-800 font-medium'
+                }`}
+              >
+                {category.name}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={(e) => handleContextMenu(e, category)}
+              className="w-9 h-9 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-700 hover:bg-white/80 shrink-0 opacity-100 sm:opacity-0 sm:group-hover:opacity-100"
+              aria-label="Действия"
+            >
+              <span className="text-xl leading-none">⋯</span>
+            </button>
           </div>
-          {isExpanded && category.children?.length > 0 && (
-            <div className="ml-3">
-              {renderCategoryTree(category.children, level + 1, currentPath, isModalMode)}
+
+          {hasChildren && (
+            <div
+              className={`grid transition-[grid-template-rows] duration-200 ease-out ${
+                isExpanded ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'
+              }`}
+            >
+              <div className="overflow-hidden min-h-0">
+                {renderCategoryTree(category.children, currentPath)}
+              </div>
             </div>
           )}
         </div>
@@ -130,7 +162,7 @@ const CategoryTree = ({
   };
 
   const handleAddProductToRoot = () => {
-    const rootCategory = { id: null, name: 'Номенклатура' };
+    const rootCategory = { id: null, name: 'Все товары' };
     navigate('/admin/storage/nomenclature/add/product', { state: { category: rootCategory } });
   };
 
@@ -142,28 +174,25 @@ const CategoryTree = ({
   const handleModalSubmit = async (data) => {
     const { id, name, description, parent_id, is_visible_on_website, imageFiles, deletePhoto } = data;
 
-    console.log('Submitting category update:', { id, name, parent_id, is_visible_on_website });
-
     try {
       let categoryId;
 
       if (id) {
-        // Редактирование
-        console.log('Updating category with data:', { id, name, parent_id, is_visible_on_website });
         await updateCategory({ id, name, description, parent_id, is_visible_on_website }).unwrap();
         categoryId = id;
       } else {
-        // Создание
-        const result = await createCategory({ name, description, parent_id, is_visible_on_website }).unwrap();
+        const result = await createCategory({
+          name,
+          description,
+          parent_id,
+          is_visible_on_website,
+        }).unwrap();
         categoryId = result.id;
       }
 
-      // Удаление или загрузка фото
       if (deletePhoto) {
-        // Удаляем фото
         await uploadCategoryPhotos({ categoryId, formData: new FormData() }).unwrap();
       } else if (imageFiles?.length) {
-        // Загружаем новые фото
         const formData = new FormData();
         imageFiles.forEach((file) => formData.append('files', file));
         await uploadCategoryPhotos({ categoryId, formData }).unwrap();
@@ -172,7 +201,12 @@ const CategoryTree = ({
       onCategoriesChange();
     } catch (err) {
       console.error('Ошибка:', err);
-      alert(extractApiErrorMessage(err, id ? 'Не удалось обновить категорию' : 'Не удалось создать категорию'));
+      alert(
+        extractApiErrorMessage(
+          err,
+          id ? 'Не удалось обновить категорию' : 'Не удалось создать категорию'
+        )
+      );
     }
   };
 
@@ -190,87 +224,141 @@ const CategoryTree = ({
     setCategoryToDelete(null);
   };
 
-  return (
-    <div className="bg-white rounded-xl shadow-md p-3 sm:p-4 overflow-hidden">
-      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-3 gap-2">
-        <button
-          onClick={() => selectCategory([])}
-          className={`text-base font-semibold ${selectedCategoryPath.length === 0 ? 'text-blue-600 font-bold' : 'text-gray-700 hover:text-blue-600'}`}
-          title="Показать всю номенклатуру"
-        >
-          Номенклатура
-        </button>
-        <div className="flex gap-1 sm:gap-2">
-          <button
-            onClick={handleAddProductToRoot}
-            className="px-2 py-1 text-xs sm:text-sm text-green-600 hover:text-green-800 border border-green-600 rounded flex items-center"
-          >
-            Товар +
-          </button>
-          <button
-            onClick={handleAddRootCategory}
-            className="px-2 py-1 text-xs sm:text-sm text-blue-500 hover:text-blue-700 border border-blue-500 rounded flex items-center"
-          >
-            Категория +
-          </button>
-        </div>
-      </div>
+  const rootSelected = selectedCategoryPath.length === 0;
 
-      <div
-        className="space-y-1 max-h-[50vh] sm:max-h-[60vh] overflow-y-auto text-sm"
-        onClick={closeContextMenu}
+  const menuActions = contextMenu && (
+    <>
+      <button
+        type="button"
+        className="block w-full text-left px-4 py-3 sm:px-3 sm:py-2 hover:bg-gray-50 text-[15px] sm:text-sm font-medium text-gray-900 rounded-xl sm:rounded-none"
+        onClick={(e) => {
+          e.stopPropagation();
+          closeContextMenu();
+          navigate('/admin/storage/nomenclature/add/product', {
+            state: { category: contextMenu.category },
+          });
+        }}
       >
-        {renderCategoryTree(categoriesTree)}
+        Добавить товар
+      </button>
+      <button
+        type="button"
+        className="block w-full text-left px-4 py-3 sm:px-3 sm:py-2 hover:bg-gray-50 text-[15px] sm:text-sm font-medium text-gray-900 rounded-xl sm:rounded-none"
+        onClick={(e) => {
+          e.stopPropagation();
+          setEditCategory(contextMenu.category);
+          setIsModalOpen(true);
+          closeContextMenu();
+        }}
+      >
+        Редактировать
+      </button>
+      <button
+        type="button"
+        className="block w-full text-left px-4 py-3 sm:px-3 sm:py-2 text-red-600 hover:bg-red-50 text-[15px] sm:text-sm font-medium rounded-xl sm:rounded-none"
+        onClick={() => {
+          setCategoryToDelete(contextMenu.category);
+          setIsDeleteModalOpen(true);
+          closeContextMenu();
+        }}
+      >
+        Удалить
+      </button>
+    </>
+  );
+
+  return (
+    <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden flex flex-col max-h-[min(70vh,36rem)] lg:max-h-[calc(100vh-10rem)]">
+      <div className="shrink-0 px-3 pt-3 pb-2 sm:px-4 sm:pt-4 border-b border-gray-100 space-y-3">
+        <div className="flex items-center justify-between gap-2">
+          <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">
+            Категории
+          </h2>
+          <div className="flex gap-1.5">
+            <button
+              type="button"
+              onClick={handleAddProductToRoot}
+              className="px-2.5 py-1.5 text-xs font-medium text-green-700 bg-green-50 hover:bg-green-100 border border-green-200 rounded-lg"
+            >
+              Товар +
+            </button>
+            <button
+              type="button"
+              onClick={handleAddRootCategory}
+              className="px-2.5 py-1.5 text-xs font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg"
+            >
+              Категория +
+            </button>
+          </div>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => selectCategory([])}
+          className={`w-full flex items-center gap-3 min-h-[44px] px-3 rounded-xl text-left transition-colors ${
+            rootSelected
+              ? 'bg-blue-50 ring-1 ring-blue-200 text-blue-800'
+              : 'text-gray-800 hover:bg-gray-50'
+          }`}
+          title="Показать все товары"
+        >
+          <span
+            className={`w-2 h-2 rounded-full shrink-0 ${
+              rootSelected ? 'bg-blue-600' : 'bg-gray-300'
+            }`}
+          />
+          <span className={`truncate text-[15px] ${rootSelected ? 'font-semibold' : 'font-medium'}`}>
+            Все товары
+          </span>
+        </button>
       </div>
 
-      {/* Контекстное меню — не меняем логику */}
-      {/* Контекстное меню — адаптивная позиция */}
-      {contextMenu && (
+      <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-2 py-2 space-y-0.5">
+        {categoriesTree?.length ? (
+          renderCategoryTree(categoriesTree)
+        ) : (
+          <p className="px-3 py-6 text-sm text-gray-500 text-center">Категорий пока нет</p>
+        )}
+      </div>
+
+      {contextMenu && !contextMenu.sheet && (
         <div
-          className="fixed z-50 bg-white border rounded shadow-lg py-1 min-w-[140px] text-sm"
+          className="fixed z-50 bg-white border border-gray-200 rounded-xl shadow-lg py-1 min-w-[160px] text-sm overflow-hidden"
           style={{
             top: contextMenu.y,
-            left: Math.min(contextMenu.x, window.innerWidth - 160), // 160 ≈ ширина меню + отступ
+            left: Math.min(contextMenu.x, window.innerWidth - 180),
           }}
           onClick={(e) => e.stopPropagation()}
         >
-          <button
-            className="block w-full text-left px-3 py-1.5 hover:bg-gray-100"
-            onClick={(e) => {
-              e.stopPropagation();
-              closeContextMenu();
-              navigate('/admin/storage/nomenclature/add/product', {
-                state: { category: contextMenu.category }
-              });
-            }}
-          >
-            Добавить товар
-          </button>
-          <button
-            className="block w-full text-left px-3 py-1.5 hover:bg-gray-100"
-            onClick={(e) => {
-              e.stopPropagation();
-              setEditCategory(contextMenu.category);
-              setIsModalOpen(true);
-              closeContextMenu();
-            }}
-          >
-            Редактировать
-          </button>
-          <button
-            className="block w-full text-left px-3 py-1.5 text-red-600 hover:bg-gray-100"
-            onClick={() => {
-              setCategoryToDelete(contextMenu.category);
-              setIsDeleteModalOpen(true);
-              closeContextMenu();
-            }}
-          >
-            Удалить
-          </button>
+          {menuActions}
         </div>
       )}
 
-      {/* Модалки — без изменений */}
+      {contextMenu?.sheet && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+          <button
+            type="button"
+            className="absolute inset-0 bg-black/40"
+            aria-label="Закрыть"
+            onClick={closeContextMenu}
+          />
+          <div className="relative w-full sm:max-w-sm bg-white rounded-t-2xl sm:rounded-2xl shadow-xl p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] space-y-1">
+            <div className="sm:hidden flex justify-center pt-1 pb-2">
+              <div className="w-10 h-1 rounded-full bg-gray-300" />
+            </div>
+            <p className="px-4 pb-1 text-sm text-gray-500 truncate">{contextMenu.category.name}</p>
+            {menuActions}
+            <button
+              type="button"
+              className="w-full px-4 py-3 text-gray-600 text-[15px]"
+              onClick={closeContextMenu}
+            >
+              Закрыть
+            </button>
+          </div>
+        </div>
+      )}
+
       <CategoryModal
         isOpen={isModalOpen}
         onClose={() => {
@@ -283,20 +371,24 @@ const CategoryTree = ({
       />
 
       {isDeleteModalOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white p-4 sm:p-6 rounded-lg shadow-lg w-full max-w-md">
-            <h3 className="text-base sm:text-lg font-semibold mb-3">Подтвердите удаление</h3>
-            <p className="text-sm">Вы уверены, что хотите удалить категорию "{categoryToDelete?.name}"?</p>
-            <div className="flex justify-end space-x-2 mt-4">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white p-5 sm:p-6 rounded-2xl shadow-lg w-full max-w-md">
+            <h3 className="text-lg font-semibold mb-2">Подтвердите удаление</h3>
+            <p className="text-sm text-gray-600">
+              Удалить категорию «{categoryToDelete?.name}»?
+            </p>
+            <div className="flex justify-end gap-2 mt-5">
               <button
+                type="button"
                 onClick={() => setIsDeleteModalOpen(false)}
-                className="px-3 py-1.5 text-sm bg-gray-300 rounded hover:bg-gray-400"
+                className="min-h-[40px] px-4 py-2 text-sm bg-gray-100 rounded-xl hover:bg-gray-200"
               >
                 Отмена
               </button>
               <button
+                type="button"
                 onClick={handleConfirmDelete}
-                className="px-3 py-1.5 text-sm bg-red-500 text-white rounded hover:bg-red-600"
+                className="min-h-[40px] px-4 py-2 text-sm bg-red-500 text-white rounded-xl hover:bg-red-600"
               >
                 Удалить
               </button>

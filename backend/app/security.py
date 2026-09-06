@@ -16,10 +16,25 @@ def check_permission(user, required_permission_code: str):
     """Проверяет, есть ли у пользователя нужное право"""
     if not user:
         return False
-    if required_permission_code and required_permission_code.startswith("administrator:"):
-        return bool(getattr(user, "is_admin", False))
 
-    if getattr(user, "is_admin", False) or getattr(user, "is_director", False):
+    # Системный админ — все права
+    if getattr(user, "is_admin", False):
+        return True
+
+    if required_permission_code and required_permission_code.startswith("administrator:"):
+        return False
+
+    # Права только по явному назначению роли (не авто для директора)
+    explicit_only = {"bookings:notify"}
+    if required_permission_code in explicit_only:
+        permissions = getattr(user, "permissions", None)
+        if permissions is None and getattr(user, "role_rel", None):
+            permissions = getattr(user.role_rel, "permissions", [])
+        if not permissions:
+            return False
+        return any(p.code == required_permission_code for p in permissions)
+
+    if getattr(user, "is_director", False):
         return True
 
     permissions = getattr(user, "permissions", None)

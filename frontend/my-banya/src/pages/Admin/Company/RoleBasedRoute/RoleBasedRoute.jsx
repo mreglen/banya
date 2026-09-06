@@ -20,10 +20,15 @@ function RoleBasedRoute({ children, requiredPermission, adminOnly = false }) {
       ? [requiredPermission]
       : [];
 
-  // Проверяем, есть ли у пользователя нужное право
+    // Проверяем, есть ли у пользователя нужное право
   if (requiredPermissions.length > 0) {
+    // Системный админ — полный доступ
+    if (user.is_admin) {
+      return children;
+    }
+
     // Раздел администратора доступен только системному админу
-    if (requiredPermissions.some((code) => code.startsWith('administrator:')) && !user.is_admin) {
+    if (requiredPermissions.some((code) => code.startsWith('administrator:'))) {
       return (
         <div className="p-8 text-red-600">
           <h2 className="text-xl font-bold">Доступ запрещён</h2>
@@ -32,8 +37,8 @@ function RoleBasedRoute({ children, requiredPermission, adminOnly = false }) {
       );
     }
 
-    // Админ и директор имеют все остальные права
-    if (user.is_admin || user.is_director) {
+    // Директор имеет все права страниц (кроме admin-only выше)
+    if (user.is_director) {
       return children;
     }
 

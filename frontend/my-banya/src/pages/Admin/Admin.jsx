@@ -86,7 +86,7 @@ function Admin() {
         </NavLink>
       </div>
 
-      <nav className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-4 space-y-2">
+      <nav className="flex-1 min-h-0 overflow-y-auto overscroll-contain scrollbar-hide p-4 space-y-2">
         {user?.is_admin && (
           <NavLink
             to="/admin/administrator"
@@ -287,7 +287,7 @@ function Admin() {
                   }
                 >
                   <Barcode className="w-4 h-4 mr-2" />
-                  Номенклатура
+                  Все товары
                 </NavLink>
               </div>
             )}

@@ -1,5 +1,5 @@
-// src/components/CategorySelectModal.jsx
-import React, { useState, useEffect, useCallback } from 'react';
+// src/pages/Admin/Storage/CategorySelectModal.jsx
+import React, { useState, useEffect } from 'react';
 import { useCreateCategoryMutation } from '../../../redux/slices/productsApiSlice';
 
 const findCategoryById = (cats, id) => {
@@ -27,7 +27,7 @@ const CategorySelectModal = ({
   const [createParentId, setCreateParentId] = useState(null);
   const [createParentName, setCreateParentName] = useState('Номенклатура');
   const [newCategoryName, setNewCategoryName] = useState('');
-  const [contextMenu, setContextMenu] = useState(null);
+  const [sheetCategory, setSheetCategory] = useState(undefined); // undefined=closed, null=root, object=cat
 
   const [createCategory, { isLoading: isCreating }] = useCreateCategoryMutation();
 
@@ -39,31 +39,16 @@ const CategorySelectModal = ({
       setCreateParentName('Номенклатура');
       setNewCategoryName('');
       setSearchText('');
-      setContextMenu(null);
+      setSheetCategory(undefined);
     }
   }, [isOpen, currentCategoryId]);
 
-  const closeContextMenu = useCallback(() => {
-    setContextMenu(null);
-  }, []);
-
-  useEffect(() => {
-    const handleClick = () => closeContextMenu();
-    if (contextMenu) {
-      window.addEventListener('click', handleClick);
-    }
-    return () => window.removeEventListener('click', handleClick);
-  }, [contextMenu, closeContextMenu]);
-
   const toggleExpand = (id) => {
-    setExpanded(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(id)) {
-        newSet.delete(id);
-      } else {
-        newSet.add(id);
-      }
-      return newSet;
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
     });
   };
 
@@ -72,7 +57,7 @@ const CategorySelectModal = ({
     setCreateParentName(parentName);
     setNewCategoryName('');
     setMode('create');
-    closeContextMenu();
+    setSheetCategory(undefined);
   };
 
   const handleAddClick = () => {
@@ -84,21 +69,9 @@ const CategorySelectModal = ({
     }
   };
 
-  const handleContextMenu = (e, category) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (category) {
-      setSelectedId(category.id);
-    } else {
-      setSelectedId(null);
-    }
-    setContextMenu({ x: e.clientX, y: e.clientY, category });
-  };
-
-  const handleAddSubcategoryFromMenu = () => {
-    const category = contextMenu?.category;
-    if (category) {
-      openCreateMode(category.id, category.name);
+  const handleAddSubcategoryFromSheet = () => {
+    if (sheetCategory) {
+      openCreateMode(sheetCategory.id, sheetCategory.name);
     } else {
       openCreateMode(null, 'Номенклатура');
     }
@@ -117,7 +90,7 @@ const CategorySelectModal = ({
       }).unwrap();
 
       if (createParentId !== null) {
-        setExpanded(prev => new Set([...prev, createParentId]));
+        setExpanded((prev) => new Set([...prev, createParentId]));
       }
 
       setSelectedId(created.id);
@@ -131,72 +104,93 @@ const CategorySelectModal = ({
 
   const categoryMatchesSearch = (category, search) => {
     if (!search) return true;
-    const searchLower = search.toLowerCase();
-    return category.name.toLowerCase().includes(searchLower);
+    return category.name.toLowerCase().includes(search.toLowerCase());
   };
 
   const categoryOrChildrenMatch = (category, search) => {
     if (!search) return true;
     if (categoryMatchesSearch(category, search)) return true;
-    if (category.children?.some(child => categoryOrChildrenMatch(child, search))) return true;
+    if (category.children?.some((child) => categoryOrChildrenMatch(child, search))) return true;
     return false;
   };
 
-  const renderCategoryTree = (categories) => {
-    return categories.map(cat => {
-      if (searchText && !categoryOrChildrenMatch(cat, searchText)) {
-        return null;
-      }
+  const renderCategoryTree = (categories, depth = 0) => {
+    return categories
+      .map((cat) => {
+        if (searchText && !categoryOrChildrenMatch(cat, searchText)) {
+          return null;
+        }
 
-      const hasChildren = cat.children?.length > 0;
-      const isExpanded = expanded.has(cat.id);
-      const shouldExpand = searchText && cat.children?.some(child => categoryOrChildrenMatch(child, searchText));
+        const hasChildren = cat.children?.length > 0;
+        const isExpanded = expanded.has(cat.id);
+        const shouldExpand =
+          searchText && cat.children?.some((child) => categoryOrChildrenMatch(child, searchText));
+        const open = isExpanded || shouldExpand;
+        const selected = selectedId === cat.id;
 
-      return (
-        <div key={cat.id} className="ml-3">
-          <div className="flex items-center justify-between py-1 px-1">
+        return (
+          <div key={cat.id}>
             <div
-              className="flex items-center flex-1"
-              onContextMenu={(e) => handleContextMenu(e, cat)}
+              className={`flex items-center gap-1 rounded-xl min-h-[48px] px-2 ${
+                selected ? 'bg-blue-50 ring-1 ring-blue-200' : 'active:bg-gray-50'
+              }`}
+              style={{ paddingLeft: `${8 + depth * 12}px` }}
             >
               {hasChildren ? (
-                <span
-                  className="mr-1 cursor-pointer select-none"
+                <button
+                  type="button"
                   onClick={() => toggleExpand(cat.id)}
+                  className="w-10 h-10 flex items-center justify-center rounded-lg text-gray-600 shrink-0"
+                  aria-label={open ? 'Свернуть' : 'Развернуть'}
                 >
-                  {isExpanded || shouldExpand ? '▼' : '►'}
-                </span>
+                  <svg
+                    className={`w-4 h-4 transition-transform ${open ? 'rotate-90' : ''}`}
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </button>
               ) : (
-                <span className="mr-1 text-gray-500">•</span>
+                <span className="w-10 shrink-0" />
               )}
-              <label className="flex items-center cursor-pointer ml-1 flex-1 min-w-0">
-                <input
-                  type="radio"
-                  name="select-category"
-                  checked={selectedId === cat.id}
-                  onChange={() => setSelectedId(cat.id)}
-                  className="mr-2"
-                />
-                <span className="truncate">{cat.name}</span>
-              </label>
+
+              <button
+                type="button"
+                onClick={() => setSelectedId(cat.id)}
+                className="flex-1 min-w-0 flex items-center gap-3 py-2 text-left"
+              >
+                <span
+                  className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${
+                    selected ? 'border-blue-600' : 'border-gray-300'
+                  }`}
+                >
+                  {selected && <span className="w-2.5 h-2.5 rounded-full bg-blue-600" />}
+                </span>
+                <span className="truncate text-[15px] text-gray-900 font-medium">{cat.name}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedId(cat.id);
+                  setSheetCategory(cat);
+                }}
+                className="w-10 h-10 flex items-center justify-center rounded-lg text-gray-500 shrink-0"
+                aria-label="Действия"
+              >
+                <span className="text-xl leading-none">⋯</span>
+              </button>
             </div>
-            <button
-              type="button"
-              onClick={(e) => handleContextMenu(e, cat)}
-              className="ml-2 text-gray-500 hover:text-gray-700 flex-shrink-0"
-              aria-label="Действия"
-            >
-              ⋯
-            </button>
+
+            {hasChildren && open && (
+              <div>{renderCategoryTree(cat.children, depth + 1)}</div>
+            )}
           </div>
-          {hasChildren && (isExpanded || shouldExpand) && (
-            <div className="ml-3">
-              {renderCategoryTree(cat.children)}
-            </div>
-          )}
-        </div>
-      );
-    }).filter(Boolean);
+        );
+      })
+      .filter(Boolean);
   };
 
   const handleSelect = () => {
@@ -206,130 +200,165 @@ const CategorySelectModal = ({
 
   if (!isOpen) return null;
 
+  const rootSelected = selectedId === null;
+
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white p-6 rounded-lg shadow-lg w-1/3 max-h-[80vh] flex flex-col">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+      <button
+        type="button"
+        className="absolute inset-0 bg-black/50"
+        aria-label="Закрыть"
+        onClick={onClose}
+      />
+
+      <div
+        className="relative bg-white w-full sm:w-[min(100%,28rem)] sm:max-w-md
+          h-[92dvh] sm:h-auto sm:max-h-[85vh]
+          rounded-t-2xl sm:rounded-2xl shadow-xl
+          flex flex-col overflow-hidden
+          pb-[env(safe-area-inset-bottom)]"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="sm:hidden flex justify-center pt-2 pb-1">
+          <div className="w-10 h-1 rounded-full bg-gray-300" />
+        </div>
+
         {mode === 'select' ? (
           <>
-            <h3 className="text-lg font-semibold mb-4">Выберите категорию</h3>
-
-            <div className="mb-3">
-              <input
-                type="text"
-                placeholder="Введите название категории..."
-                value={searchText}
-                onChange={(e) => setSearchText(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-              />
-              {searchText && (
-                <button
-                  onClick={() => setSearchText('')}
-                  className="mt-1 text-sm text-gray-500 hover:text-gray-700"
-                >
-                  Очистить поиск
-                </button>
-              )}
+            <div className="px-4 pt-2 sm:pt-5 pb-3 border-b border-gray-100 shrink-0">
+              <h3 className="text-lg font-semibold text-gray-900">Выберите категорию</h3>
+              <div className="relative mt-3">
+                <input
+                  type="search"
+                  placeholder="Поиск категории..."
+                  value={searchText}
+                  onChange={(e) => setSearchText(e.target.value)}
+                  className="w-full pl-3 pr-10 py-3 border border-gray-300 rounded-xl text-base focus:outline-none focus:ring-2 focus:ring-green-500 [&::-webkit-search-cancel-button]:hidden"
+                />
+                {searchText && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchText('')}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 flex items-center justify-center rounded-full text-gray-500 bg-gray-100"
+                    aria-label="Очистить"
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
             </div>
 
-            <div
-              className="border rounded p-2 max-h-60 overflow-y-auto mb-4"
-              onClick={closeContextMenu}
-            >
-              <div className="flex items-center justify-between mb-2 px-1">
-                <div
-                  className="flex items-center flex-1"
-                  onContextMenu={(e) => handleContextMenu(e, null)}
-                >
-                  <label className="flex items-center cursor-pointer">
-                    <input
-                      type="radio"
-                      name="select-category"
-                      checked={selectedId === null}
-                      onChange={() => setSelectedId(null)}
-                      className="mr-2"
-                    />
-                    <span>Номенклатура (без категории)</span>
-                  </label>
-                </div>
+            <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-2 py-2">
+              <div
+                className={`flex items-center gap-1 rounded-xl min-h-[48px] px-2 mb-1 ${
+                  rootSelected ? 'bg-blue-50 ring-1 ring-blue-200' : 'active:bg-gray-50'
+                }`}
+              >
+                <span className="w-10 shrink-0" />
                 <button
                   type="button"
-                  onClick={(e) => handleContextMenu(e, null)}
-                  className="ml-2 text-gray-500 hover:text-gray-700 flex-shrink-0"
+                  onClick={() => setSelectedId(null)}
+                  className="flex-1 min-w-0 flex items-center gap-3 py-2 text-left"
+                >
+                  <span
+                    className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${
+                      rootSelected ? 'border-blue-600' : 'border-gray-300'
+                    }`}
+                  >
+                    {rootSelected && <span className="w-2.5 h-2.5 rounded-full bg-blue-600" />}
+                  </span>
+                  <span className="text-[15px] text-gray-900 font-medium">
+                    Номенклатура (без категории)
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedId(null);
+                    setSheetCategory(null);
+                  }}
+                  className="w-10 h-10 flex items-center justify-center rounded-lg text-gray-500 shrink-0"
                   aria-label="Действия"
                 >
-                  ⋯
+                  <span className="text-xl leading-none">⋯</span>
                 </button>
               </div>
               {renderCategoryTree(categoriesTree)}
             </div>
 
-            <div className="flex justify-between space-x-2">
+            <div className="shrink-0 border-t border-gray-100 p-3 sm:p-4 space-y-2 bg-white">
               <button
-                onClick={handleAddClick}
-                className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600"
+                type="button"
+                onClick={handleSelect}
+                className="w-full min-h-[48px] px-4 py-3 bg-blue-600 text-white rounded-xl font-medium text-base hover:bg-blue-700"
               >
-                Добавить
+                Выбрать
               </button>
-              <div className="flex space-x-2">
+              <div className="grid grid-cols-2 gap-2">
                 <button
-                  onClick={onClose}
-                  className="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400"
+                  type="button"
+                  onClick={handleAddClick}
+                  className="min-h-[44px] px-3 py-2.5 bg-green-600 text-white rounded-xl font-medium text-sm hover:bg-green-700"
                 >
-                  Отмена
+                  Добавить
                 </button>
                 <button
-                  onClick={handleSelect}
-                  className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+                  type="button"
+                  onClick={onClose}
+                  className="min-h-[44px] px-3 py-2.5 bg-gray-100 text-gray-800 rounded-xl font-medium text-sm hover:bg-gray-200"
                 >
-                  Выбрать
+                  Отмена
                 </button>
               </div>
             </div>
           </>
         ) : (
           <>
-            <h3 className="text-lg font-semibold mb-4">Добавить категорию</h3>
-
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Родительская категория
-              </label>
-              <div className="p-2 bg-gray-100 rounded text-sm">
-                {createParentName}
+            <div className="px-4 pt-2 sm:pt-5 pb-3 border-b border-gray-100 shrink-0">
+              <h3 className="text-lg font-semibold text-gray-900">Добавить категорию</h3>
+            </div>
+            <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Родительская категория
+                </label>
+                <div className="p-3 bg-gray-100 rounded-xl text-sm text-gray-800">
+                  {createParentName}
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Имя категории
+                </label>
+                <input
+                  type="text"
+                  value={newCategoryName}
+                  onChange={(e) => setNewCategoryName(e.target.value)}
+                  className="w-full px-3 py-3 border border-gray-300 rounded-xl text-base focus:outline-none focus:ring-2 focus:ring-green-500"
+                  placeholder="Введите название"
+                  autoFocus
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleCreateCategory();
+                  }}
+                />
               </div>
             </div>
-
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Имя категории
-              </label>
-              <input
-                type="text"
-                value={newCategoryName}
-                onChange={(e) => setNewCategoryName(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                placeholder="Введите название категории"
-                autoFocus
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') handleCreateCategory();
-                }}
-              />
-            </div>
-
-            <div className="flex justify-between space-x-2">
+            <div className="shrink-0 border-t border-gray-100 p-3 sm:p-4 grid grid-cols-2 gap-2">
               <button
+                type="button"
                 onClick={() => {
                   setMode('select');
                   setNewCategoryName('');
                 }}
-                className="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400"
+                className="min-h-[48px] px-3 py-2.5 bg-gray-100 text-gray-800 rounded-xl font-medium"
               >
                 Назад
               </button>
               <button
+                type="button"
                 onClick={handleCreateCategory}
                 disabled={isCreating}
-                className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 disabled:opacity-50"
+                className="min-h-[48px] px-3 py-2.5 bg-green-600 text-white rounded-xl font-medium disabled:opacity-50"
               >
                 {isCreating ? 'Создание...' : 'Создать'}
               </button>
@@ -338,25 +367,36 @@ const CategorySelectModal = ({
         )}
       </div>
 
-      {contextMenu && mode === 'select' && (
-        <div
-          className="fixed z-[60] bg-white border rounded shadow-lg py-1 min-w-[160px] text-sm"
-          style={{
-            top: contextMenu.y,
-            left: Math.min(contextMenu.x, window.innerWidth - 170),
-          }}
-          onClick={(e) => e.stopPropagation()}
-        >
+      {sheetCategory !== undefined && mode === 'select' && (
+        <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center">
           <button
             type="button"
-            className="block w-full text-left px-3 py-1.5 hover:bg-gray-100"
-            onClick={(e) => {
-              e.stopPropagation();
-              handleAddSubcategoryFromMenu();
-            }}
-          >
-            {contextMenu.category ? 'Добавить подкатегорию' : 'Добавить категорию'}
-          </button>
+            className="absolute inset-0 bg-black/40"
+            aria-label="Закрыть меню"
+            onClick={() => setSheetCategory(undefined)}
+          />
+          <div className="relative w-full sm:max-w-sm bg-white rounded-t-2xl sm:rounded-2xl shadow-xl p-4 pb-[max(1rem,env(safe-area-inset-bottom))] space-y-2">
+            <div className="sm:hidden flex justify-center pb-1">
+              <div className="w-10 h-1 rounded-full bg-gray-300" />
+            </div>
+            <p className="text-sm text-gray-500 px-1 pb-1">
+              {sheetCategory ? sheetCategory.name : 'Номенклатура'}
+            </p>
+            <button
+              type="button"
+              className="w-full min-h-[48px] text-left px-4 py-3 rounded-xl bg-gray-50 hover:bg-gray-100 text-[15px] font-medium text-gray-900"
+              onClick={handleAddSubcategoryFromSheet}
+            >
+              {sheetCategory ? 'Добавить подкатегорию' : 'Добавить категорию'}
+            </button>
+            <button
+              type="button"
+              className="w-full min-h-[44px] px-4 py-2.5 rounded-xl text-gray-600"
+              onClick={() => setSheetCategory(undefined)}
+            >
+              Закрыть
+            </button>
+          </div>
         </div>
       )}
     </div>

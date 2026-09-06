@@ -71,7 +71,7 @@ function MobileSidebar({ isOpen, onClose }) {
 
       {/* Sidebar */}
       <div
-        className="fixed left-0 top-0 w-64 h-full bg-white shadow-lg border-r border-gray-200 overflow-y-auto"
+        className="fixed left-0 top-0 w-64 h-full bg-white shadow-lg border-r border-gray-200 overflow-y-auto scrollbar-hide"
         onClick={(e) => e.stopPropagation()} // предотвращает закрытие при клике внутри меню
       >
         <div className="p-6 border-b border-gray-200">
@@ -237,7 +237,7 @@ function MobileSidebar({ isOpen, onClose }) {
                       onClick={onClose}
                     >
                       <Barcode className="w-4 h-4 mr-2" />
-                      Номенклатура
+                      Все товары
                     </NavLink>
                 </div>
               )}

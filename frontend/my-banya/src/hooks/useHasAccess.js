@@ -2,10 +2,10 @@
 import { useSelector } from 'react-redux';
 
 /**
- * Права, которые НЕ выдаются админу/директору автоматически —
- * только если явно назначены роли.
+ * Права, которые директору НЕ выдаются автоматически —
+ * только явное назначение роли. Админ (is_admin) получает всё.
  */
-const EXPLICIT_ONLY_PERMISSIONS = new Set(['bookings:notify']);
+const EXPLICIT_ONLY_FOR_DIRECTOR = new Set(['bookings:notify']);
 
 /**
  * Hook to check if current user has specific permission
@@ -27,16 +27,25 @@ export function useHasAccess() {
         )
       );
 
-    // Explicit-only: никогда не через is_admin / is_director
-    if (required.every((code) => EXPLICIT_ONLY_PERMISSIONS.has(code))) {
-      return required.some(hasExplicit);
+    // Системный админ — все права автоматически
+    if (user.is_admin) return true;
+
+    // administrator:* — только is_admin (уже обработан выше)
+    if (required.some((code) => code?.startsWith('administrator:'))) return false;
+
+    // Директор: всё, кроме explicit-only (например bookings:notify)
+    if (user.is_director) {
+      if (required.every((code) => EXPLICIT_ONLY_FOR_DIRECTOR.has(code))) {
+        return required.some(hasExplicit);
+      }
+      if (required.some((code) => EXPLICIT_ONLY_FOR_DIRECTOR.has(code))) {
+        return required.some(
+          (code) =>
+            !EXPLICIT_ONLY_FOR_DIRECTOR.has(code) || hasExplicit(code)
+        );
+      }
+      return true;
     }
-
-    // administrator:* permissions are admin-only
-    if (required.some((code) => code?.startsWith('administrator:'))) return !!user.is_admin;
-
-    // Admin and director have access to all other permissions
-    if (user.is_admin || user.is_director) return true;
 
     if (!user.permissions) return false;
     return required.some(hasExplicit);

@@ -8,6 +8,7 @@ import {
   useGetProductRequestReceiveItemsQuery,
 } from '../../../../redux/slices/productsApiSlice';
 import { useGetFinanceAccountsQuery } from '../../../../redux/slices/apiSlice';
+import ProductSelectionModal from './ProductSelectionModal';
 import { toast } from 'react-hot-toast';
 
 const draftKey = (userId, requestId) =>
@@ -37,6 +38,7 @@ function ReceiveEntrance() {
   const [updateSalePrices, setUpdateSalePrices] = useState(true);
   const [productSearch, setProductSearch] = useState('');
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [isCatalogOpen, setIsCatalogOpen] = useState(false);
   const searchRef = useRef(null);
   const hydratedRef = useRef(false);
 
@@ -259,35 +261,51 @@ function ReceiveEntrance() {
         )}
 
         <div className="bg-white rounded-xl shadow p-4 space-y-3">
-          <div ref={searchRef} className="relative">
-            <input
-              type="search"
-              value={productSearch}
-              onChange={(e) => {
-                setProductSearch(e.target.value);
-                setDropdownOpen(true);
+          <div className="flex gap-2 items-stretch">
+            <div ref={searchRef} className="relative flex-1 min-w-0">
+              <input
+                type="search"
+                value={productSearch}
+                onChange={(e) => {
+                  setProductSearch(e.target.value);
+                  setDropdownOpen(true);
+                }}
+                onFocus={() => setDropdownOpen(true)}
+                placeholder="Найти товар..."
+                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent [&::-webkit-search-cancel-button]:hidden"
+              />
+              {dropdownOpen && searchResults.length > 0 && (
+                <div className="absolute z-20 left-0 right-0 mt-1 max-h-56 overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-lg">
+                  {searchResults.map((p) => (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => addProduct(p)}
+                      className="w-full text-left px-3 py-2.5 text-sm hover:bg-gray-50 border-b border-gray-50 last:border-0"
+                    >
+                      <div className="font-medium text-gray-900">{p.name}</div>
+                      <div className="text-xs text-gray-500">
+                        Остаток: {p.total_quantity || 0} {unitName(p.unit_id)}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setDropdownOpen(false);
+                setIsCatalogOpen(true);
               }}
-              onFocus={() => setDropdownOpen(true)}
-              placeholder="Найти товар..."
-              className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent [&::-webkit-search-cancel-button]:hidden"
-            />
-            {dropdownOpen && searchResults.length > 0 && (
-              <div className="absolute z-20 left-0 right-0 mt-1 max-h-56 overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-lg">
-                {searchResults.map((p) => (
-                  <button
-                    key={p.id}
-                    type="button"
-                    onClick={() => addProduct(p)}
-                    className="w-full text-left px-3 py-2.5 text-sm hover:bg-gray-50 border-b border-gray-50 last:border-0"
-                  >
-                    <div className="font-medium text-gray-900">{p.name}</div>
-                    <div className="text-xs text-gray-500">
-                      Остаток: {p.total_quantity || 0} {unitName(p.unit_id)}
-                    </div>
-                  </button>
-                ))}
-              </div>
-            )}
+              className="shrink-0 px-3 sm:px-4 py-2.5 rounded-lg border border-gray-300 bg-gray-50 hover:bg-gray-100 text-sm font-medium text-gray-800 flex items-center gap-1.5"
+              title="Каталог по категориям"
+            >
+              <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+              </svg>
+              <span className="hidden sm:inline">Каталог</span>
+            </button>
           </div>
 
           {items.length === 0 ? (
@@ -393,6 +411,15 @@ function ReceiveEntrance() {
           </div>
         </div>
       </div>
+
+      <ProductSelectionModal
+        isOpen={isCatalogOpen}
+        onClose={() => setIsCatalogOpen(false)}
+        onSelect={(product) => {
+          addProduct(product);
+          setIsCatalogOpen(false);
+        }}
+      />
     </div>
   );
 }

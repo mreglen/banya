@@ -221,7 +221,7 @@ const CategoryModal = ({
                   onChange={() => setSelectedParentId(null)}
                   className="mr-2"
                 />
-                <span>Номенклатура</span>
+                <span>Все товары</span>
               </label>
               {renderCategoryTree(categoriesTree)}
             </div>
