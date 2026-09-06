@@ -451,6 +451,32 @@ with engine.begin() as connection:
             """
         )
     )
+    connection.execute(
+        text(
+            """
+            ALTER TABLE entrance_documents
+            ADD COLUMN IF NOT EXISTS reverses_id INTEGER REFERENCES entrance_documents(id)
+            """
+        )
+    )
+    connection.execute(
+        text(
+            """
+            ALTER TABLE entrance_documents
+            ADD COLUMN IF NOT EXISTS reversed_by_id INTEGER REFERENCES entrance_documents(id)
+            """
+        )
+    )
+    connection.execute(
+        text(
+            """
+            INSERT INTO permissions (code, name, category, description)
+            SELECT 'bookings:notify', 'Звуковые уведомления о новых заявках', 'bookings',
+                   'Звук при новой заявке с сайта (только при явном назначении роли)'
+            WHERE NOT EXISTS (SELECT 1 FROM permissions WHERE code = 'bookings:notify')
+            """
+        )
+    )
 
 app = FastAPI(title='Бани')
 

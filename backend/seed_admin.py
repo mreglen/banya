@@ -9,6 +9,7 @@ PERMISSIONS = [
     ("reservations:manage", "Управление бронированиями", "reservations"),
     ("bookings:view", "Просмотр заявок с сайта", "bookings"),
     ("bookings:manage", "Управление заявками", "bookings"),
+    ("bookings:notify", "Звуковые уведомления о новых заявках", "bookings"),
     ("baths:view", "Просмотр бань", "baths"),
     ("baths:manage", "Управление банями", "baths"),
     ("storage:view", "Просмотр склада", "storage"),

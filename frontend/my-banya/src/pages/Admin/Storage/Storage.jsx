@@ -1,5 +1,5 @@
 // src/pages/Admin/Storage/Storage.jsx
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import CategoryTree from './CategoryTree';
 import ProductList from './ProductList';
@@ -10,8 +10,51 @@ import {
   useCreateProductMutation,
 } from '../../../redux/slices/productsApiSlice';
 
+const STORAGE_VIEW_KEY = 'banya:admin-storage-view';
+
+const getScrollParent = () => {
+  if (typeof document === 'undefined') return null;
+  return document.querySelector('main') || null;
+};
+
+const getScrollY = () => {
+  const parent = getScrollParent();
+  if (parent && parent.scrollHeight > parent.clientHeight) {
+    return parent.scrollTop;
+  }
+  return window.scrollY || 0;
+};
+
+const setScrollY = (y) => {
+  const parent = getScrollParent();
+  if (parent && parent.scrollHeight > parent.clientHeight) {
+    parent.scrollTop = y;
+    return;
+  }
+  window.scrollTo(0, y);
+};
+
+const readStorageView = () => {
+  try {
+    const raw = sessionStorage.getItem(STORAGE_VIEW_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+};
+
+const writeStorageView = (state) => {
+  try {
+    sessionStorage.setItem(STORAGE_VIEW_KEY, JSON.stringify(state));
+  } catch {
+    /* ignore */
+  }
+};
+
 function Storage() {
   const navigate = useNavigate();
+  const savedView = useRef(readStorageView()).current;
+  const scrollRestoredRef = useRef(false);
 
   const {
     data: categoriesTree = [],
@@ -29,18 +72,57 @@ function Storage() {
 
   const [createProduct] = useCreateProductMutation();
 
-  const [selectedCategoryPath, setSelectedCategoryPath] = useState([]);
-  const [expandedCategories, setExpandedCategories] = useState(new Set());
+  const [selectedCategoryPath, setSelectedCategoryPath] = useState(
+    () => savedView?.selectedCategoryPath || []
+  );
+  const [expandedCategories, setExpandedCategories] = useState(
+    () => new Set(savedView?.expandedCategories || [])
+  );
   const [showFilter, setShowFilter] = useState(false);
-  const [filterType, setFilterType] = useState(null); // 'min_stock' или null
-  const [searchQuery, setSearchQuery] = useState('');
+  const [filterType, setFilterType] = useState(() => savedView?.filterType ?? null);
+  const [searchQuery, setSearchQuery] = useState(() => savedView?.searchQuery || '');
+
+  const persistView = (overrides = {}) => {
+    writeStorageView({
+      selectedCategoryPath,
+      expandedCategories: [...expandedCategories],
+      filterType,
+      searchQuery,
+      scrollY: getScrollY(),
+      ...overrides,
+    });
+  };
+
+  useEffect(() => {
+    persistView();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedCategoryPath, expandedCategories, filterType, searchQuery]);
+
+  useEffect(() => {
+    if (isLoadingCategories || isLoadingProducts || scrollRestoredRef.current) return;
+    const scrollY = savedView?.scrollY;
+    if (typeof scrollY !== 'number' || scrollY <= 0) {
+      scrollRestoredRef.current = true;
+      return;
+    }
+    scrollRestoredRef.current = true;
+    const restore = () => setScrollY(scrollY);
+    requestAnimationFrame(() => {
+      restore();
+      setTimeout(restore, 50);
+      setTimeout(restore, 200);
+    });
+  }, [isLoadingCategories, isLoadingProducts, products, categoriesTree, savedView]);
 
   const handleEdit = (productId) => {
-    navigate(`/admin/storage/product/${productId}`);
+    persistView({ scrollY: getScrollY() });
+    navigate(`/admin/storage/product/${productId}`, {
+      state: { from: '/admin/storage/nomenclature' },
+    });
   };
 
   const toggleCategory = (id) => {
-    setExpandedCategories(prev => {
+    setExpandedCategories((prev) => {
       const next = new Set(prev);
       next.has(id) ? next.delete(id) : next.add(id);
       return next;
@@ -92,20 +174,32 @@ function Storage() {
           <div className="flex flex-col sm:flex-row w-full sm:w-auto gap-2 sm:items-center">
             <div className="relative w-full sm:w-80">
               <input
-                type="text"
+                type="search"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Поиск товаров..."
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                className="w-full pl-10 pr-10 py-2.5 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm appearance-none [&::-webkit-search-cancel-button]:hidden [&::-webkit-search-decoration]:hidden"
               />
               <svg
-                className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2"
+                className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
               >
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="m21 21-4.35-4.35M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15z" />
               </svg>
+              {searchQuery.trim() !== '' && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery('')}
+                  aria-label="Очистить поиск"
+                  className="absolute right-1.5 top-1/2 -translate-y-1/2 z-10 w-8 h-8 flex items-center justify-center rounded-full text-gray-500 bg-gray-100 hover:text-gray-800 hover:bg-gray-200 active:bg-gray-300"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              )}
             </div>
             <div className="relative">
               <button
@@ -131,7 +225,6 @@ function Storage() {
           </div>
         </div>
 
-        {/* Адаптив: на мобильных — один под другим */}
         <div className="flex flex-col lg:flex-row gap-4 lg:gap-6">
           <div className="w-full lg:w-1/4">
             <CategoryTree

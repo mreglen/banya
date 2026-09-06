@@ -2,7 +2,7 @@ import { useEffect, useRef, lazy, Suspense } from 'react';
 import { useDispatch } from 'react-redux';
 import { setCredentials, logOut } from './redux/slices/authSlice';
 import { getProfile } from './redux/slices/adminApi';
-import { BrowserRouter, Routes, Route, useLocation, useNavigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { HelmetProvider } from 'react-helmet-async';
 import { YANDEX_METRIKA_ID } from './utils/yandexMetrika';
 import Header from './components/Header/Header';
@@ -26,8 +26,7 @@ const AdminBookings = lazy(() => import('./pages/Admin/AdminBookings/AdminBookin
 const AdminBathsList = lazy(() => import('./pages/Admin/AdminBaths/AdminBathsList'));
 const BathForm = lazy(() => import('./pages/Admin/AdminBaths/BathForm'));
 const DocumentEntrance = lazy(() => import('./pages/Admin/Documents/DocumentsEntrance/DocumentEntrance'));
-const AddDocumentEntrance = lazy(() => import('./pages/Admin/Documents/DocumentsEntrance/AddDocumentEntrance'));
-const EntranceDrafts = lazy(() => import('./pages/Admin/Documents/DocumentsEntrance/EntranceDrafts'));
+const ReceiveEntrance = lazy(() => import('./pages/Admin/Documents/DocumentsEntrance/ReceiveEntrance'));
 const ProductRequestsList = lazy(() => import('./pages/Admin/Documents/ProductRequests/ProductRequestsList'));
 const AddProductRequest = lazy(() => import('./pages/Admin/Documents/ProductRequests/AddProductRequest'));
 const ProductRequestReview = lazy(() => import('./pages/Admin/Documents/ProductRequests/ProductRequestReview'));
@@ -175,9 +174,10 @@ function AppWithLayout() {
           <Route path="baths/edit/:id" element={withAdminSuspense(<RoleBasedRoute requiredPermission="baths:manage"><BathForm /></RoleBasedRoute>)} />
           <Route path="promotions" element={withAdminSuspense(<RoleBasedRoute requiredPermission="promotions:view"><Promotions /></RoleBasedRoute>)} />
           <Route path="documents/entrance" element={withAdminSuspense(<RoleBasedRoute requiredPermission="documents:view"><DocumentEntrance /></RoleBasedRoute>)} />
-          <Route path="documents/entrance/drafts" element={withAdminSuspense(<RoleBasedRoute requiredPermission="documents:view"><EntranceDrafts /></RoleBasedRoute>)} />
-          <Route path="documents/entrance/add" element={withAdminSuspense(<RoleBasedRoute requiredPermission="documents:manage"><AddDocumentEntrance /></RoleBasedRoute>)} />
-          <Route path="documents/entrance/edit/:id" element={withAdminSuspense(<RoleBasedRoute requiredPermission={['documents:edit', 'documents:manage']}><AddDocumentEntrance /></RoleBasedRoute>)} />
+          <Route path="documents/entrance/receive" element={withAdminSuspense(<RoleBasedRoute requiredPermission="documents:manage"><ReceiveEntrance /></RoleBasedRoute>)} />
+          <Route path="documents/entrance/drafts" element={<Navigate to="/admin/documents/entrance" replace />} />
+          <Route path="documents/entrance/add" element={<Navigate to="/admin/documents/entrance/receive" replace />} />
+          <Route path="documents/entrance/edit/:id" element={<Navigate to="/admin/documents/entrance" replace />} />
           <Route path="documents/product-requests" element={withAdminSuspense(<RoleBasedRoute requiredPermission="documents:view"><ProductRequestsList /></RoleBasedRoute>)} />
           <Route path="documents/product-requests/add" element={withAdminSuspense(<RoleBasedRoute requiredPermission="documents:manage"><AddProductRequest /></RoleBasedRoute>)} />
           <Route path="documents/product-requests/edit/:id" element={withAdminSuspense(<RoleBasedRoute requiredPermission="documents:manage"><AddProductRequest /></RoleBasedRoute>)} />

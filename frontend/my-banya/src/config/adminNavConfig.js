@@ -138,7 +138,7 @@ export const ADMIN_PAGE_TITLES = {
   '/admin/company/organization': 'Организация',
   '/admin/company/client': 'Клиенты',
   '/admin/documents/entrance': 'Поступление',
-  '/admin/documents/entrance/drafts': 'Черновики',
+  '/admin/documents/entrance/receive': 'Оприходовать',
   '/admin/documents/realization': 'Реализация',
   '/admin/documents/product-requests': 'Заявки на товар',
   '/admin/storage/nomenclature': 'Склад',

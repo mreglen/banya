@@ -54,6 +54,7 @@ function Roles() {
       update: 'Редактирование',
       delete: 'Удаление',
       manage: 'Управление',
+      notify: 'Звук о заявках',
       roles: 'Роли',
       audit: 'Аудит',
     };

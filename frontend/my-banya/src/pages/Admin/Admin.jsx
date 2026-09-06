@@ -4,6 +4,7 @@ import { Outlet, useLocation, NavLink } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { useGetPermissionsQuery } from '../../redux/slices/apiSlice';
 import { useUnreadBookingsCount } from '../../hooks/useUnreadBookingsCount';
+import { useBookingNotifyAlerts } from '../../hooks/useBookingNotifyAlerts';
 import { getAdminPageTitle } from '../../config/adminNavConfig';
 import AdminMobileEntryRedirect from '../../components/Admin/AdminMobileEntryRedirect';
 import MobileBottomNav from '../../components/Admin/MobileBottomNav';
@@ -71,11 +72,12 @@ function Admin() {
   const unreadBookingsCount = useUnreadBookingsCount({
     skip: !hasAccess('/admin/bookings'),
   });
+  useBookingNotifyAlerts();
 
   // Десктопный сайдбар (виден только на md+)
   const DesktopSidebar = () => (
-    <aside className="hidden md:block w-64 bg-white shadow-lg border-r border-gray-200 flex flex-col">
-      <div className="p-6 border-b border-gray-200">
+    <aside className="hidden md:flex w-64 shrink-0 h-screen sticky top-0 bg-white shadow-lg border-r border-gray-200 flex-col overflow-hidden">
+      <div className="p-6 border-b border-gray-200 shrink-0">
         <NavLink to="/admin/" className="text-2xl font-bold text-gray-800 hover:text-green-700 transition">
           Админ панель
         </NavLink>
@@ -84,7 +86,7 @@ function Admin() {
         </NavLink>
       </div>
 
-      <nav className="flex-1 p-4 space-y-2">
+      <nav className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-4 space-y-2">
         {user?.is_admin && (
           <NavLink
             to="/admin/administrator"
@@ -404,7 +406,7 @@ function Admin() {
         </NavLink>
       </nav>
 
-      <div className="p-4 border-t border-gray-200">
+      <div className="p-4 border-t border-gray-200 shrink-0">
           <button
             onClick={handleLogout}
             className="w-full flex items-center px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg transition"
@@ -417,7 +419,7 @@ function Admin() {
   );
 
   return (
-    <div className="min-h-screen bg-gray-50 flex">
+    <div className="min-h-screen md:h-screen md:overflow-hidden bg-gray-50 flex">
       <SeoHead title="Админ-панель" noindex />
       <AdminMobileEntryRedirect />
       <DesktopSidebar />
@@ -427,7 +429,7 @@ function Admin() {
         <h1 className="text-base font-bold text-gray-900 truncate">{pageTitle}</h1>
       </header>
 
-      <main className="flex-1 md:ml-0 ml-0 pt-14 md:pt-0 px-3 md:px-8 py-3 md:py-8 pb-20 md:pb-8">
+      <main className="flex-1 min-w-0 min-h-0 md:h-screen md:overflow-y-auto overscroll-contain pt-14 md:pt-0 px-3 md:px-8 py-3 md:py-8 pb-20 md:pb-8">
         <Outlet />
       </main>
 

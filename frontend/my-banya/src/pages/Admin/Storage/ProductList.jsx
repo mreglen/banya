@@ -11,12 +11,6 @@ import ActionDropdown from '../../../components/UI/ActionDropdown/ActionDropdown
 import { useHasAccess } from '../../../hooks/useHasAccess';
 import { toast } from 'react-hot-toast';
 
-const truncateDescription = (str, maxLength = 50) => {
-    if (!str) return '—';
-    if (str.length <= maxLength) return str;
-    return str.slice(0, maxLength) + '...';
-};
-
 const findCategoryName = (categories, categoryId) => {
     for (const cat of categories) {
         if (cat.id === categoryId) return cat.name;
@@ -60,6 +54,11 @@ const getProductsForSelectedCategory = (selectedCategoryPath, categoriesTree, st
 
     const allCategoryIds = collectSubcategoryIds(rootCategory);
     return storageData.filter(item => allCategoryIds.includes(item.category_id));
+};
+
+const formatStockLabel = (product, unitName) => {
+    if (!product.is_countable) return 'не исчисляемый';
+    return `${product.total_quantity || 0} ${unitName}`;
 };
 
 const ProductList = ({
@@ -154,7 +153,7 @@ const ProductList = ({
                 handleEdit(product.id);
             },
         },
-        ...(canManageStorage
+        ...(canManageStorage && product.is_countable
             ? [
                 {
                     label: 'Списать',
@@ -218,11 +217,10 @@ const ProductList = ({
                     <table className="hidden md:table w-full table-fixed">
                         <thead className="bg-gray-50 text-left text-xs text-gray-600 uppercase">
                             <tr>
-                                <th className="px-4 py-3 w-[25%]">Наименование</th>
-                                <th className="px-4 py-3 w-[20%]">Категория</th>
-                                <th className="px-4 py-3 w-[25%]">Описание</th>
-                                <th className="px-4 py-3 w-[10%] text-right">Остаток</th>
-                                <th className="px-4 py-3 w-[8%] text-right">Цена</th>
+                                <th className="px-4 py-3 w-[32%]">Наименование</th>
+                                <th className="px-4 py-3 w-[24%]">Категория</th>
+                                <th className="px-4 py-3 w-[14%] text-right">Остаток</th>
+                                <th className="px-4 py-3 w-[12%] text-right">Цена</th>
                                 <th className="px-4 py-3 w-[8%] text-center">Сайт</th>
                                 <th className="px-4 py-3 w-[10%] text-center">Действия</th>
                             </tr>
@@ -232,6 +230,8 @@ const ProductList = ({
                                 const categoryName = findCategoryName(categoriesTree, product.category_id);
                                 const markedForDeletion = deletionArray.includes(product.id);
                                 const unitName = findUnitName(product.unit_id);
+                                const isLowStock = product.is_countable
+                                    && (product.total_quantity || 0) < (product.min_stock || 0);
 
                                 return (
                                     <tr
@@ -239,11 +239,18 @@ const ProductList = ({
                                         className="hover:bg-gray-50 cursor-pointer"
                                         onDoubleClick={() => handleEdit(product.id)}
                                     >
-                                        <td className="px-4 py-3 font-medium text-gray-900 w-[25%]">{product.name}</td>
-                                        <td className="px-4 py-3 text-gray-700 w-[20%]">{categoryName || '—'}</td>
-                                        <td className="px-4 py-3 text-gray-700 w-[25%]">{truncateDescription(product.description, 50)}</td>
-                                        <td className={`px-4 py-3 w-[10%] text-right ${(product.total_quantity || 0) < (product.min_stock || 0) ? 'text-red-600 font-semibold' : 'text-gray-900'}`}>{(product.total_quantity || 0)} {unitName}</td>
-                                        <td className="px-4 py-3 text-gray-900 w-[8%] text-right">{(product.price ?? 0).toFixed(2)} ₽</td>
+                                        <td className="px-4 py-3 font-medium text-gray-900 w-[32%]">{product.name}</td>
+                                        <td className="px-4 py-3 text-gray-700 w-[24%]">{categoryName || '—'}</td>
+                                        <td className={`px-4 py-3 w-[14%] text-right ${
+                                            !product.is_countable
+                                                ? 'text-gray-500'
+                                                : isLowStock
+                                                    ? 'text-red-600 font-semibold'
+                                                    : 'text-gray-900'
+                                        }`}>
+                                            {formatStockLabel(product, unitName)}
+                                        </td>
+                                        <td className="px-4 py-3 text-gray-900 w-[12%] text-right">{(product.price ?? 0).toFixed(2)} ₽</td>
                                         <td className="px-4 py-3 w-[8%] text-center">
                                             <input
                                                 type="checkbox"
@@ -267,41 +274,50 @@ const ProductList = ({
                         </tbody>
                     </table>
 
-                    <div className="md:hidden p-2">
+                    <div className="md:hidden p-2 space-y-2">
                         {finalProducts.map((product) => {
                             const categoryName = findCategoryName(categoriesTree, product.category_id);
                             const markedForDeletion = deletionArray.includes(product.id);
                             const unitName = findUnitName(product.unit_id);
+                            const isLowStock = product.is_countable
+                                && (product.total_quantity || 0) < (product.min_stock || 0);
 
                             return (
                                 <div
                                     key={product.id}
-                                    className="border rounded-lg p-4 mb-3 bg-gray-50 hover:bg-gray-100 cursor-pointer"
+                                    className="border border-gray-200 rounded-lg p-3 bg-white cursor-pointer"
                                     onDoubleClick={() => handleEdit(product.id)}
                                 >
-                                    <div className="font-semibold">{product.name}</div>
-                                    <div className="text-sm text-gray-600 mt-1">
-                                        Категория: {categoryName || '—'}
+                                    <div className="font-semibold text-gray-900 leading-snug">{product.name}</div>
+                                    <div className="text-sm text-gray-500 mt-0.5">
+                                        {categoryName || 'Без категории'}
                                     </div>
-                                    <div className="text-sm text-gray-600 mt-1">
-                                        Описание: {truncateDescription(product.description, 60)}
+                                    <div className="flex justify-between items-center mt-2 text-sm gap-2">
+                                        <span className={
+                                            !product.is_countable
+                                                ? 'text-gray-500'
+                                                : isLowStock
+                                                    ? 'text-red-600 font-semibold'
+                                                    : 'text-gray-800'
+                                        }>
+                                            {product.is_countable
+                                                ? `Остаток: ${formatStockLabel(product, unitName)}`
+                                                : 'не исчисляемый'}
+                                        </span>
+                                        <span className="font-medium text-gray-900 shrink-0">{(product.price ?? 0).toFixed(2)} ₽</span>
                                     </div>
-                                    <div className="flex justify-between items-center mt-2 text-sm">
-                                        <span className={(product.total_quantity || 0) < (product.min_stock || 0) ? 'text-red-600 font-semibold' : ''}>Остаток: {(product.total_quantity || 0)} {unitName}</span>
-                                        <span>{(product.price ?? 0).toFixed(2)} ₽</span>
-                                    </div>
-                                    <div className="text-sm text-gray-600 mt-1 flex items-center gap-2">
-                                        <span>Сайт:</span>
-                                        <input
-                                            type="checkbox"
-                                            checked={Boolean(product.is_visible_on_website)}
-                                            readOnly
-                                            disabled
-                                            tabIndex={-1}
-                                            className="cursor-not-allowed opacity-80"
-                                        />
-                                    </div>
-                                    <div className="flex justify-end items-center mt-2">
+                                    <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-100">
+                                        <div className="text-sm text-gray-500 flex items-center gap-2">
+                                            <span>Сайт</span>
+                                            <input
+                                                type="checkbox"
+                                                checked={Boolean(product.is_visible_on_website)}
+                                                readOnly
+                                                disabled
+                                                tabIndex={-1}
+                                                className="cursor-not-allowed opacity-80"
+                                            />
+                                        </div>
                                         <ActionDropdown
                                             buttonText="Действия"
                                             actions={buildActions(product, markedForDeletion)}

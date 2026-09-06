@@ -163,17 +163,45 @@ export const productsApiSlice = createApi({
         getEntranceDocuments: builder.query({
             query: (status) => ({
                 url: '/admin/documents/entrance/',
-                params: { status: status || 'posted' },
+                params: status ? { status } : {},
             }),
             providesTags: (result, error, status) => [
-                { type: 'EntranceDocument', id: `LIST-${status || 'posted'}` },
+                { type: 'EntranceDocument', id: `LIST-${status || 'all'}` },
                 { type: 'EntranceDocument', id: 'LIST' },
             ],
         }),
 
         getEntranceDocumentById: builder.query({
-            query: (id) => `/admin/documents/entrance/${id}/`,
+            query: (id) => `/admin/documents/entrance/${id}`,
             providesTags: (result, error, id) => [{ type: 'EntranceDocument', id }],
+        }),
+
+        receiveEntranceStock: builder.mutation({
+            query: (body) => ({
+                url: '/admin/documents/entrance/receive',
+                method: 'POST',
+                body,
+            }),
+            invalidatesTags: [
+                { type: 'Product', id: 'LIST' },
+                { type: 'EntranceDocument', id: 'LIST' },
+                { type: 'EntranceDocument', id: 'LIST-all' },
+                { type: 'EntranceDocument', id: 'LIST-posted' },
+                { type: 'ProductRequest', id: 'LIST' },
+            ],
+        }),
+
+        stornoEntranceDocument: builder.mutation({
+            query: (id) => ({
+                url: `/admin/documents/entrance/${id}/storno`,
+                method: 'POST',
+            }),
+            invalidatesTags: [
+                { type: 'Product', id: 'LIST' },
+                { type: 'EntranceDocument', id: 'LIST' },
+                { type: 'EntranceDocument', id: 'LIST-all' },
+                { type: 'EntranceDocument', id: 'LIST-posted' },
+            ],
         }),
 
         createEntranceDocument: builder.mutation({
@@ -237,6 +265,11 @@ export const productsApiSlice = createApi({
 
         getProductRequestById: builder.query({
             query: (id) => `/admin/documents/product-requests/${id}/`,
+            providesTags: (result, error, id) => [{ type: 'ProductRequest', id }],
+        }),
+
+        getProductRequestReceiveItems: builder.query({
+            query: (id) => `/admin/documents/product-requests/${id}/receive-items`,
             providesTags: (result, error, id) => [{ type: 'ProductRequest', id }],
         }),
 
@@ -335,12 +368,15 @@ export const {
     useDeleteProductPhotoMutation,
     useGetEntranceDocumentsQuery,
     useGetEntranceDocumentByIdQuery,
+    useReceiveEntranceStockMutation,
+    useStornoEntranceDocumentMutation,
     useCreateEntranceDocumentMutation,
     useUpdateEntranceDocumentMutation,
     usePostEntranceDocumentMutation,
     useDeleteEntranceDocumentMutation,
     useGetProductRequestsQuery,
     useGetProductRequestByIdQuery,
+    useGetProductRequestReceiveItemsQuery,
     useCreateProductRequestMutation,
     useUpdateProductRequestMutation,
     useApproveProductRequestItemsMutation,

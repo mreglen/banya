@@ -7,8 +7,6 @@ from sqlalchemy.orm import Session, joinedload
 from app.auth import get_current_user
 from app.database import get_db
 from app.models import (
-    EntranceDocument,
-    EntranceDocumentItem,
     Product,
     ProductRequest,
     ProductRequestItem,
@@ -19,6 +17,7 @@ from app.schemas import (
     ProductRequestItemIds,
     ProductRequestRead,
     ProductRequestUpdate,
+    ProductRequestReceiveItem,
 )
 
 router = APIRouter(prefix="/admin/documents/product-requests", tags=["Documents - Product Requests"])
@@ -194,6 +193,21 @@ def update_product_request(
     return _to_read(_load_request(db, request_id))
 
 
+@router.get("/{request_id}/receive-items", response_model=List[ProductRequestReceiveItem])
+def get_receive_items(
+    request_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Approved позиции без привязанного поступления — для префилла приёмки."""
+    db_request = _load_request(db, request_id)
+    return [
+        item
+        for item in (db_request.items or [])
+        if item.status == "approved" and item.entrance_document_id is None
+    ]
+
+
 @router.post("/{request_id}/approve", response_model=ProductRequestRead)
 def approve_product_request_items(
     request_id: int,
@@ -215,33 +229,12 @@ def approve_product_request_items(
             raise HTTPException(status_code=400, detail=f"Позиция {item_id} уже обработана")
         selected.append(item)
 
-    total_amount = sum(i.quantity * float(i.purchase_price or 0) for i in selected)
-    draft = EntranceDocument(
-        date=dt_date.today(),
-        supplier_id=None,
-        responsible_name=current_user.full_name or "Директор",
-        comment=f"Из заявки #{db_request.id}",
-        total_amount=total_amount,
-        status="draft",
-        created_from_request_id=db_request.id,
-    )
-    db.add(draft)
-    db.flush()
-
     now = datetime.now(timezone.utc)
     for item in selected:
-        db.add(
-            EntranceDocumentItem(
-                document_id=draft.id,
-                product_id=item.product_id,
-                quantity=item.quantity,
-                purchase_price=item.purchase_price or 0,
-            )
-        )
         item.status = "approved"
         item.processed_by_user_id = current_user.user_id
         item.processed_at = now
-        item.entrance_document_id = draft.id
+        item.entrance_document_id = None
 
     db.commit()
     return _to_read(_load_request(db, request_id))

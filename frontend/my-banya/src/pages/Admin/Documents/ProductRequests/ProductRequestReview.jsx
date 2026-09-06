@@ -40,6 +40,14 @@ function ProductRequestReview() {
     [request]
   );
 
+  const awaitingReceive = useMemo(
+    () =>
+      (request?.items || []).filter(
+        (item) => item.status === 'approved' && !item.entrance_document_id
+      ),
+    [request]
+  );
+
   const toggleItem = (itemId) => {
     setSelectedIds((prev) =>
       prev.includes(itemId) ? prev.filter((x) => x !== itemId) : [...prev, itemId]
@@ -59,9 +67,9 @@ function ProductRequestReview() {
     }
     try {
       await approveItems({ id: Number(id), item_ids: selectedIds }).unwrap();
-      toast.success('Позиции подтверждены. Создан черновик поступления.');
+      toast.success('Позиции подтверждены');
       setSelectedIds([]);
-      refetch();
+      navigate(`/admin/documents/entrance/receive?requestId=${id}`);
     } catch (err) {
       toast.error(err?.data?.detail || 'Не удалось подтвердить');
     }
@@ -121,6 +129,14 @@ function ProductRequestReview() {
             )}
           </div>
           <div className="flex flex-wrap gap-2">
+            {canManage && awaitingReceive.length > 0 && (
+              <button
+                onClick={() => navigate(`/admin/documents/entrance/receive?requestId=${request.id}`)}
+                className="px-3 py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white text-sm"
+              >
+                Принять на склад
+              </button>
+            )}
             {canManage && (request.pending_count || 0) > 0 && (
               <button
                 onClick={() => navigate(`/admin/documents/product-requests/edit/${request.id}`)}
@@ -171,13 +187,6 @@ function ProductRequestReview() {
             >
               Отклонить
             </button>
-            <button
-              type="button"
-              onClick={() => navigate('/admin/documents/entrance/drafts')}
-              className="ml-auto text-sm text-blue-600 hover:underline"
-            >
-              Черновики поступления →
-            </button>
           </div>
         )}
 
@@ -190,7 +199,7 @@ function ProductRequestReview() {
                 <th className="px-4 py-3">Кол-во</th>
                 <th className="px-4 py-3">Цена закупки</th>
                 <th className="px-4 py-3">Статус</th>
-                <th className="px-4 py-3">Черновик</th>
+                <th className="px-4 py-3">Поступление</th>
               </tr>
             </thead>
             <tbody className="divide-y">
@@ -219,14 +228,16 @@ function ProductRequestReview() {
                     </td>
                     <td className="px-4 py-3">
                       {item.entrance_document_id ? (
+                        <span className="text-gray-700">#{item.entrance_document_id}</span>
+                      ) : item.status === 'approved' ? (
                         <button
                           type="button"
-                          className="text-blue-600 hover:underline"
+                          className="text-green-700 hover:underline"
                           onClick={() =>
-                            navigate(`/admin/documents/entrance/edit/${item.entrance_document_id}`)
+                            navigate(`/admin/documents/entrance/receive?requestId=${request.id}`)
                           }
                         >
-                          #{item.entrance_document_id}
+                          Принять
                         </button>
                       ) : (
                         '—'

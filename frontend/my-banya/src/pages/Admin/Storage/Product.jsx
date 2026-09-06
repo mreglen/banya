@@ -15,6 +15,15 @@ import { isVideoFile, isVideoUrl } from '../../../utils/mediaHelpers';
 import UnitCreateModal from './UnitCreateModal';
 const ADD_UNIT_OPTION_VALUE = '__add_unit__';
 
+/** Пустая строка для 0 / пустых значений — чтобы в инпуте был placeholder */
+const emptyIfZero = (value, { asInt = false } = {}) => {
+  if (value === null || value === undefined || value === '') return '';
+  const n = Number(value);
+  if (!Number.isFinite(n) || n === 0) return '';
+  if (asInt) return String(Math.floor(n));
+  return String(n);
+};
+
 const findCategoryById = (categories, categoryId) => {
   if (categoryId == null) return null;
   for (const cat of categories) {
@@ -51,10 +60,10 @@ function Product() {
     name: '',
     description: '',
     category_id: null,
-    total_quantity: '0',
+    total_quantity: '',
     price: '',
     is_countable: true,
-    min_stock: 0.0,
+    min_stock: '',
     unit_id: null,
     is_visible_on_website: true,
   });
@@ -74,10 +83,10 @@ function Product() {
         name: product.name || '',
         description: product.description || '',
         category_id: product.category_id || null,
-        total_quantity: String(Math.floor(Number(product.total_quantity) || 0)),
-        price: (product.price ?? 0).toString(),
+        total_quantity: emptyIfZero(product.total_quantity, { asInt: true }),
+        price: emptyIfZero(product.price),
         is_countable: product.is_countable ?? true,
-        min_stock: product.min_stock || 0.0,
+        min_stock: emptyIfZero(product.min_stock),
         unit_id: product.unit_id || null,
         is_visible_on_website: categoryVisible
           ? (product.is_visible_on_website ?? true)
@@ -113,8 +122,8 @@ function Product() {
       ...prev,
       [name]: name === 'total_quantity'
         ? (value === '' || /^\d+$/.test(value) ? value : prev.total_quantity)
-        : name === 'price'
-        ? (value === '' || /^\d*$/.test(value) ? value : prev.price)
+        : name === 'price' || name === 'min_stock'
+        ? (value === '' || /^\d*\.?\d*$/.test(value) ? value : prev[name])
         : name === 'unit_id'
         ? (value === '' ? null : Number(value))
         : value
@@ -228,10 +237,10 @@ function Product() {
         category_id: category_id !== null ? parseInt(category_id) : null,
         is_visible_on_website: visibleCategory ? Boolean(is_visible_on_website) : false,
         is_countable: is_countable,
-        min_stock: is_countable ? min_stock : 0,
+        min_stock: is_countable ? (min_stock === '' ? 0 : Number(min_stock)) : 0,
         unit_id: unit_id,
         price: price === '' ? 0 : Number(price),
-        ...(is_countable ? { total_quantity: parseInt(total_quantity, 10) || 0 } : {}),
+        ...(is_countable ? { total_quantity: total_quantity === '' ? 0 : (parseInt(total_quantity, 10) || 0) } : {}),
       };
 
       await updateProduct(productData).unwrap();
@@ -469,14 +478,14 @@ function Product() {
                 Минимальный остаток ({selectedUnit?.name || 'шт.'})
               </label>
               <input
-                type="number"
+                type="text"
                 name="min_stock"
                 value={form.min_stock}
                 onChange={handleChange}
-                min="0"
-                step="0.01"
+                inputMode="decimal"
+                placeholder="0"
                 disabled={!form.is_countable}
-                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
               />
             </div>
 
@@ -492,6 +501,7 @@ function Product() {
                   onChange={handleChange}
                   inputMode="numeric"
                   pattern="[0-9]*"
+                  placeholder="0"
                   className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
@@ -500,8 +510,12 @@ function Product() {
             {isEditing && (
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Цена закупки (₽)</label>
-                <div className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-700">
-                  {(product?.last_purchase_price || 0).toFixed(2)}
+                <div className={`w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl ${
+                  Number(product?.last_purchase_price) > 0 ? 'text-gray-700' : 'text-gray-400'
+                }`}>
+                  {Number(product?.last_purchase_price) > 0
+                    ? Number(product.last_purchase_price).toFixed(2)
+                    : '0'}
                 </div>
               </div>
             )}
@@ -512,34 +526,19 @@ function Product() {
                 type="text"
                 name="price"
                 value={form.price}
-                inputMode="numeric"
+                inputMode="decimal"
+                placeholder="0"
                 onChange={handleChange}
                 onBlur={() => {
                   setForm((prev) => {
-                    if (prev.price === '') return prev;
-                    return { ...prev, price: String(Number(prev.price)) };
+                    if (prev.price === '' || prev.price === '.') return { ...prev, price: '' };
+                    const n = Number(prev.price);
+                    if (!Number.isFinite(n) || n === 0) return { ...prev, price: '' };
+                    return { ...prev, price: String(n) };
                   });
                 }}
                 className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
-              <p className="text-xs text-gray-500 mt-1">
-                Рассчитывается автоматически: закупочная × (1 + наценка %). При ручном изменении не пересчитывается автоматически, пока не придёт новое поступление или не измените наценку в настройках.
-              </p>
-              {isEditing && product?.is_price_manual && (
-                <p className="text-xs text-amber-700 mt-1 font-medium">Ручное значение</p>
-              )}
-            </div>
-
-            <div className="flex space-x-4 pt-4">
-              <button
-                type="submit"
-                disabled={isUpdating || isUploadingPhotos}
-                className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-medium shadow transition disabled:opacity-50"
-              >
-                {isUpdating || isUploadingPhotos ? 'Сохранение...' : 'Сохранить'}
-              </button>
-              <button
-                type="button"
                 onClick={() => navigate(fromPath)}
                 className="bg-gray-300 hover:bg-gray-400 text-gray-800 px-6 py-3 rounded-xl font-medium shadow transition"
               >

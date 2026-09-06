@@ -37,7 +37,7 @@ function StorageSkeleton() {
                 <table className="w-full">
                   <thead className="bg-gray-50">
                     <tr>
-                      {['Наименование', 'Категория', 'Описание', 'Остаток', 'Цена'].map((_, i) => (
+                      {['Наименование', 'Категория', 'Остаток', 'Цена', 'Сайт'].map((_, i) => (
                         <th key={i} className="px-4 py-3">
                           <Skeleton.Text width="80px" />
                         </th>
@@ -59,12 +59,11 @@ function StorageSkeleton() {
               </div>
 
               {/* Mobile Cards */}
-              <div className="md:hidden p-2">
+              <div className="md:hidden p-2 space-y-2">
                 {[1, 2, 3, 4].map((i) => (
-                  <div key={i} className="border rounded-lg p-4 mb-3 bg-gray-50">
-                    <Skeleton.Title width="70%" className="mb-2" />
-                    <Skeleton.Text width="90%" className="mb-2" />
-                    <Skeleton.Text width="60%" className="mb-2" />
+                  <div key={i} className="border border-gray-200 rounded-lg p-3 bg-white">
+                    <Skeleton.Title width="70%" className="mb-1" />
+                    <Skeleton.Text width="40%" className="mb-2" />
                     <div className="flex justify-between mt-2">
                       <Skeleton.Text width="40%" />
                       <Skeleton.Text width="30%" />

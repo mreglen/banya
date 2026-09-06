@@ -604,15 +604,37 @@ class EntranceDocumentBase(BaseModel):
     total_amount: float
     status: str = "posted"
     created_from_request_id: Optional[int] = None
+    reverses_id: Optional[int] = None
+    reversed_by_id: Optional[int] = None
 
 class EntranceDocumentCreate(EntranceDocumentBase):
     account_id: Optional[int] = None
+    items: List[EntranceDocumentItemCreate]
+
+class EntranceReceiveCreate(BaseModel):
+    date: Optional[date] = None
+    account_id: Optional[int] = None
+    comment: Optional[str] = None
+    responsible_name: Optional[str] = None
+    update_sale_prices: bool = True
+    created_from_request_id: Optional[int] = None
     items: List[EntranceDocumentItemCreate]
 
 class EntranceDocumentRead(EntranceDocumentBase):
     id: int
     supplier: Optional[PartnerResponse] = None
     items: List[EntranceDocumentItemRead] = []
+
+    class Config:
+        from_attributes = True
+
+
+class ProductRequestReceiveItem(BaseModel):
+    id: int
+    product_id: int
+    quantity: int
+    purchase_price: float
+    product: Optional[Product] = None
 
     class Config:
         from_attributes = True

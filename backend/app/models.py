@@ -188,13 +188,18 @@ class EntranceDocument(Base):
     comment = Column(Text, nullable=True)
     total_amount = Column(Float, nullable=False, default=0.0)
     account_id = Column(Integer, ForeignKey("organization_accounts.id"), nullable=True)
-    status = Column(String(20), nullable=False, default="posted")  # draft | posted
+    status = Column(String(20), nullable=False, default="posted")  # draft | posted | reversed
     created_from_request_id = Column(Integer, ForeignKey("product_requests.id"), nullable=True)
+    # Сторно: reverses_id — этот документ отменяет указанный; reversed_by_id — кем отменён
+    reverses_id = Column(Integer, ForeignKey("entrance_documents.id"), nullable=True)
+    reversed_by_id = Column(Integer, ForeignKey("entrance_documents.id"), nullable=True)
 
     supplier = relationship("Partner", backref="entrance_documents")
     account = relationship("OrganizationAccount")
     items = relationship("EntranceDocumentItem", back_populates="document", cascade="all, delete-orphan")
     created_from_request = relationship("ProductRequest", foreign_keys=[created_from_request_id])
+    reverses = relationship("EntranceDocument", foreign_keys=[reverses_id], remote_side=[id], post_update=True)
+    reversed_by = relationship("EntranceDocument", foreign_keys=[reversed_by_id], remote_side=[id], post_update=True)
 
 
 class EntranceDocumentItem(Base):
