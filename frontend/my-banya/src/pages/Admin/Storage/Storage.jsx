@@ -1,9 +1,11 @@
 // src/pages/Admin/Storage/Storage.jsx
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { toast } from 'react-hot-toast';
 import CategoryTree from './CategoryTree';
 import ProductList from './ProductList';
 import StorageSkeleton from './StorageSkeleton';
+import ProductSelectionModal from '../Documents/DocumentsEntrance/ProductSelectionModal';
 import {
   useGetCategoriesQuery,
   useGetProductsQuery,
@@ -81,6 +83,8 @@ function Storage() {
   const [showFilter, setShowFilter] = useState(false);
   const [filterType, setFilterType] = useState(() => savedView?.filterType ?? null);
   const [searchQuery, setSearchQuery] = useState(() => savedView?.searchQuery || '');
+  const [isProductModalOpen, setIsProductModalOpen] = useState(false);
+  const [productModalCategory, setProductModalCategory] = useState(null);
 
   const persistView = (overrides = {}) => {
     writeStorageView({
@@ -130,6 +134,25 @@ function Storage() {
   };
 
   const selectCategory = (path) => setSelectedCategoryPath(path);
+
+  const openAddProductModal = (category = null) => {
+    setProductModalCategory(category?.id ? category : null);
+    setIsProductModalOpen(true);
+  };
+
+  const handleProductModalSelect = (product) => {
+    setIsProductModalOpen(false);
+    setProductModalCategory(null);
+    refetchProducts();
+    refetchCategories();
+    if (product?.id) {
+      toast.success(`Товар «${product.name}» добавлен`);
+      persistView({ scrollY: getScrollY() });
+      navigate(`/admin/storage/product/${product.id}`, {
+        state: { from: '/admin/storage/nomenclature' },
+      });
+    }
+  };
 
   const handleAddProduct = async (productData) => {
     try {
@@ -225,8 +248,8 @@ function Storage() {
           </div>
         </div>
 
-        <div className="flex flex-col lg:flex-row gap-4 lg:gap-6">
-          <div className="w-full lg:w-1/4">
+        <div className="flex flex-col lg:flex-row gap-4 lg:gap-6 lg:items-start">
+          <div className="w-full lg:w-1/4 lg:sticky lg:top-8 lg:self-start lg:max-h-[calc(100vh-4rem)]">
             <CategoryTree
               categoriesTree={categoriesTree}
               expandedCategories={expandedCategories}
@@ -234,9 +257,10 @@ function Storage() {
               toggleCategory={toggleCategory}
               selectCategory={selectCategory}
               onCategoriesChange={refetchCategories}
+              onAddProduct={openAddProductModal}
             />
           </div>
-          <div className="w-full lg:w-3/4">
+          <div className="w-full lg:w-3/4 min-w-0">
             <ProductList
               selectedCategoryPath={selectedCategoryPath}
               categoriesTree={categoriesTree}
@@ -248,6 +272,16 @@ function Storage() {
           </div>
         </div>
       </div>
+
+      <ProductSelectionModal
+        isOpen={isProductModalOpen}
+        onClose={() => {
+          setIsProductModalOpen(false);
+          setProductModalCategory(null);
+        }}
+        onSelect={handleProductModalSelect}
+        initialCategory={productModalCategory}
+      />
     </div>
   );
 }

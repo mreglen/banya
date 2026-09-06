@@ -1,43 +1,45 @@
-// src/components/MobileSidebar.jsx
+// src/pages/Admin/MobileSidebar.jsx
 import { useState, useEffect } from 'react';
 import { NavLink } from 'react-router-dom';
 import { useSelector } from 'react-redux';
-import { useGetPermissionsQuery } from '../../redux/slices/apiSlice';
 import { useUnreadBookingsCount } from '../../hooks/useUnreadBookingsCount';
-import { 
-  ShieldCheck, 
-  CalendarDays, 
-  Building2, 
-  Users, 
-  Truck, 
-  Hotel, 
-  FileText, 
-  FilePlus2, 
+import { useHasAccess } from '../../hooks/useHasAccess';
+import {
+  ShieldCheck,
+  CalendarDays,
+  Building2,
+  Users,
+  Truck,
+  Hotel,
+  FileText,
+  FilePlus2,
   FileMinus2,
   ClipboardList,
-  Package, 
-  Barcode, 
-  Trash2, 
-  Globe, 
-  Home, 
-  Tag, 
-  Wallet, 
-  Settings, 
-  HelpCircle, 
+  Package,
+  Barcode,
+  Trash2,
+  Globe,
+  Home,
+  Tag,
+  Wallet,
+  Settings,
+  HelpCircle,
   LogOut,
-  ChevronRight
+  ChevronRight,
 } from 'lucide-react';
 
 function MobileSidebar({ isOpen, onClose }) {
   const { user } = useSelector((state) => state.auth);
-  const { permissions = [] } = useGetPermissionsQuery();
-  const unreadBookingsCount = useUnreadBookingsCount();
+  const hasAccess = useHasAccess();
+  const canViewBookings = hasAccess('bookings:view');
+  const canViewDocuments = hasAccess('documents:view');
+  const canViewStorage = hasAccess('storage:view');
+  const unreadBookingsCount = useUnreadBookingsCount({ skip: !canViewBookings });
 
   const [isCompanyOpen, setIsCompanyOpen] = useState(false);
   const [isDocumentsOpen, setIsDocumentsOpen] = useState(false);
   const [isStorageOpen, setIsStorageOpen] = useState(false);
 
-  // Сброс раскрытых секций при закрытии меню
   useEffect(() => {
     if (!isOpen) {
       setIsCompanyOpen(false);
@@ -46,45 +48,35 @@ function MobileSidebar({ isOpen, onClose }) {
     }
   }, [isOpen]);
 
-  const hasAccess = (path) => {
-    if (!user || !permissions.length) return true;
-    const perm = permissions.find(p =>
-      path === p.path || path.startsWith(p.path + '/')
-    );
-    if (!perm) return true;
-    return perm.allowed_roles.includes(user.role_id);
-  };
-
-  const toggleCompany = () => setIsCompanyOpen(!isCompanyOpen);
-  const toggleDocuments = () => setIsDocumentsOpen(!isDocumentsOpen);
-  const toggleStorage = () => setIsStorageOpen(!isStorageOpen);
-
   if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50">
-      {/* Overlay */}
-      <div
-        className="fixed inset-0 bg-black bg-opacity-50"
-        onClick={onClose}
-      ></div>
+      <div className="fixed inset-0 bg-black bg-opacity-50" onClick={onClose} />
 
-      {/* Sidebar */}
       <div
         className="fixed left-0 top-0 w-64 h-full bg-white shadow-lg border-r border-gray-200 overflow-y-auto scrollbar-hide"
-        onClick={(e) => e.stopPropagation()} // предотвращает закрытие при клике внутри меню
+        onClick={(e) => e.stopPropagation()}
       >
         <div className="p-6 border-b border-gray-200">
-          <NavLink to="/admin/" className="text-2xl font-bold text-gray-800 hover:text-green-700 transition block" onClick={onClose}>
+          <NavLink
+            to="/admin/"
+            className="text-2xl font-bold text-gray-800 hover:text-green-700 transition block"
+            onClick={onClose}
+          >
             Админ панель
           </NavLink>
-          <NavLink to="/" className="text-sm text-gray-500 mt-1 hover:underline block" onClick={onClose}>
+          <NavLink
+            to="/"
+            className="text-sm text-gray-500 mt-1 hover:underline block"
+            onClick={onClose}
+          >
             Николаевские бани
           </NavLink>
         </div>
 
         <nav className="p-4 space-y-2">
-            {user?.is_admin && (
+          {user?.is_admin && (
             <NavLink
               to="/admin/administrator"
               className="flex items-center px-4 py-3 text-gray-700 hover:bg-purple-50 rounded-xl"
@@ -93,8 +85,9 @@ function MobileSidebar({ isOpen, onClose }) {
               <ShieldCheck className="w-5 h-5 mr-3" />
               Администратор
             </NavLink>
-            )}
+          )}
 
+          {hasAccess('reservations:view') && (
             <NavLink
               to="/admin/reservations"
               className="flex items-center px-4 py-3 text-gray-700 hover:bg-green-50 rounded-xl"
@@ -103,14 +96,15 @@ function MobileSidebar({ isOpen, onClose }) {
               <CalendarDays className="w-5 h-5 mr-3" />
               Бронирование
             </NavLink>
+          )}
 
-          {/* Компания — только системный администратор */}
           {user?.is_admin && (
-              <div>
-                <button
-                  onClick={toggleCompany}
-                  className="w-full flex items-center justify-between px-4 py-3 text-left text-gray-700 hover:bg-green-50 rounded-xl"
-                >
+            <div>
+              <button
+                type="button"
+                onClick={() => setIsCompanyOpen(!isCompanyOpen)}
+                className="w-full flex items-center justify-between px-4 py-3 text-left text-gray-700 hover:bg-green-50 rounded-xl"
+              >
                 <span className="flex items-center">
                   <Building2 className="w-5 h-5 mr-3" />
                   Компания
@@ -118,106 +112,95 @@ function MobileSidebar({ isOpen, onClose }) {
                 <ChevronRight
                   className={`w-4 h-4 transition-transform ${isCompanyOpen ? 'rotate-90' : ''}`}
                 />
-                </button>
+              </button>
 
-                {isCompanyOpen && (
-                  <div className="ml-4 mt-1 space-y-1">
-                    {hasAccess('/admin/company/user') && (
-                        <NavLink
-                          to="/admin/company/user"
-                          className="flex items-center px-4 py-2 text-sm text-gray-600 hover:bg-green-50 rounded-lg"
-                          onClick={onClose}
-                        >
-                          <Users className="w-4 h-4 mr-2" />
-                          Сотрудники
-                        </NavLink>
-                    )}
-                    {hasAccess('/admin/company/partner') && (
-                        <NavLink
-                          to="/admin/company/partner"
-                          className="flex items-center px-4 py-2 text-sm text-gray-600 hover:bg-green-50 rounded-lg"
-                          onClick={onClose}
-                        >
-                          <Truck className="w-4 h-4 mr-2" />
-                          Поставщики
-                        </NavLink>
-                    )}
+              {isCompanyOpen && (
+                <div className="ml-4 mt-1 space-y-1">
+                  {hasAccess('staff:view') && (
+                    <NavLink
+                      to="/admin/company/user"
+                      className="flex items-center px-4 py-2 text-sm text-gray-600 hover:bg-green-50 rounded-lg"
+                      onClick={onClose}
+                    >
+                      <Users className="w-4 h-4 mr-2" />
+                      Сотрудники
+                    </NavLink>
+                  )}
+                  {hasAccess('partners:view') && (
+                    <NavLink
+                      to="/admin/company/partner"
+                      className="flex items-center px-4 py-2 text-sm text-gray-600 hover:bg-green-50 rounded-lg"
+                      onClick={onClose}
+                    >
+                      <Truck className="w-4 h-4 mr-2" />
+                      Поставщики
+                    </NavLink>
+                  )}
+                  <NavLink
+                    to="/admin/company/organization"
+                    className="flex items-center px-4 py-2 text-sm text-gray-600 hover:bg-green-50 rounded-lg"
+                    onClick={onClose}
+                  >
+                    <Hotel className="w-4 h-4 mr-2" />
+                    Организация
+                  </NavLink>
+                </div>
+              )}
+            </div>
+          )}
 
-                    {hasAccess('/admin/company/organization') && (
-                        <NavLink
-                          to="/admin/company/organization"
-                          className="flex items-center px-4 py-2 text-sm text-gray-600 hover:bg-green-50 rounded-lg"
-                          onClick={onClose}
-                        >
-                          <Hotel className="w-4 h-4 mr-2" />
-                          Организация
-                        </NavLink>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
-
-          {/* Документы */}
-          {(hasAccess('/admin/documents/entrance') ||
-            hasAccess('/admin/documents/realization') ||
-            hasAccess('/admin/documents/product-requests')) && (
-              <div>
-                <button
-                  onClick={toggleDocuments}
-                  className="w-full flex items-center justify-between px-4 py-3 text-left text-gray-700 hover:bg-green-50 rounded-xl"
-                >
-                  <span className="flex items-center">
-                    <FileText className="w-5 h-5 mr-3" />
-                    Документы
-                  </span>
-                  <ChevronRight
-                    className={`w-4 h-4 transition-transform ${isDocumentsOpen ? 'rotate-90' : ''}`}
-                  />
-                </button>
-
-                {isDocumentsOpen && (
-                  <div className="ml-4 mt-1 space-y-1">
-                    {hasAccess('/admin/documents/entrance') && (
-                        <NavLink
-                          to="/admin/documents/entrance"
-                          className="flex items-center px-4 py-2 text-sm text-gray-600 hover:bg-green-50 rounded-lg"
-                          onClick={onClose}
-                        >
-                          <FilePlus2 className="w-4 h-4 mr-2" />
-                          Поступление
-                        </NavLink>
-                    )}
-                    {hasAccess('/admin/documents/product-requests') && (
-                        <NavLink
-                          to="/admin/documents/product-requests"
-                          className="flex items-center px-4 py-2 text-sm text-gray-600 hover:bg-green-50 rounded-lg"
-                          onClick={onClose}
-                        >
-                          <ClipboardList className="w-4 h-4 mr-2" />
-                          Заявки на товар
-                        </NavLink>
-                    )}
-                    {hasAccess('/admin/documents/realization') && (
-                        <NavLink
-                          to="/admin/documents/realization"
-                          className="flex items-center px-4 py-2 text-sm text-gray-600 hover:bg-green-50 rounded-lg"
-                          onClick={onClose}
-                        >
-                          <FileMinus2 className="w-4 h-4 mr-2" />
-                          Реализация
-                        </NavLink>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
-
-          {/* Склад */}
-          {hasAccess('/admin/storage/nomenclature') && (
+          {canViewDocuments && (
             <div>
               <button
-                onClick={toggleStorage}
+                type="button"
+                onClick={() => setIsDocumentsOpen(!isDocumentsOpen)}
+                className="w-full flex items-center justify-between px-4 py-3 text-left text-gray-700 hover:bg-green-50 rounded-xl"
+              >
+                <span className="flex items-center">
+                  <FileText className="w-5 h-5 mr-3" />
+                  Документы
+                </span>
+                <ChevronRight
+                  className={`w-4 h-4 transition-transform ${isDocumentsOpen ? 'rotate-90' : ''}`}
+                />
+              </button>
+
+              {isDocumentsOpen && (
+                <div className="ml-4 mt-1 space-y-1">
+                  <NavLink
+                    to="/admin/documents/entrance"
+                    className="flex items-center px-4 py-2 text-sm text-gray-600 hover:bg-green-50 rounded-lg"
+                    onClick={onClose}
+                  >
+                    <FilePlus2 className="w-4 h-4 mr-2" />
+                    Поступление
+                  </NavLink>
+                  <NavLink
+                    to="/admin/documents/product-requests"
+                    className="flex items-center px-4 py-2 text-sm text-gray-600 hover:bg-green-50 rounded-lg"
+                    onClick={onClose}
+                  >
+                    <ClipboardList className="w-4 h-4 mr-2" />
+                    Заявки на товар
+                  </NavLink>
+                  <NavLink
+                    to="/admin/documents/realization"
+                    className="flex items-center px-4 py-2 text-sm text-gray-600 hover:bg-green-50 rounded-lg"
+                    onClick={onClose}
+                  >
+                    <FileMinus2 className="w-4 h-4 mr-2" />
+                    Реализация
+                  </NavLink>
+                </div>
+              )}
+            </div>
+          )}
+
+          {canViewStorage && (
+            <div>
+              <button
+                type="button"
+                onClick={() => setIsStorageOpen(!isStorageOpen)}
                 className="w-full flex items-center justify-between px-4 py-3 text-left text-gray-700 hover:bg-green-50 rounded-xl"
               >
                 <span className="flex items-center">
@@ -231,19 +214,20 @@ function MobileSidebar({ isOpen, onClose }) {
 
               {isStorageOpen && (
                 <div className="ml-4 mt-1 space-y-1">
-                    <NavLink
-                      to="/admin/storage/nomenclature"
-                      className="flex items-center px-4 py-2 text-sm text-gray-600 hover:bg-green-50 rounded-lg"
-                      onClick={onClose}
-                    >
-                      <Barcode className="w-4 h-4 mr-2" />
-                      Все товары
-                    </NavLink>
+                  <NavLink
+                    to="/admin/storage/nomenclature"
+                    className="flex items-center px-4 py-2 text-sm text-gray-600 hover:bg-green-50 rounded-lg"
+                    onClick={onClose}
+                  >
+                    <Barcode className="w-4 h-4 mr-2" />
+                    Все товары
+                  </NavLink>
                 </div>
               )}
             </div>
           )}
 
+          {hasAccess('staff:manage') && (
             <NavLink
               to="/admin/deletion-requests"
               className="flex items-center px-4 py-3 text-gray-700 hover:bg-green-50 rounded-xl"
@@ -252,7 +236,9 @@ function MobileSidebar({ isOpen, onClose }) {
               <Trash2 className="w-5 h-5 mr-3" />
               Запросы на удаление
             </NavLink>
+          )}
 
+          {canViewBookings && (
             <NavLink
               to="/admin/bookings"
               className="flex items-center px-4 py-3 text-gray-700 hover:bg-green-50 rounded-xl"
@@ -266,7 +252,9 @@ function MobileSidebar({ isOpen, onClose }) {
                 </span>
               )}
             </NavLink>
+          )}
 
+          {hasAccess('baths:view') && (
             <NavLink
               to="/admin/baths"
               className="flex items-center px-4 py-3 text-gray-700 hover:bg-green-50 rounded-xl"
@@ -275,7 +263,9 @@ function MobileSidebar({ isOpen, onClose }) {
               <Home className="w-5 h-5 mr-3" />
               Бани
             </NavLink>
+          )}
 
+          {hasAccess('promotions:view') && (
             <NavLink
               to="/admin/promotions"
               className="flex items-center px-4 py-3 text-gray-700 hover:bg-green-50 rounded-xl"
@@ -284,7 +274,9 @@ function MobileSidebar({ isOpen, onClose }) {
               <Tag className="w-5 h-5 mr-3" />
               Акции
             </NavLink>
+          )}
 
+          {hasAccess('finance:view') && (
             <NavLink
               to="/admin/finance"
               className="flex items-center px-4 py-3 text-gray-700 hover:bg-emerald-50 rounded-xl"
@@ -293,8 +285,8 @@ function MobileSidebar({ isOpen, onClose }) {
               <Wallet className="w-5 h-5 mr-3" />
               Финансы
             </NavLink>
+          )}
 
-          {/* Настройки - только для администратора */}
           {user?.is_admin && (
             <NavLink
               to="/admin/settings"
@@ -306,7 +298,6 @@ function MobileSidebar({ isOpen, onClose }) {
             </NavLink>
           )}
 
-          {/* Поддержка - доступно всем */}
           <NavLink
             to="/admin/support"
             className="flex items-center px-4 py-3 text-gray-700 hover:bg-indigo-50 rounded-xl"
@@ -317,6 +308,7 @@ function MobileSidebar({ isOpen, onClose }) {
           </NavLink>
 
           <button
+            type="button"
             onClick={() => {
               localStorage.removeItem('access_token');
               window.location.href = '/admin/login';

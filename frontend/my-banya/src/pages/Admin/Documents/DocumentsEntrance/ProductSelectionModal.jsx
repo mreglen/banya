@@ -8,46 +8,122 @@ import {
   useGetUnitsOfMeasurementQuery,
 } from '../../../../redux/slices/productsApiSlice';
 
-const ProductSelectionModal = ({ isOpen, onClose, onSelect }) => {
-  const [step, setStep] = useState(1);
+const ROOT_LABEL = 'Все товары';
+
+const ChevronIcon = ({ open }) => (
+  <svg
+    className={`w-3.5 h-3.5 text-gray-500 transition-transform duration-150 ${open ? 'rotate-90' : ''}`}
+    fill="none"
+    stroke="currentColor"
+    viewBox="0 0 24 24"
+    aria-hidden="true"
+  >
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+  </svg>
+);
+
+const findCategoryById = (cats, id) => {
+  for (const cat of cats || []) {
+    if (cat.id === id) return cat;
+    if (cat.children?.length) {
+      const found = findCategoryById(cat.children, id);
+      if (found) return found;
+    }
+  }
+  return null;
+};
+
+const collectAncestorIds = (cats, targetId, path = []) => {
+  for (const cat of cats || []) {
+    const next = [...path, cat.id];
+    if (cat.id === targetId) return next;
+    if (cat.children?.length) {
+      const found = collectAncestorIds(cat.children, targetId, next);
+      if (found) return found;
+    }
+  }
+  return null;
+};
+
+const ProductSelectionModal = ({
+  isOpen,
+  onClose,
+  onSelect,
+  initialCategory = null,
+  startInCreate = false,
+}) => {
   const [selectedCategory, setSelectedCategory] = useState(null);
-  const [newProductName, setNewProductName] = useState('');
-  const [newProductDescription, setNewProductDescription] = useState('');
-  const [newProductCost, setNewProductCost] = useState('');
-  const [contextMenu, setContextMenu] = useState(null);
+  const [expandedCategories, setExpandedCategories] = useState(new Set());
+  const [productSearchTerm, setProductSearchTerm] = useState('');
+
   const [isCreatingCategory, setIsCreatingCategory] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
   const [createParentId, setCreateParentId] = useState(null);
   const [expandedParentCategories, setExpandedParentCategories] = useState(new Set());
-  const [expandedCategories, setExpandedCategories] = useState(new Set());
-  const [productSearchTerm, setProductSearchTerm] = useState('');
+
+  const [isCreatingProduct, setIsCreatingProduct] = useState(false);
+  const [newProductName, setNewProductName] = useState('');
+  const [newProductDescription, setNewProductDescription] = useState('');
+  const [newProductCost, setNewProductCost] = useState('');
+  const [newProductUnitId, setNewProductUnitId] = useState('');
+  const [productCategoryId, setProductCategoryId] = useState(null);
+  const [expandedProductParentCategories, setExpandedProductParentCategories] = useState(new Set());
 
   const { data: categories = [], isLoading: isLoadingCategories } = useGetCategoriesQuery();
   const { data: products = [], isLoading: isLoadingProducts } = useGetStockProductsQuery();
   const { data: units = [] } = useGetUnitsOfMeasurementQuery();
-  const [createCategory] = useCreateCategoryMutation();
-  const [createProduct] = useCreateProductMutation();
+  const [createCategory, { isLoading: isCreatingCat }] = useCreateCategoryMutation();
+  const [createProduct, { isLoading: isCreatingProd }] = useCreateProductMutation();
 
   const resetModalState = useCallback(() => {
-    setStep(1);
     setSelectedCategory(null);
-    setNewProductName('');
-    setNewProductDescription('');
-    setNewProductCost('');
-    setContextMenu(null);
+    setExpandedCategories(new Set());
+    setProductSearchTerm('');
     setIsCreatingCategory(false);
     setNewCategoryName('');
     setCreateParentId(null);
     setExpandedParentCategories(new Set());
-    setExpandedCategories(new Set());
-    setProductSearchTerm('');
+    setIsCreatingProduct(false);
+    setNewProductName('');
+    setNewProductDescription('');
+    setNewProductCost('');
+    setNewProductUnitId('');
+    setProductCategoryId(null);
+    setExpandedProductParentCategories(new Set());
   }, []);
 
   useEffect(() => {
-    if (isOpen) {
-      resetModalState();
+    if (!isOpen) return;
+    resetModalState();
+
+    const initialId = initialCategory?.id ?? null;
+    if (initialId) {
+      setSelectedCategory(initialCategory);
+      setExpandedCategories(new Set([initialId]));
     }
-  }, [isOpen, resetModalState]);
+
+    if (startInCreate) {
+      setProductCategoryId(initialId);
+      setNewProductName('');
+      setNewProductDescription('');
+      setNewProductCost('');
+      setNewProductUnitId('');
+      setExpandedProductParentCategories(initialId ? new Set([initialId]) : new Set());
+      setIsCreatingProduct(true);
+    }
+  }, [isOpen, initialCategory, startInCreate, resetModalState]);
+
+  useEffect(() => {
+    if (!isOpen || !categories.length) return;
+    const expandFor = (id, setter) => {
+      if (id == null) return;
+      const ancestors = collectAncestorIds(categories, id);
+      if (ancestors?.length) setter(new Set(ancestors));
+    };
+    if (selectedCategory?.id) expandFor(selectedCategory.id, setExpandedCategories);
+    if (createParentId != null) expandFor(createParentId, setExpandedParentCategories);
+    if (productCategoryId != null) expandFor(productCategoryId, setExpandedProductParentCategories);
+  }, [isOpen, categories, selectedCategory?.id, createParentId, productCategoryId]);
 
   const handleClose = useCallback(() => {
     resetModalState();
@@ -56,7 +132,7 @@ const ProductSelectionModal = ({ isOpen, onClose, onSelect }) => {
 
   const findUnitName = (unitId) => {
     if (!unitId) return 'шт.';
-    const unit = units.find(u => u.id === unitId);
+    const unit = units.find((u) => u.id === unitId);
     return unit ? unit.name : 'шт.';
   };
 
@@ -90,30 +166,13 @@ const ProductSelectionModal = ({ isOpen, onClose, onSelect }) => {
     };
 
     const allCategoryIds = collectSubcategoryIds(selectedCategory);
-    return products.filter(product =>
-      allCategoryIds.includes(product.category_id) && matchesSearch(product)
+    return products.filter(
+      (product) => allCategoryIds.includes(product.category_id) && matchesSearch(product)
     );
   }, [selectedCategory, products, productSearchTerm]);
 
-  const handleContextMenu = useCallback((e, category) => {
-    e.preventDefault();
-    setContextMenu({ x: e.clientX, y: e.clientY, category });
-  }, []);
-
-  const closeContextMenu = useCallback(() => {
-    setContextMenu(null);
-  }, []);
-
-  useEffect(() => {
-    const handleClick = () => closeContextMenu();
-    if (contextMenu) {
-      window.addEventListener('click', handleClick);
-    }
-    return () => window.removeEventListener('click', handleClick);
-  }, [contextMenu, closeContextMenu]);
-
-  const toggleParentExpand = (id) => {
-    setExpandedParentCategories((prev) => {
+  const toggleExpand = (id, setter) => {
+    setter((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
@@ -121,85 +180,127 @@ const ProductSelectionModal = ({ isOpen, onClose, onSelect }) => {
     });
   };
 
-  const openCreateCategoryModal = (parentId = null) => {
-    setCreateParentId(parentId);
-    setNewCategoryName('');
-    setExpandedParentCategories(parentId ? new Set([parentId]) : new Set());
-    setIsCreatingCategory(true);
-    closeContextMenu();
+  const openCategory = (category) => {
+    setSelectedCategory(category);
+    if (category.children?.length && !expandedCategories.has(category.id)) {
+      setExpandedCategories((prev) => new Set([...prev, category.id]));
+    }
   };
 
-  const renderParentCategoryTree = (categoryList) => {
+  const openCreateCategoryModal = (parentId = null) => {
+    const resolvedParentId = parentId !== undefined ? parentId : selectedCategory?.id ?? null;
+    setCreateParentId(resolvedParentId);
+    setNewCategoryName('');
+    const ancestors =
+      resolvedParentId != null
+        ? collectAncestorIds(categories, resolvedParentId) || [resolvedParentId]
+        : [];
+    setExpandedParentCategories(new Set(ancestors));
+    setIsCreatingCategory(true);
+  };
+
+  const openCreateProductModal = (categoryId = undefined) => {
+    const resolvedId = categoryId !== undefined ? categoryId : selectedCategory?.id ?? null;
+    setProductCategoryId(resolvedId);
+    setNewProductName('');
+    setNewProductDescription('');
+    setNewProductCost('');
+    setNewProductUnitId(units[0]?.id ? String(units[0].id) : '');
+    const ancestors =
+      resolvedId != null ? collectAncestorIds(categories, resolvedId) || [resolvedId] : [];
+    setExpandedProductParentCategories(new Set(ancestors));
+    setIsCreatingProduct(true);
+  };
+
+  const parentCategoryName = (parentId) => {
+    if (parentId == null) return ROOT_LABEL;
+    return findCategoryById(categories, parentId)?.name || ROOT_LABEL;
+  };
+
+  const renderCompactTree = ({
+    categoryList,
+    depth = 0,
+    expandedSet,
+    onToggleExpand,
+    selectedId,
+    onSelect,
+    mode = 'select', // select | radio
+    radioName = 'category',
+  }) => {
     return categoryList.map((category) => {
       const hasChildren = category.children?.length > 0;
-      const isExpanded = expandedParentCategories.has(category.id);
+      const isExpanded = expandedSet.has(category.id);
+      const isSelected = selectedId === category.id;
 
       return (
-        <div key={category.id} className="ml-3">
-          <div className="flex items-center py-1 px-1">
-            {hasChildren ? (
-              <span
-                className="mr-1 cursor-pointer select-none text-sm"
-                onClick={() => toggleParentExpand(category.id)}
-              >
-                {isExpanded ? '▼' : '►'}
-              </span>
-            ) : (
-              <span className="mr-1 text-gray-500 text-sm">•</span>
-            )}
-            <label className="flex items-center cursor-pointer ml-1 min-w-0">
-              <input
-                type="radio"
-                name="parent-category"
-                checked={createParentId === category.id}
-                onChange={() => setCreateParentId(category.id)}
-                className="mr-2"
-              />
-              <span className="truncate text-sm">{category.name}</span>
-            </label>
-          </div>
-          {hasChildren && isExpanded && (
-            <div className="ml-3">{renderParentCategoryTree(category.children)}</div>
-          )}
-        </div>
-      );
-    });
-  };
-
-  const renderCategoryTree = (categories, level = 0) => {
-    return categories.map(category => {
-      const isExpanded = expandedCategories.has(category.id);
-      const isSelected = selectedCategory?.id === category.id;
-
-      return (
-        <div key={category.id} className="ml-3">
+        <div key={category.id}>
           <div
-            className={`flex items-center py-2 px-3 cursor-pointer hover:bg-gray-100 rounded truncate ${isSelected ? 'bg-blue-100' : ''
-              }`}
-            onClick={() => setSelectedCategory(category)}
-            onContextMenu={(e) => handleContextMenu(e, category)}
-            onDoubleClick={(e) => {
-              e.stopPropagation();
-              if (category.children?.length) {
-                setExpandedCategories(prev => {
-                  const newSet = new Set(prev);
-                  if (newSet.has(category.id)) newSet.delete(category.id);
-                  else newSet.add(category.id);
-                  return newSet;
-                });
-              }
-            }}
+            className={`flex items-center gap-0.5 rounded-lg min-h-[36px] pr-1 transition-colors ${
+              isSelected ? 'bg-blue-50 ring-1 ring-blue-200' : 'hover:bg-gray-50'
+            }`}
+            style={{ paddingLeft: `${6 + depth * 10}px` }}
           >
-            {category.children?.length ? (
-              <span className="mr-1">{isExpanded ? '▼' : '►'}</span>
+            {hasChildren ? (
+              <button
+                type="button"
+                onClick={() => onToggleExpand(category.id)}
+                className="w-7 h-7 flex items-center justify-center rounded-md shrink-0 text-gray-600"
+                aria-label={isExpanded ? 'Свернуть' : 'Развернуть'}
+              >
+                <ChevronIcon open={isExpanded} />
+              </button>
             ) : (
-              <span className="mr-1 text-gray-500">•</span>
+              <span className="w-7 h-7 flex items-center justify-center shrink-0">
+                <span className="w-1.5 h-1.5 rounded-full bg-gray-300" />
+              </span>
             )}
-            <span className="truncate">{category.name}</span>
+
+            {mode === 'radio' ? (
+              <label className="flex-1 min-w-0 flex items-center gap-2 py-1.5 pr-1 cursor-pointer">
+                <input
+                  type="radio"
+                  name={radioName}
+                  checked={isSelected}
+                  onChange={() => onSelect(category)}
+                  className="shrink-0"
+                />
+                <span
+                  className={`truncate text-sm ${
+                    isSelected ? 'text-blue-800 font-semibold' : 'text-gray-800 font-medium'
+                  }`}
+                >
+                  {category.name}
+                </span>
+              </label>
+            ) : (
+              <button
+                type="button"
+                onClick={() => onSelect(category)}
+                className="flex-1 min-w-0 text-left py-1.5 pr-1"
+              >
+                <span
+                  className={`block truncate text-sm ${
+                    isSelected ? 'text-blue-800 font-semibold' : 'text-gray-800 font-medium'
+                  }`}
+                >
+                  {category.name}
+                </span>
+              </button>
+            )}
           </div>
-          {isExpanded && category.children?.length > 0 && (
-            <div className="ml-3">
-              {renderCategoryTree(category.children, level + 1)}
+
+          {hasChildren && isExpanded && (
+            <div>
+              {renderCompactTree({
+                categoryList: category.children,
+                depth: depth + 1,
+                expandedSet,
+                onToggleExpand,
+                selectedId,
+                onSelect,
+                mode,
+                radioName,
+              })}
             </div>
           )}
         </div>
@@ -214,27 +315,21 @@ const ProductSelectionModal = ({ isOpen, onClose, onSelect }) => {
     }
 
     try {
-      await createCategory({
+      const created = await createCategory({
         name: newCategoryName.trim(),
         parent_id: createParentId,
       }).unwrap();
-      setNewCategoryName('');
-      setCreateParentId(null);
+
+      if (createParentId != null) {
+        setExpandedCategories((prev) => new Set([...prev, createParentId]));
+      }
+
+      setSelectedCategory(created);
       setIsCreatingCategory(false);
-      closeContextMenu();
+      setNewCategoryName('');
     } catch (err) {
       console.error('Ошибка создания категории:', err);
       alert('Не удалось создать категорию');
-    }
-  };
-
-  const handleCreateProduct = () => {
-    setNewProductName('');
-    setNewProductDescription('');
-    setNewProductCost('');
-    setStep(2);
-    if (contextMenu?.category) {
-      setSelectedCategory(contextMenu.category);
     }
   };
 
@@ -243,27 +338,30 @@ const ProductSelectionModal = ({ isOpen, onClose, onSelect }) => {
       alert('Название товара обязательно');
       return;
     }
-    if (!selectedCategory) {
-      alert('Выберите категорию');
-      return;
-    }
 
     let costNum = 0;
     if (newProductCost.trim() !== '') {
-      costNum = parseFloat(newProductCost);
-      if (isNaN(costNum) || costNum < 0) {
+      costNum = parseFloat(newProductCost.replace(',', '.'));
+      if (Number.isNaN(costNum) || costNum < 0) {
         alert('Укажите корректную цену закупки');
         return;
       }
     }
 
     try {
-      const newProduct = await createProduct({
+      const payload = {
         name: newProductName.trim(),
         description: newProductDescription.trim(),
-        category_id: selectedCategory.id,
-      }).unwrap();
+        category_id: productCategoryId,
+      };
+      if (newProductUnitId) {
+        payload.unit_id = Number(newProductUnitId);
+      }
+      if (costNum > 0) {
+        payload.price = costNum;
+      }
 
+      const newProduct = await createProduct(payload).unwrap();
       onSelect(newProduct);
       resetModalState();
       onClose();
@@ -282,326 +380,257 @@ const ProductSelectionModal = ({ isOpen, onClose, onSelect }) => {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-start justify-center z-50 p-2 overflow-y-auto">
-      <div className="bg-white p-4 sm:p-6 rounded-lg shadow-lg w-full max-w-full sm:w-3/5 max-h-[90vh] flex flex-col my-8">
-        <div className="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-          <h3 className="text-base sm:text-lg font-semibold">
-            {step === 1 ? 'Выберите категорию и товар' : 'Создайте товар'}
-          </h3>
-          {step === 1 && (
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => openCreateCategoryModal(selectedCategory?.id ?? null)}
-                className="px-3 py-1.5 bg-blue-100 text-blue-800 rounded text-sm hover:bg-blue-200"
-              >
-                Добавить категорию
-              </button>
-              <button
-                type="button"
-                onClick={handleCreateProduct}
-                className="px-3 py-1.5 bg-green-100 text-green-800 rounded text-sm hover:bg-green-200"
-              >
-                Добавить товар
-              </button>
-            </div>
-          )}
+    <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50 p-0 sm:p-3">
+      <div className="bg-white w-full sm:max-w-5xl sm:rounded-2xl shadow-xl h-[94dvh] sm:h-auto sm:max-h-[90vh] flex flex-col overflow-hidden pb-[env(safe-area-inset-bottom)]">
+        <div className="sm:hidden flex justify-center pt-2">
+          <div className="w-10 h-1 rounded-full bg-gray-300" />
         </div>
 
-        {step === 1 ? (
-          <>
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Выбранная категория:</label>
-              <div className="p-2 bg-gray-100 rounded text-sm truncate">
-                {selectedCategory ? selectedCategory.name : 'Номенклатура'}
-              </div>
-            </div>
-
-            {/* Десктоп: две колонки | Мобильный: одна колонка */}
-            <div className="flex flex-col sm:flex-row gap-4 flex-grow min-h-0">
-              {/* Дерево категорий */}
-              <div className="sm:w-1/3 flex flex-col">
-                <div className="text-sm font-medium mb-2">Категории</div>
-                <div className="flex-grow overflow-y-auto mb-4 bg-gray-50 p-2 rounded">
-                  <div
-                    className={`py-2 px-3 cursor-pointer hover:bg-gray-100 rounded truncate ${!selectedCategory ? 'bg-blue-100' : ''
-                      }`}
-                    onContextMenu={(e) => {
-                      e.preventDefault();
-                      setContextMenu({ x: e.clientX, y: e.clientY, category: null });
-                    }}
-                    onClick={() => setSelectedCategory(null)}
-                  >
-                    <span className="font-medium">Номенклатура</span>
-                  </div>
-
-                  {isLoadingCategories ? (
-                    <p className="text-sm">Загрузка...</p>
-                  ) : (
-                    renderCategoryTree(categories)
-                  )}
-                </div>
-              </div>
-
-              {/* Список товаров */}
-              <div className="sm:w-2/3 flex flex-col min-h-0">
-                <div className="text-sm font-medium mb-2">
-                  Товары {selectedCategory ? `в "${selectedCategory.name}"` : 'во всей номенклатуре'}:
-                </div>
-                <input
-                  type="text"
-                  value={productSearchTerm}
-                  onChange={(e) => setProductSearchTerm(e.target.value)}
-                  className="w-full p-2 mb-2 border border-gray-300 rounded text-sm"
-                  placeholder="Введите название товара"
-                />
-                <div className="flex-grow overflow-y-auto min-h-0">
-                  {isLoadingProducts ? (
-                    <p className="text-sm">Загрузка товаров...</p>
-                  ) : filteredProducts.length === 0 ? (
-                    <p className="text-gray-500 text-sm">
-                      {selectedCategory ? 'Нет товаров в этой категории' : 'Нет товаров'}
-                    </p>
-                  ) : (
-                    <>
-                      <div className="space-y-2 sm:hidden">
-                        {filteredProducts.map((product) => (
-                          <div
-                            key={product.id}
-                            className="p-3 border border-gray-200 rounded bg-white hover:bg-gray-50"
-                            onDoubleClick={() => handleSelectExistingProduct(product)}
-                          >
-                            <div className="font-medium text-gray-900">{product.name}</div>
-                            <div className="text-xs text-gray-600 mt-1">
-                              {product.description || '—'}
-                            </div>
-                            <div className="text-xs text-gray-600 mt-1">
-                              Остаток: {getProductStock(product)} {findUnitName(product.unit_id)}
-                            </div>
-                            <div className="text-xs text-gray-600 mt-1">
-                              Мин. остаток: {product.min_stock || 0} {findUnitName(product.unit_id)}
-                            </div>
-                            <div className="text-sm font-medium text-green-800 mt-1">
-                              {getProductPrice(product).toFixed(2)} ₽
-                            </div>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleSelectExistingProduct(product);
-                              }}
-                              className="mt-2 w-full py-1.5 bg-blue-100 text-blue-800 rounded text-sm font-medium hover:bg-blue-200"
-                            >
-                              Выбрать
-                            </button>
-                          </div>
-                        ))}
-                        <button
-                          type="button"
-                          onClick={handleCreateProduct}
-                          className="w-full p-3 border border-dashed border-green-400 rounded bg-green-50 text-green-700 font-medium text-sm hover:bg-green-100"
-                        >
-                          + Добавить товар
-                        </button>
-                      </div>
-
-                      <table className="hidden sm:table w-full">
-                        <thead className="bg-gray-50">
-                          <tr>
-                            <th className="px-2 py-2 text-left text-xs font-medium text-gray-700">Название</th>
-                            <th className="px-2 py-2 text-left text-xs font-medium text-gray-700">Описание</th>
-                            <th className="px-2 py-2 text-left text-xs font-medium text-gray-700">Остаток</th>
-                            <th className="px-2 py-2 text-left text-xs font-medium text-gray-700">Мин. остаток</th>
-                            <th className="px-2 py-2 text-left text-xs font-medium text-gray-700">Ед. изм.</th>
-                            <th className="px-2 py-2 text-left text-xs font-medium text-gray-700">Цена</th>
-                            <th className="px-2 py-2 text-right text-xs font-medium text-gray-700">Действие</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-200">
-                          {filteredProducts.map((product) => (
-                            <tr
-                              key={product.id}
-                              className="hover:bg-gray-50 cursor-pointer"
-                              onDoubleClick={() => handleSelectExistingProduct(product)}
-                            >
-                              <td className="px-2 py-2 text-xs text-gray-900">{product.name}</td>
-                              <td className="px-2 py-2 text-xs text-gray-700 max-w-[100px] truncate" title={product.description || ''}>
-                                {product.description || '—'}
-                              </td>
-                              <td className="px-2 py-2 text-xs text-gray-900">{getProductStock(product)}</td>
-                              <td className="px-2 py-2 text-xs text-gray-900">{product.min_stock || 0}</td>
-                              <td className="px-2 py-2 text-xs text-gray-900">{findUnitName(product.unit_id)}</td>
-                              <td className="px-2 py-2 text-xs text-gray-900">
-                                {getProductPrice(product).toFixed(2)} ₽
-                              </td>
-                              <td className="px-2 py-2 text-right text-xs">
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleSelectExistingProduct(product);
-                                  }}
-                                  className="text-blue-600 hover:text-blue-800"
-                                >
-                                  Выбрать
-                                </button>
-                              </td>
-                            </tr>
-                          ))}
-                          <tr className="bg-green-50">
-                            <td colSpan="7" className="px-2 py-2 text-right text-xs">
-                              <button
-                                type="button"
-                                onClick={handleCreateProduct}
-                                className="text-green-700 hover:text-green-900 font-medium"
-                              >
-                                + Добавить товар
-                              </button>
-                            </td>
-                          </tr>
-                        </tbody>
-                      </table>
-                    </>
-                  )}
-                </div>
-
-                <div className="mt-4 flex flex-col sm:flex-row justify-between gap-2">
-                  <button
-                    onClick={handleClose}
-                    className="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400 text-sm"
-                  >
-                    Отмена
-                  </button>
-                </div>
-              </div>
-            </div>
-          </>
-        ) : (
-          // Шаг 2: Создание товара
-          <>
-            <div className="mb-3">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Категория:</label>
-              <div className="p-2 bg-gray-100 rounded text-sm truncate">
-                {selectedCategory ? selectedCategory.name : 'Номенклатура'}
-              </div>
-            </div>
-            <div className="mb-3">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Название товара *</label>
-              <input
-                type="text"
-                value={newProductName}
-                onChange={(e) => setNewProductName(e.target.value)}
-                className="w-full p-2 border border-gray-300 rounded text-sm"
-                placeholder="Введите название"
-              />
-            </div>
-            <div className="mb-3">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Описание</label>
-              <textarea
-                value={newProductDescription}
-                onChange={(e) => setNewProductDescription(e.target.value)}
-                className="w-full p-2 border border-gray-300 rounded text-sm"
-                placeholder="Введите описание"
-                rows="2"
-              />
-            </div>
-            <div className="mb-3">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Цена закупки *</label>
-              <input
-                type="text" // ← изменено с "number" на "text"
-                value={newProductCost}
-                onChange={(e) => {
-                  const value = e.target.value;
-                  // Разрешаем пустое значение, цифры и одну точку/запятую
-                  if (value === '' || /^(\d+\.?\d*|\.\d+)$/.test(value)) {
-                    setNewProductCost(value);
-                  }
-                }}
-                className="w-full p-2 border border-gray-300 rounded text-sm"
-                placeholder="0.00"
-              />
-            </div>
-            <div className="flex flex-col sm:flex-row justify-between gap-2">
-              <button
-                onClick={() => setStep(1)}
-                className="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400 text-sm"
-              >
-                Назад
-              </button>
-              <button
-                onClick={handleAddProduct}
-                className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 text-sm"
-              >
-                Создать товар
-              </button>
-            </div>
-          </>
-        )}
-
-        {/* Контекстное меню */}
-        {/* Контекстное меню — с адаптивной позицией */}
-        {contextMenu && (
-          <div
-            className="fixed z-50 bg-white border rounded shadow-lg py-1 min-w-[160px] text-sm"
-            style={{
-              top: Math.min(contextMenu.y, window.innerHeight - 120), // также не уходить за низ
-              left: Math.max(0, Math.min(contextMenu.x, window.innerWidth - 165)),
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
+        <div className="shrink-0 px-4 pt-3 pb-3 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+          <div>
+            <h3 className="text-lg font-semibold text-gray-900">Выберите категорию и товар</h3>
+            <p className="text-sm text-gray-500 mt-0.5">
+              Категория:{' '}
+              <span className="font-medium text-gray-800">
+                {selectedCategory?.name || ROOT_LABEL}
+              </span>
+            </p>
+          </div>
+          <div className="flex gap-2">
             <button
-              className="block w-full text-left px-4 py-2 hover:bg-gray-100"
-              onClick={(e) => {
-                e.stopPropagation();
-                handleCreateProduct();
-                closeContextMenu();
-              }}
+              type="button"
+              onClick={() => openCreateCategoryModal(selectedCategory?.id ?? null)}
+              className="px-3 py-2 bg-blue-50 text-blue-800 border border-blue-200 rounded-xl text-sm font-medium hover:bg-blue-100"
+            >
+              Добавить категорию
+            </button>
+            <button
+              type="button"
+              onClick={() => openCreateProductModal()}
+              className="px-3 py-2 bg-green-50 text-green-800 border border-green-200 rounded-xl text-sm font-medium hover:bg-green-100"
             >
               Добавить товар
             </button>
-            <button
-              className="block w-full text-left px-4 py-2 hover:bg-gray-100"
-              onClick={(e) => {
-                e.stopPropagation();
-                openCreateCategoryModal(contextMenu?.category?.id ?? null);
-              }}
-            >
-              Добавить подкатегорию
-            </button>
-            <button className="block w-full text-left px-4 py-2 hover:bg-gray-100">
-              Памятка на удаление
-            </button>
           </div>
-        )}
+        </div>
 
-        {/* Модалка создания категории */}
-        {isCreatingCategory && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white p-4 rounded-lg shadow-lg w-full max-w-md max-h-[90vh] overflow-y-auto">
-              <h4 className="font-medium mb-4 text-sm sm:text-base">Добавить категорию</h4>
+        <div className="flex-1 min-h-0 flex flex-col sm:flex-row">
+          {/* Компактное дерево категорий */}
+          <aside className="sm:w-56 lg:w-64 shrink-0 border-b sm:border-b-0 sm:border-r border-gray-100 flex flex-col max-h-[36vh] sm:max-h-none">
+            <div className="px-3 pt-3 pb-1 text-xs font-semibold uppercase tracking-wide text-gray-500">
+              Категории
+            </div>
+            <div className="flex-1 overflow-y-auto overscroll-contain px-2 pb-2 space-y-0.5">
+              <button
+                type="button"
+                onClick={() => setSelectedCategory(null)}
+                className={`w-full flex items-center gap-2 min-h-[36px] px-2 rounded-lg text-left ${
+                  !selectedCategory
+                    ? 'bg-blue-50 ring-1 ring-blue-200 text-blue-800'
+                    : 'text-gray-800 hover:bg-gray-50'
+                }`}
+              >
+                <span
+                  className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                    !selectedCategory ? 'bg-blue-600' : 'bg-gray-300'
+                  }`}
+                />
+                <span className={`truncate text-sm ${!selectedCategory ? 'font-semibold' : 'font-medium'}`}>
+                  {ROOT_LABEL}
+                </span>
+              </button>
 
-              <div className="mb-4">
+              {isLoadingCategories ? (
+                <p className="text-sm text-gray-500 px-2 py-3">Загрузка...</p>
+              ) : (
+                renderCompactTree({
+                  categoryList: categories,
+                  expandedSet: expandedCategories,
+                  onToggleExpand: (id) => toggleExpand(id, setExpandedCategories),
+                  selectedId: selectedCategory?.id ?? null,
+                  onSelect: openCategory,
+                  mode: 'select',
+                })
+              )}
+            </div>
+          </aside>
+
+          {/* Список товаров */}
+          <div className="flex-1 min-h-0 flex flex-col px-3 sm:px-4 py-3">
+            <div className="text-sm font-medium text-gray-700 mb-2">
+              Товары {selectedCategory ? `в «${selectedCategory.name}»` : 'во всех категориях'}
+            </div>
+            <input
+              type="search"
+              value={productSearchTerm}
+              onChange={(e) => setProductSearchTerm(e.target.value)}
+              className="w-full px-3 py-2.5 mb-2 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500 [&::-webkit-search-cancel-button]:hidden"
+              placeholder="Поиск товара..."
+            />
+
+            <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain">
+              {isLoadingProducts ? (
+                <p className="text-sm text-gray-500 py-4">Загрузка товаров...</p>
+              ) : filteredProducts.length === 0 ? (
+                <div className="py-8 text-center">
+                  <p className="text-sm text-gray-500 mb-3">
+                    {selectedCategory ? 'Нет товаров в этой категории' : 'Нет товаров'}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => openCreateProductModal()}
+                    className="px-4 py-2.5 bg-green-50 text-green-800 border border-green-200 rounded-xl text-sm font-medium"
+                  >
+                    + Добавить товар
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <div className="space-y-2 sm:hidden">
+                    {filteredProducts.map((product) => (
+                      <button
+                        key={product.id}
+                        type="button"
+                        onClick={() => handleSelectExistingProduct(product)}
+                        className="w-full text-left p-3 border border-gray-200 rounded-xl bg-white active:bg-gray-50"
+                      >
+                        <div className="font-semibold text-gray-900">{product.name}</div>
+                        <div className="text-xs text-gray-500 mt-1 line-clamp-2">
+                          {product.description || '—'}
+                        </div>
+                        <div className="mt-2 flex justify-between text-sm">
+                          <span className="text-gray-600">
+                            {getProductStock(product)} {findUnitName(product.unit_id)}
+                          </span>
+                          <span className="font-semibold text-green-800">
+                            {getProductPrice(product).toFixed(2)} ₽
+                          </span>
+                        </div>
+                      </button>
+                    ))}
+                    <button
+                      type="button"
+                      onClick={() => openCreateProductModal()}
+                      className="w-full p-3 border border-dashed border-green-400 rounded-xl bg-green-50 text-green-700 font-medium text-sm"
+                    >
+                      + Добавить товар
+                    </button>
+                  </div>
+
+                  <table className="hidden sm:table w-full">
+                    <thead className="bg-gray-50 sticky top-0">
+                      <tr>
+                        <th className="px-2 py-2 text-left text-xs font-medium text-gray-600">Название</th>
+                        <th className="px-2 py-2 text-left text-xs font-medium text-gray-600">Описание</th>
+                        <th className="px-2 py-2 text-left text-xs font-medium text-gray-600">Остаток</th>
+                        <th className="px-2 py-2 text-left text-xs font-medium text-gray-600">Ед.</th>
+                        <th className="px-2 py-2 text-left text-xs font-medium text-gray-600">Цена</th>
+                        <th className="px-2 py-2 text-right text-xs font-medium text-gray-600">Действие</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {filteredProducts.map((product) => (
+                        <tr key={product.id} className="hover:bg-gray-50">
+                          <td className="px-2 py-2 text-sm font-medium text-gray-900">{product.name}</td>
+                          <td
+                            className="px-2 py-2 text-xs text-gray-600 max-w-[140px] truncate"
+                            title={product.description || ''}
+                          >
+                            {product.description || '—'}
+                          </td>
+                          <td className="px-2 py-2 text-sm text-gray-800">{getProductStock(product)}</td>
+                          <td className="px-2 py-2 text-xs text-gray-700">{findUnitName(product.unit_id)}</td>
+                          <td className="px-2 py-2 text-sm text-gray-800">
+                            {getProductPrice(product).toFixed(2)} ₽
+                          </td>
+                          <td className="px-2 py-2 text-right">
+                            <button
+                              type="button"
+                              onClick={() => handleSelectExistingProduct(product)}
+                              className="text-sm font-medium text-blue-600 hover:text-blue-800"
+                            >
+                              Выбрать
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                      <tr className="bg-green-50/60">
+                        <td colSpan={6} className="px-2 py-2 text-right">
+                          <button
+                            type="button"
+                            onClick={() => openCreateProductModal()}
+                            className="text-sm font-medium text-green-700 hover:text-green-900"
+                          >
+                            + Добавить товар
+                          </button>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </>
+              )}
+            </div>
+
+            <div className="shrink-0 pt-3 border-t border-gray-100 mt-2">
+              <button
+                type="button"
+                onClick={handleClose}
+                className="px-4 py-2.5 bg-gray-100 text-gray-800 rounded-xl text-sm font-medium hover:bg-gray-200"
+              >
+                Отмена
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Модалка создания категории */}
+      {isCreatingCategory && (
+        <div className="fixed inset-0 z-[60] bg-black/40 flex items-end sm:items-center justify-center p-0 sm:p-4">
+          <div className="bg-white w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl shadow-xl max-h-[90vh] flex flex-col overflow-hidden pb-[env(safe-area-inset-bottom)]">
+            <div className="px-4 pt-4 pb-3 border-b border-gray-100">
+              <h4 className="font-semibold text-gray-900">Добавить категорию</h4>
+              <p className="text-sm text-gray-500 mt-0.5">
+                Родитель: {parentCategoryName(createParentId)}
+              </p>
+            </div>
+
+            <div className="flex-1 overflow-y-auto px-4 py-3 space-y-4">
+              <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Родительская категория
+                  Куда добавить
                 </label>
-                <div className="border rounded p-2 max-h-40 overflow-y-auto text-sm bg-gray-50">
-                  <label className="flex items-center cursor-pointer mb-2 px-1">
+                <div className="border border-gray-200 rounded-xl p-2 max-h-52 overflow-y-auto bg-gray-50">
+                  <label
+                    className={`flex items-center gap-2 min-h-[36px] px-2 rounded-lg cursor-pointer ${
+                      createParentId === null ? 'bg-blue-50 ring-1 ring-blue-200' : 'hover:bg-white'
+                    }`}
+                  >
                     <input
                       type="radio"
                       name="parent-category"
                       checked={createParentId === null}
                       onChange={() => setCreateParentId(null)}
-                      className="mr-2"
                     />
-                    <span>Номенклатура</span>
+                    <span className="text-sm font-medium">{ROOT_LABEL}</span>
                   </label>
                   {isLoadingCategories ? (
-                    <p className="text-gray-500 px-1">Загрузка...</p>
+                    <p className="text-gray-500 px-2 py-2 text-sm">Загрузка...</p>
                   ) : (
-                    renderParentCategoryTree(categories)
+                    renderCompactTree({
+                      categoryList: categories,
+                      expandedSet: expandedParentCategories,
+                      onToggleExpand: (id) => toggleExpand(id, setExpandedParentCategories),
+                      selectedId: createParentId,
+                      onSelect: (cat) => setCreateParentId(cat.id),
+                      mode: 'radio',
+                      radioName: 'parent-category',
+                    })
                   )}
                 </div>
               </div>
 
-              <div className="mb-4">
+              <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Имя категории
                 </label>
@@ -609,7 +638,7 @@ const ProductSelectionModal = ({ isOpen, onClose, onSelect }) => {
                   type="text"
                   value={newCategoryName}
                   onChange={(e) => setNewCategoryName(e.target.value)}
-                  className="w-full p-2 border border-gray-300 rounded text-sm"
+                  className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-base focus:outline-none focus:ring-2 focus:ring-green-500"
                   placeholder="Введите имя категории"
                   autoFocus
                   onKeyDown={(e) => {
@@ -617,29 +646,156 @@ const ProductSelectionModal = ({ isOpen, onClose, onSelect }) => {
                   }}
                 />
               </div>
+            </div>
 
-              <div className="flex space-x-2">
-                <button
-                  onClick={handleCreateCategory}
-                  className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 text-sm"
-                >
-                  Создать
-                </button>
-                <button
-                  onClick={() => {
-                    setIsCreatingCategory(false);
-                    setNewCategoryName('');
-                    setCreateParentId(null);
-                  }}
-                  className="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400 text-sm"
-                >
-                  Отмена
-                </button>
-              </div>
+            <div className="shrink-0 p-4 border-t border-gray-100 grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsCreatingCategory(false);
+                  setNewCategoryName('');
+                }}
+                className="min-h-[44px] px-3 py-2 bg-gray-100 rounded-xl text-sm font-medium"
+              >
+                Отмена
+              </button>
+              <button
+                type="button"
+                onClick={handleCreateCategory}
+                disabled={isCreatingCat}
+                className="min-h-[44px] px-3 py-2 bg-green-600 text-white rounded-xl text-sm font-medium disabled:opacity-50"
+              >
+                {isCreatingCat ? 'Создание...' : 'Создать'}
+              </button>
             </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
+
+      {/* Модалка добавления товара (как при оприходовании) */}
+      {isCreatingProduct && (
+        <div className="fixed inset-0 z-[60] bg-black/40 flex items-end sm:items-center justify-center p-0 sm:p-4">
+          <div className="bg-white w-full sm:max-w-lg rounded-t-2xl sm:rounded-2xl shadow-xl max-h-[92vh] flex flex-col overflow-hidden pb-[env(safe-area-inset-bottom)]">
+            <div className="px-4 pt-4 pb-3 border-b border-gray-100">
+              <h4 className="font-semibold text-gray-900 text-lg">Добавление товара</h4>
+              <p className="text-sm text-gray-500 mt-0.5">
+                Новый товар будет сразу доступен для выбора
+              </p>
+            </div>
+
+            <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Категория</label>
+                <div className="border border-gray-200 rounded-xl p-2 max-h-44 overflow-y-auto bg-gray-50">
+                  <label
+                    className={`flex items-center gap-2 min-h-[36px] px-2 rounded-lg cursor-pointer ${
+                      productCategoryId === null ? 'bg-blue-50 ring-1 ring-blue-200' : 'hover:bg-white'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="product-category"
+                      checked={productCategoryId === null}
+                      onChange={() => setProductCategoryId(null)}
+                    />
+                    <span className="text-sm font-medium">{ROOT_LABEL}</span>
+                  </label>
+                  {renderCompactTree({
+                    categoryList: categories,
+                    expandedSet: expandedProductParentCategories,
+                    onToggleExpand: (id) => toggleExpand(id, setExpandedProductParentCategories),
+                    selectedId: productCategoryId,
+                    onSelect: (cat) => setProductCategoryId(cat.id),
+                    mode: 'radio',
+                    radioName: 'product-category',
+                  })}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Название товара *
+                </label>
+                <input
+                  type="text"
+                  value={newProductName}
+                  onChange={(e) => setNewProductName(e.target.value)}
+                  className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-base focus:outline-none focus:ring-2 focus:ring-green-500"
+                  placeholder="Введите название"
+                  autoFocus
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Описание</label>
+                <textarea
+                  value={newProductDescription}
+                  onChange={(e) => setNewProductDescription(e.target.value)}
+                  className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                  placeholder="Введите описание"
+                  rows={2}
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Единица измерения
+                  </label>
+                  <select
+                    value={newProductUnitId}
+                    onChange={(e) => setNewProductUnitId(e.target.value)}
+                    className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm bg-white"
+                  >
+                    <option value="">Не выбрана</option>
+                    {units.map((unit) => (
+                      <option key={unit.id} value={unit.id}>
+                        {unit.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Цена закупки
+                  </label>
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    value={newProductCost}
+                    onChange={(e) => {
+                      const value = e.target.value.replace(',', '.');
+                      if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                        setNewProductCost(value);
+                      }
+                    }}
+                    className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm"
+                    placeholder="0.00"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="shrink-0 p-4 border-t border-gray-100 grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setIsCreatingProduct(false)}
+                className="min-h-[48px] px-3 py-2 bg-gray-100 rounded-xl text-sm font-medium"
+              >
+                Отмена
+              </button>
+              <button
+                type="button"
+                onClick={handleAddProduct}
+                disabled={isCreatingProd}
+                className="min-h-[48px] px-3 py-2 bg-green-600 text-white rounded-xl text-sm font-semibold disabled:opacity-50"
+              >
+                {isCreatingProd ? 'Создание...' : 'Создать товар'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

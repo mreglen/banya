@@ -9,28 +9,42 @@ function playNotifyBeep() {
     const Ctx = window.AudioContext || window.webkitAudioContext;
     if (!Ctx) return;
     const ctx = new Ctx();
+    if (ctx.state === 'suspended') {
+      ctx.resume().catch(() => {});
+    }
     const now = ctx.currentTime;
+    const master = ctx.createGain();
+    master.gain.value = 1;
+    master.connect(ctx.destination);
 
     const beep = (start, freq, duration) => {
-      const osc = ctx.createOscillator();
       const gain = ctx.createGain();
-      osc.type = 'sine';
-      osc.frequency.value = freq;
       gain.gain.setValueAtTime(0.0001, start);
-      gain.gain.exponentialRampToValueAtTime(0.18, start + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.55, start + 0.015);
       gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.start(start);
-      osc.stop(start + duration + 0.02);
+      gain.connect(master);
+
+      // Два осциллятора — звук громче и заметнее
+      [freq, freq * 2].forEach((f, i) => {
+        const osc = ctx.createOscillator();
+        osc.type = i === 0 ? 'square' : 'sine';
+        osc.frequency.value = f;
+        const partial = ctx.createGain();
+        partial.gain.value = i === 0 ? 0.55 : 0.35;
+        osc.connect(partial);
+        partial.connect(gain);
+        osc.start(start);
+        osc.stop(start + duration + 0.02);
+      });
     };
 
-    beep(now, 880, 0.12);
-    beep(now + 0.16, 1175, 0.14);
+    beep(now, 880, 0.16);
+    beep(now + 0.2, 1175, 0.18);
+    beep(now + 0.42, 1319, 0.2);
 
     setTimeout(() => {
       ctx.close().catch(() => {});
-    }, 500);
+    }, 800);
   } catch {
     /* ignore autoplay / unsupported */
   }

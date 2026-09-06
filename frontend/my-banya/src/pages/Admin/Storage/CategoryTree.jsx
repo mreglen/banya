@@ -1,6 +1,5 @@
 // src/pages/Admin/Storage/CategoryTree.jsx
 import React, { useState, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
 import {
   useUpdateCategoryMutation,
   useUploadCategoryPhotosMutation,
@@ -28,6 +27,7 @@ const CategoryTree = ({
   toggleCategory,
   selectCategory,
   onCategoriesChange,
+  onAddProduct,
 }) => {
   const [contextMenu, setContextMenu] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -35,7 +35,6 @@ const CategoryTree = ({
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [categoryToDelete, setCategoryToDelete] = useState(null);
 
-  const navigate = useNavigate();
   const [createCategory] = useCreateCategoryMutation();
   const [updateCategory] = useUpdateCategoryMutation();
   const [uploadCategoryPhotos] = useUploadCategoryPhotosMutation();
@@ -162,8 +161,11 @@ const CategoryTree = ({
   };
 
   const handleAddProductToRoot = () => {
-    const rootCategory = { id: null, name: 'Все товары' };
-    navigate('/admin/storage/nomenclature/add/product', { state: { category: rootCategory } });
+    const category =
+      selectedCategoryPath.length > 0
+        ? selectedCategoryPath[selectedCategoryPath.length - 1]
+        : null;
+    onAddProduct?.(category);
   };
 
   const handleAddRootCategory = () => {
@@ -234,9 +236,7 @@ const CategoryTree = ({
         onClick={(e) => {
           e.stopPropagation();
           closeContextMenu();
-          navigate('/admin/storage/nomenclature/add/product', {
-            state: { category: contextMenu.category },
-          });
+          onAddProduct?.(contextMenu.category);
         }}
       >
         Добавить товар
@@ -268,7 +268,7 @@ const CategoryTree = ({
   );
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden flex flex-col max-h-[min(70vh,36rem)] lg:max-h-[calc(100vh-10rem)]">
+    <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden flex flex-col max-h-[min(70vh,36rem)] lg:max-h-[calc(100vh-4rem)]">
       <div className="shrink-0 px-3 pt-3 pb-2 sm:px-4 sm:pt-4 border-b border-gray-100 space-y-3">
         <div className="flex items-center justify-between gap-2">
           <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">
@@ -313,7 +313,7 @@ const CategoryTree = ({
         </button>
       </div>
 
-      <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-2 py-2 space-y-0.5">
+      <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain scrollbar-hide px-2 py-2 space-y-0.5">
         {categoriesTree?.length ? (
           renderCategoryTree(categoriesTree)
         ) : (

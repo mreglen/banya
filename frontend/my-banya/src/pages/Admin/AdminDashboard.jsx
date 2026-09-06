@@ -43,11 +43,13 @@ import {
 } from 'lucide-react';
 import AdminDashboardSkeleton from './AdminDashboardSkeleton';
 import MobileAdminSummary from './MobileAdminSummary';
+import { useHasAccess } from '../../hooks/useHasAccess';
 
 const COLORS = ['#10b981', '#3b82f6', '#8b5cf6', '#f59e0b', '#ef4444'];
 
 function AdminDashboard() {
   const { user } = useSelector((state) => state.auth);
+  const hasAccess = useHasAccess();
   const currentDate = new Date();
   const hours = currentDate.getHours();
   const greeting = hours < 6 ? 'Доброй ночи' : hours < 12 ? 'Доброе утро' : hours < 18 ? 'Добрый день' : 'Добрый вечер';
@@ -446,11 +448,11 @@ function AdminDashboard() {
         <h2 className="text-xl font-bold text-gray-900 mb-6">Быстрый доступ</h2>
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
           {[
-            { to: "/admin/reservations", icon: Calendar, label: "Брони", color: "bg-green-50 text-green-600" },
-            { to: "/admin/bookings", icon: MousePointer2, label: "Заявки", color: "bg-orange-50 text-orange-600" },
-            { to: "/admin/baths", icon: HomeIcon, label: "Бани", color: "bg-blue-50 text-blue-600" },
-            { to: "/admin/storage/nomenclature", icon: Package, label: "Склад", color: "bg-teal-50 text-teal-600" },
-            { to: "/admin/documents/entrance", icon: ClipboardList, label: "Документы", color: "bg-purple-50 text-purple-600" },
+            hasAccess('reservations:view') && { to: "/admin/reservations", icon: Calendar, label: "Брони", color: "bg-green-50 text-green-600" },
+            hasAccess('bookings:view') && { to: "/admin/bookings", icon: MousePointer2, label: "Заявки", color: "bg-orange-50 text-orange-600" },
+            hasAccess('baths:view') && { to: "/admin/baths", icon: HomeIcon, label: "Бани", color: "bg-blue-50 text-blue-600" },
+            hasAccess('storage:view') && { to: "/admin/storage/nomenclature", icon: Package, label: "Склад", color: "bg-teal-50 text-teal-600" },
+            hasAccess('documents:view') && { to: "/admin/documents/entrance", icon: ClipboardList, label: "Документы", color: "bg-purple-50 text-purple-600" },
             user?.is_admin && { to: "/admin/administrator/audit", icon: History, label: "Логи", color: "bg-gray-50 text-gray-600" },
           ].filter(Boolean).map((item, idx) => (
             <NavLink

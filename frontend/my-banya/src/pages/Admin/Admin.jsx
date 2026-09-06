@@ -2,9 +2,9 @@
 import { useState, useEffect } from 'react';
 import { Outlet, useLocation, NavLink } from 'react-router-dom';
 import { useSelector } from 'react-redux';
-import { useGetPermissionsQuery } from '../../redux/slices/apiSlice';
 import { useUnreadBookingsCount } from '../../hooks/useUnreadBookingsCount';
 import { useBookingNotifyAlerts } from '../../hooks/useBookingNotifyAlerts';
+import { useHasAccess } from '../../hooks/useHasAccess';
 import { getAdminPageTitle } from '../../config/adminNavConfig';
 import AdminMobileEntryRedirect from '../../components/Admin/AdminMobileEntryRedirect';
 import MobileBottomNav from '../../components/Admin/MobileBottomNav';
@@ -36,7 +36,7 @@ import {
 function Admin() {
   const location = useLocation();
   const { user } = useSelector((state) => state.auth);
-  const { permissions = [] } = useGetPermissionsQuery();
+  const hasAccess = useHasAccess();
 
   const [isCompanyOpen, setIsCompanyOpen] = useState(false);
   const [isDocumentsOpen, setIsDocumentsOpen] = useState(false);
@@ -60,17 +60,12 @@ function Admin() {
   const toggleDocuments = () => setIsDocumentsOpen(!isDocumentsOpen);
   const toggleStorage = () => setIsStorageOpen(!isStorageOpen);
 
-  const hasAccess = (path) => {
-    if (!user || !permissions.length) return true;
-    const perm = permissions.find(p =>
-      path === p.path || path.startsWith(p.path + '/')
-    );
-    if (!perm) return true;
-    return perm.allowed_roles.includes(user.role_id);
-  };
+  const canViewDocuments = hasAccess('documents:view');
+  const canViewStorage = hasAccess('storage:view');
+  const canViewBookings = hasAccess('bookings:view');
 
   const unreadBookingsCount = useUnreadBookingsCount({
-    skip: !hasAccess('/admin/bookings'),
+    skip: !canViewBookings,
   });
   useBookingNotifyAlerts();
 
@@ -102,7 +97,7 @@ function Admin() {
           </NavLink>
         )}
 
-        {hasAccess('/admin/reservations') && (
+        {hasAccess('reservations:view') && (
           <NavLink
             to="/admin/reservations"
             className={({ isActive }) =>
@@ -138,7 +133,7 @@ function Admin() {
 
               {isCompanyOpen && (
                 <div className="ml-4 mt-1 space-y-1">
-                  {hasAccess('/admin/company/user') && (
+                  {hasAccess('staff:view') && (
                     <NavLink
                       to="/admin/company/user"
                       className={({ isActive }) =>
@@ -152,7 +147,7 @@ function Admin() {
                       Сотрудники
                     </NavLink>
                   )}
-                  {hasAccess('/admin/company/partner') && (
+                  {hasAccess('partners:view') && (
                     <NavLink
                       to="/admin/company/partner"
                       className={({ isActive }) =>
@@ -167,7 +162,7 @@ function Admin() {
                     </NavLink>
                   )}
 
-                  {hasAccess('/admin/company/organization') && (
+                  {user?.is_admin && (
                     <NavLink
                       to="/admin/company/organization"
                       className={({ isActive }) =>
@@ -187,9 +182,7 @@ function Admin() {
           )}
 
         {/* Документы */}
-        {(hasAccess('/admin/documents/entrance') ||
-          hasAccess('/admin/documents/realization') ||
-          hasAccess('/admin/documents/product-requests')) && (
+        {canViewDocuments && (
             <div>
               <button
                 onClick={toggleDocuments}
@@ -209,55 +202,49 @@ function Admin() {
 
               {isDocumentsOpen && (
                 <div className="ml-4 mt-1 space-y-1">
-                  {hasAccess('/admin/documents/entrance') && (
-                    <NavLink
-                      to="/admin/documents/entrance"
-                      className={({ isActive }) =>
-                        `flex items-center px-4 py-2 rounded-lg text-sm transition ${isActive
-                          ? 'bg-green-100 text-green-800 font-medium'
-                          : 'text-gray-600 hover:bg-green-50 hover:text-green-700'
-                        }`
-                      }
-                    >
-                      <FilePlus2 className="w-4 h-4 mr-2" />
-                      Поступление
-                    </NavLink>
-                  )}
-                  {hasAccess('/admin/documents/product-requests') && (
-                    <NavLink
-                      to="/admin/documents/product-requests"
-                      className={({ isActive }) =>
-                        `flex items-center px-4 py-2 rounded-lg text-sm transition ${isActive
-                          ? 'bg-green-100 text-green-800 font-medium'
-                          : 'text-gray-600 hover:bg-green-50 hover:text-green-700'
-                        }`
-                      }
-                    >
-                      <ClipboardList className="w-4 h-4 mr-2" />
-                      Заявки на товар
-                    </NavLink>
-                  )}
-                  {hasAccess('/admin/documents/realization') && (
-                    <NavLink
-                      to="/admin/documents/realization"
-                      className={({ isActive }) =>
-                        `flex items-center px-4 py-2 rounded-lg text-sm transition ${isActive
-                          ? 'bg-green-100 text-green-800 font-medium'
-                          : 'text-gray-600 hover:bg-green-50 hover:text-green-700'
-                        }`
-                      }
-                    >
-                      <FileMinus2 className="w-4 h-4 mr-2" />
-                      Реализация
-                    </NavLink>
-                  )}
+                  <NavLink
+                    to="/admin/documents/entrance"
+                    className={({ isActive }) =>
+                      `flex items-center px-4 py-2 rounded-lg text-sm transition ${isActive
+                        ? 'bg-green-100 text-green-800 font-medium'
+                        : 'text-gray-600 hover:bg-green-50 hover:text-green-700'
+                      }`
+                    }
+                  >
+                    <FilePlus2 className="w-4 h-4 mr-2" />
+                    Поступление
+                  </NavLink>
+                  <NavLink
+                    to="/admin/documents/product-requests"
+                    className={({ isActive }) =>
+                      `flex items-center px-4 py-2 rounded-lg text-sm transition ${isActive
+                        ? 'bg-green-100 text-green-800 font-medium'
+                        : 'text-gray-600 hover:bg-green-50 hover:text-green-700'
+                      }`
+                    }
+                  >
+                    <ClipboardList className="w-4 h-4 mr-2" />
+                    Заявки на товар
+                  </NavLink>
+                  <NavLink
+                    to="/admin/documents/realization"
+                    className={({ isActive }) =>
+                      `flex items-center px-4 py-2 rounded-lg text-sm transition ${isActive
+                        ? 'bg-green-100 text-green-800 font-medium'
+                        : 'text-gray-600 hover:bg-green-50 hover:text-green-700'
+                      }`
+                    }
+                  >
+                    <FileMinus2 className="w-4 h-4 mr-2" />
+                    Реализация
+                  </NavLink>
                 </div>
               )}
             </div>
           )}
 
         {/* Склад */}
-        {hasAccess('/admin/storage/nomenclature') && (
+        {canViewStorage && (
           <div>
             <button
               onClick={toggleStorage}
@@ -294,7 +281,7 @@ function Admin() {
           </div>
         )}
 
-        {hasAccess('/admin/deletion-requests') && (
+        {hasAccess('staff:manage') && (
           <NavLink
             to="/admin/deletion-requests"
             className={({ isActive }) =>
@@ -309,7 +296,7 @@ function Admin() {
           </NavLink>
         )}
 
-        {hasAccess('/admin/bookings') && (
+        {canViewBookings && (
           <NavLink
             to="/admin/bookings"
             className={({ isActive }) =>
@@ -329,7 +316,7 @@ function Admin() {
           </NavLink>
         )}
 
-        {hasAccess('/admin/site-content/baths') && (
+        {hasAccess('baths:view') && (
           <NavLink
             to="/admin/baths"
             className={({ isActive }) =>
@@ -344,7 +331,7 @@ function Admin() {
           </NavLink>
         )}
 
-        {hasAccess('/admin/promotions') && (
+        {hasAccess('promotions:view') && (
           <NavLink
             to="/admin/promotions"
             className={({ isActive }) =>
@@ -359,7 +346,7 @@ function Admin() {
           </NavLink>
         )}
 
-        {hasAccess('/admin/finance') && (
+        {hasAccess('finance:view') && (
           <NavLink
             to="/admin/finance"
             className={({ isActive }) =>

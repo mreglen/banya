@@ -107,7 +107,10 @@ export const productsApiSlice = createApi({
                 method: 'POST',
                 body: productData,
             }),
-            invalidatesTags: [{ type: 'Product', id: 'LIST' }],
+            invalidatesTags: [
+                { type: 'Product', id: 'LIST' },
+                { type: 'Product', id: 'STOCK_LIST' },
+            ],
         }),
 
         // --- СКЛАД ---

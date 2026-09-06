@@ -26,7 +26,7 @@ function DocumentEntrance() {
   const [expandedId, setExpandedId] = useState(null);
 
   const handleStorno = async (id) => {
-    if (!window.confirm('Сторнировать поступление? Остатки будут уменьшены.')) return;
+    if (!window.confirm('Удалить поступление? Остатки будут уменьшены.')) return;
     try {
       await stornoDocument(id).unwrap();
       toast.success('Поступление сторнировано');
@@ -69,7 +69,7 @@ function DocumentEntrance() {
 
   const statusBadge = (doc) => {
     if (doc.reverses_id) {
-      return <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-700">Сторно #{doc.reverses_id}</span>;
+      return <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-700">Удаление #{doc.reverses_id}</span>;
     }
     if (doc.reversed_by_id) {
       return <span className="text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">Отменён</span>;
@@ -146,7 +146,7 @@ function DocumentEntrance() {
                               <ActionDropdown
                                 actions={[
                                   {
-                                    label: isStorno ? 'Сторно...' : 'Сторно',
+                                    label: isStorno ? 'Удаление...' : 'Удалить',
                                     icon: '',
                                     color: 'red',
                                     onClick: () => handleStorno(doc.id),
@@ -226,7 +226,7 @@ function DocumentEntrance() {
                         disabled={isStorno}
                         className="mt-3 w-full text-sm bg-red-50 text-red-800 px-3 py-2 rounded-lg min-h-[44px] hover:bg-red-100 disabled:opacity-50"
                       >
-                        Сторно
+                        {isStorno ? 'Удаление...' : 'Удалить'}
                       </button>
                     )}
                   </div>

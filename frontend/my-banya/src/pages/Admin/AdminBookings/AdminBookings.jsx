@@ -60,50 +60,83 @@ function AdminBookings() {
     );
   }
 
-  const renderBookingCard = (booking, extraClassName = '') => (
+  const renderBookingCard = (booking, extraClassName = '') => {
+    const isUnread = !booking.is_read;
+
+    return (
     <div
       key={booking.booking_id}
-      className={`rounded-2xl p-4 transition-all ${extraClassName} ${
-        booking.isUnread
+      className={`rounded-2xl p-4 sm:p-5 transition-all ${extraClassName} ${
+        isUnread
           ? 'border-2 border-blue-200 bg-blue-50/50 shadow-sm'
           : 'border border-gray-200 bg-white shadow-sm'
       }`}
     >
-      <div className="flex items-start justify-between gap-2 mb-2">
-        <div className="min-w-0 flex-1">
-          <p className="font-semibold text-gray-900 truncate">{booking.name}</p>
-          <div className="mt-1 space-y-0.5 text-xs text-gray-500">
-            <p>
-              <span className="text-gray-400">Отправлена:</span>{' '}
-              {formatSubmittedAt(booking.created_at)}
-            </p>
-            <p>
-              <span className="text-gray-400">Дата записи:</span>{' '}
-              {formatVisitDate(booking)}
-            </p>
+      <div className="flex flex-col sm:flex-row sm:items-start gap-3 sm:gap-5">
+        <div className="min-w-0 flex-1 space-y-3">
+          <div className="flex items-start justify-between gap-3 sm:block">
+            <h3 className="text-lg sm:text-xl font-bold text-gray-900 leading-snug break-words">
+              {booking.name}
+            </h3>
+            {isUnread && (
+              <span className="sm:hidden flex-shrink-0 mt-0.5 px-2.5 py-1 rounded-full bg-blue-600 text-white text-xs font-bold tracking-wide">
+                NEW
+              </span>
+            )}
           </div>
+
+          <a
+            href={`tel:${booking.phone}`}
+            className="inline-flex items-center text-base sm:text-[17px] font-semibold text-gray-900 hover:text-blue-700"
+          >
+            {booking.phone}
+          </a>
+
+          <div className="flex flex-wrap gap-2">
+            <span className="inline-flex items-center px-2.5 py-1 rounded-lg bg-white/80 border border-gray-200 text-sm font-semibold text-gray-800">
+              {booking.bath?.name || 'Баня не указана'}
+            </span>
+            <span className="inline-flex items-center px-2.5 py-1 rounded-lg bg-white/80 border border-gray-200 text-sm font-semibold text-gray-800">
+              {booking.duration_hours} ч
+            </span>
+            <span className="inline-flex items-center px-2.5 py-1 rounded-lg bg-white/80 border border-gray-200 text-sm font-semibold text-gray-800">
+              {booking.guests} гост.
+            </span>
+          </div>
+
+          {booking.notes && (
+            <p className="text-sm text-gray-600 leading-relaxed line-clamp-3">
+              {booking.notes}
+            </p>
+          )}
         </div>
-        {booking.isUnread && (
-          <span className="flex-shrink-0 px-2 py-0.5 rounded-full bg-blue-500 text-white text-[10px] font-bold">
-            NEW
-          </span>
-        )}
+
+        <div className="sm:w-52 shrink-0 sm:text-right space-y-1.5 sm:pt-1">
+          {isUnread && (
+            <div className="hidden sm:flex justify-end mb-2">
+              <span className="px-2.5 py-1 rounded-full bg-blue-600 text-white text-xs font-bold tracking-wide">
+                NEW
+              </span>
+            </div>
+          )}
+          <p className="text-sm text-gray-700">
+            <span className="text-gray-500">дата заезда:</span>{' '}
+            <span className="font-semibold text-gray-900">{formatVisitDate(booking)}</span>
+          </p>
+          <p className="text-sm text-gray-500">
+            отправлена: {formatSubmittedAt(booking.created_at)}
+          </p>
+        </div>
       </div>
-      <div className="text-xs text-gray-600 space-y-1 mb-3">
-        <p>{booking.phone}</p>
-        <p>{booking.bath?.name || '—'} · {booking.duration_hours} ч · {booking.guests} гост.</p>
-      </div>
-      {booking.notes && (
-        <p className="text-xs text-gray-500 mb-3 line-clamp-2">{booking.notes}</p>
-      )}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+
+      <div className="grid grid-cols-2 gap-2 mt-3 pt-3 border-t border-gray-200/80">
         <button
           type="button"
           onClick={() => {
             setBookingToConfirm(booking);
             setIsConfirmModalOpen(true);
           }}
-          className="min-h-[44px] rounded-xl bg-blue-600 text-white text-sm font-medium"
+          className="min-h-[36px] px-3 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700"
         >
           Подтвердить
         </button>
@@ -111,17 +144,18 @@ function AdminBookings() {
           type="button"
           onClick={() => handleMarkAsRead(booking.booking_id)}
           disabled={booking.is_read}
-          className={`min-h-[44px] rounded-xl text-sm font-medium ${
+          className={`min-h-[36px] px-3 py-2 rounded-lg text-sm font-medium ${
             booking.is_read
               ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-              : 'bg-green-50 text-green-700'
+              : 'bg-green-50 text-green-700 hover:bg-green-100'
           }`}
         >
           {booking.is_read ? 'Прочитано' : 'Прочитать'}
         </button>
       </div>
     </div>
-  );
+    );
+  };
 
   return (
     <div className="md:p-8">
