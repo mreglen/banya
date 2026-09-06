@@ -539,6 +539,18 @@ function Product() {
                 }}
                 className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
+            </div>
+
+            <div className="flex space-x-4 pt-4">
+              <button
+                type="submit"
+                disabled={isUpdating || isUploadingPhotos}
+                className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-medium shadow transition disabled:opacity-50"
+              >
+                {isUpdating || isUploadingPhotos ? 'Сохранение...' : 'Сохранить'}
+              </button>
+              <button
+                type="button"
                 onClick={() => navigate(fromPath)}
                 className="bg-gray-300 hover:bg-gray-400 text-gray-800 px-6 py-3 rounded-xl font-medium shadow transition"
               >
